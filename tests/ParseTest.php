@@ -114,6 +114,20 @@ class ParseTest extends AbstractSchemaTest {
     }
 
     /**
+     * Test single root schemas.
+     *
+     * @param string $short The short type to test.
+     * @param string $type The type to test.
+     * @dataProvider provideTypes
+     */
+    public function testRootSchemas($short, $type) {
+        $schema = new Schema([":$short" => 'desc']);
+
+        $expected = ['type' => $type, 'description' => 'desc'];
+        $this->assertEquals($expected, $schema->jsonSerialize());
+    }
+
+    /**
      * Test defining the root with a schema array.
      */
     public function testDefineRoot() {
