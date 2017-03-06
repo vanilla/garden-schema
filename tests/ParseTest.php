@@ -28,7 +28,6 @@ class ParseTest extends AbstractSchemaTest {
                 'timestamp' => ['type' => 'timestamp'],
                 'date' => ['type' => 'datetime'],
                 'amount' => ['type' => 'float'],
-                '64ish' => ['type' => 'base64'],
                 'enabled' => ['type' => 'boolean'],
             ]
         ];

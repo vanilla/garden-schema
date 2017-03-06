@@ -22,7 +22,6 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
         $result = [
             'array' => ['a', 'array'],
             'object' => ['o', 'object'],
-            'base64' => ['=', 'base64'],
             'integer' => ['i', 'integer'],
             'string' => ['s', 'string'],
             'float' => ['f', 'float'],
@@ -48,10 +47,6 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
             ['o', 123],
             ['o', 'foo'],
             ['o', [1, 2, 3]],
-            ['=', false],
-            ['=', 123],
-            ['=', [1, 2, 3]],
-            ['=', 'Iñtërnâtiônàlizætiøn'],
             ['i', false],
             ['i', 'foo'],
             ['i', [1, 2, 3]],
@@ -87,7 +82,6 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
                 'timestamp:ts?',
                 'date:dt?',
                 'amount:f?',
-                '64ish:=?',
                 'enabled:b?',
             ]
         );
