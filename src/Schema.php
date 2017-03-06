@@ -75,17 +75,6 @@ class Schema implements \JsonSerializable {
     }
 
     /**
-     * Create a new schema and return it.
-     *
-     * @param array $schema The schema array.
-     * @return Schema Returns the newly created and parsed schema.
-     */
-    public static function create($schema = []) {
-        $new = new Schema($schema);
-        return $new;
-    }
-
-    /**
      * Build an OpenAPI-compatible specification of the current schema.
      *
      * @see https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameter-object

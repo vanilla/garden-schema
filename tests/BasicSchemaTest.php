@@ -72,7 +72,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideBooleanData
      */
     public function testBooleanSchema($input, $expected) {
-        $schema = Schema::create(['bool:b']);
+        $schema = new Schema(['bool:b']);
         $expected = ['bool' => $expected];
 
         // Test some false data.
@@ -86,7 +86,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test an array type.
      */
     public function testArrayType() {
-        $schema = Schema::create([':a']);
+        $schema = new Schema([':a']);
 
         $expectedSchema = [
             'type' => 'array',
@@ -103,7 +103,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         // Array with a description and not a type.
         $expectedSchema['arr']['description'] = 'Hello world!';
-        $schema = Schema::create(['arr:a' => 'Hello world!']);
+        $schema = new Schema(['arr:a' => 'Hello world!']);
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
 
         // Array with an items type.
@@ -111,12 +111,12 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $expectedSchema['arr']['items']['type'] = 'integer';
         $expectedSchema['arr']['items']['required'] = true;
 
-        $schema = Schema::create(['arr:a' => 'i']);
+        $schema = new Schema(['arr:a' => 'i']);
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
 
         // Test the longer syntax.
         $expectedSchema['arr']['description'] = 'Hello world!';
-        $schema = Schema::create(['arr:a' => [
+        $schema = new Schema(['arr:a' => [
             'description' => 'Hello world!',
             'items' => ['type' => 'integer', 'required' => true]
         ]]);
@@ -128,7 +128,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testLongCreate() {
         $schema = $this->getAtomicSchema();
-        $schema2 = Schema::create($schema->jsonSerialize());
+        $schema2 = new Schema($schema->jsonSerialize());
 
         $this->assertEquals($schema->jsonSerialize(), $schema2->jsonSerialize());
     }

@@ -74,17 +74,15 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
      * @return Schema Returns the schema of atomic types.
      */
     public function getAtomicSchema() {
-        $schema = Schema::create(
-            [
-                'id:i',
-                'name:s' => 'The name of the object.',
-                'description:s?',
-                'timestamp:ts?',
-                'date:dt?',
-                'amount:f?',
-                'enabled:b?',
-            ]
-        );
+        $schema = new Schema([
+            'id:i',
+            'name:s' => 'The name of the object.',
+            'description:s?',
+            'timestamp:ts?',
+            'date:dt?',
+            'amount:f?',
+            'enabled:b?',
+        ]);
 
         return $schema;
     }

@@ -39,7 +39,7 @@ class ParseTest extends AbstractSchemaTest {
      * Test a basic nested object.
      */
     public function testBasicNested() {
-        $schema = Schema::create([
+        $schema = new Schema([
             'obj:o' => [
                 'id:i',
                 'name:s?'
@@ -76,7 +76,7 @@ class ParseTest extends AbstractSchemaTest {
      * Test a double nested schema.
      */
     public function testDoubleNested() {
-        $schema = Schema::create([
+        $schema = new Schema([
             'obj:o' => [
                 'obj:o?' => [
                     'id:i'

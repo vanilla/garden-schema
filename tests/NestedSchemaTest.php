@@ -59,7 +59,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * Test a variety of array item validation scenarios.
      */
     public function testArrayItemsType() {
-        $schema = Schema::create(['arr:a' => 'i']);
+        $schema = new Schema(['arr:a' => 'i']);
 
         $validData = ['arr' => [1, '2', 3]];
         $this->assertTrue($schema->isValid($validData));
@@ -227,7 +227,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * The schema fields should be case-insensitive and fix the case of incorrect keys.
      */
     public function testCaseInsensitivity() {
-        $schema = Schema::create([
+        $schema = new Schema([
             'obj:o' => [
                 'id:i',
                 'name:s?'
