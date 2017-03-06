@@ -112,4 +112,32 @@ class ParseTest extends AbstractSchemaTest {
 
         $this->assertEquals($expected, $schema->jsonSerialize());
     }
+
+    /**
+     * Test defining the root with a schema array.
+     */
+    public function testDefineRoot() {
+        $schema = new Schema([
+            ':a' => [
+                'userID:i',
+                'name:s',
+                'email:s'
+            ]
+        ]);
+
+        $expected = [
+            'type' => 'array',
+            'items' => [
+                'type' => 'object',
+                'properties' => [
+                    'userID' => ['type' => 'integer'],
+                    'name' => ['type' => 'string'],
+                    'email' => ['type' => 'string']
+                ],
+                'required' => ['userID', 'name', 'email']
+            ]
+        ];
+
+        $this->assertEquals($expected, $schema->jsonSerialize());
+    }
 }

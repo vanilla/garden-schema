@@ -320,16 +320,8 @@ class Schema implements \JsonSerializable {
                     if (isset($value['items'])) {
                         // The value includes array schema information.
                         $node = array_replace($node, $value);
-                    } elseif (isset($value['type'])) {
-                        // The value is a long-form schema.
-                        $node['items'] = $value;
                     } else {
-                        // The value is another shorthand schema.
-                        $node['items'] = [
-                            'type' => 'object',
-                            'required' => true,
-                            'properties' => $this->parse($value)
-                        ];
+                        $node['items'] = $this->parse($value);
                     }
                     break;
                 case 'object':
