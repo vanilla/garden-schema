@@ -22,14 +22,15 @@ class ParseTest extends AbstractSchemaTest {
         $expected = [
             'type' => 'object',
             'properties' => [
-                'id' => ['type' => 'integer', 'required' => true],
-                'name' => ['type' => 'string', 'required' => true, 'description' => 'The name of the object.'],
+                'id' => ['type' => 'integer'],
+                'name' => ['type' => 'string', 'description' => 'The name of the object.'],
                 'description' => ['type' => 'string'],
                 'timestamp' => ['type' => 'timestamp'],
                 'date' => ['type' => 'datetime'],
                 'amount' => ['type' => 'float'],
                 'enabled' => ['type' => 'boolean'],
-            ]
+            ],
+            'required' => ['id', 'name']
         ];
 
         $this->assertEquals($expected, $schema->jsonSerialize());
@@ -47,18 +48,22 @@ class ParseTest extends AbstractSchemaTest {
         ]);
 
         $expected = [
-            'obj' => [
-                'type' => 'object',
-                'required' => true,
-                'properties' => [
-                    'id' => ['type' => 'integer', 'required' => true],
-                    'name' => ['type' => 'string']
+            'type' => 'object',
+            'properties' => [
+                'obj' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer'],
+                        'name' => ['type' => 'string']
+                    ],
+                    'required' => ['id']
                 ]
-            ]
+            ],
+            'required' => ['obj']
         ];
 
         $actual = $schema->jsonSerialize();
-        $this->assertEquals($expected, $actual['properties']);
+        $this->assertEquals($expected, $actual);
     }
 
     /**
@@ -85,23 +90,26 @@ class ParseTest extends AbstractSchemaTest {
         ]);
 
         $expected = [
-            'obj' => [
-                'type' => 'object',
-                'required' => true,
-                'properties' => [
-                    'obj' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'id' => [
-                                'type' => 'integer',
-                                'required' => true
-                            ]
+            'type' => 'object',
+            'properties' => [
+                'obj' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'obj' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'id' => [
+                                    'type' => 'integer'
+                                ]
+                            ],
+                            'required' => ['id']
                         ]
                     ]
                 ]
-            ]
+            ],
+            'required' => ['obj']
         ];
 
-        $this->assertEquals($expected, $schema->jsonSerialize()['properties']);
+        $this->assertEquals($expected, $schema->jsonSerialize());
     }
 }

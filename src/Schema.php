@@ -28,15 +28,21 @@ class Schema implements \JsonSerializable {
         'a' => 'array',
         'o' => 'object',
         'i' => 'integer',
+        'int' => 'integer',
         's' => 'string',
+        'str' => 'string',
         'f' => 'float',
         'b' => 'boolean',
+        'bool' => 'boolean',
         'ts' => 'timestamp',
         'dt' => 'datetime'
     ];
+
     /** @var string */
     protected $description = '';
+
     protected $schema = [];
+
     /** @var int */
     protected $validationBehavior = self::VALIDATE_NOTICE;
 
@@ -271,12 +277,94 @@ class Schema implements \JsonSerializable {
      * @throws \InvalidArgumentException Throws an exception when an item in the schema is invalid.
      */
     public function parse(array $arr) {
-        // Check for a long form schema.
-        if (isset($arr['type'])) {
-            $arr = [':?' => $arr];
+        if (empty($arr)) {
+            // An empty schema validates to anything.
+            return [];
+        } elseif (isset($arr['type'])) {
+            // This is a long form schema and can be parsed as the root.
+            return $this->parseNode($arr);
+        } else {
+            // Check for a root schema.
+            $value = reset($arr);
+            $key = key($arr);
+            if (!is_int($key)) {
+                list ($name, $param) = $this->parseShortParam($key, $value);
+                if (empty($name)) {
+                    return $this->parseNode($param, $value);
+                }
+            }
         }
 
+        // If we are here then this is n object schema.
+        list($properties, $required) = $this->parseProperties($arr);
+
+        $result = [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => $required
+        ];
+
+        return array_filter($result);
+    }
+
+    /**
+     * @param array $node
+     * @param mixed $value
+     * @return array
+     */
+    private function parseNode($node, $value = null) {
+        if (is_array($value)) {
+            // The value describes a bit more about the schema.
+            switch ($node['type']) {
+                case 'array':
+                    if (isset($value['items'])) {
+                        // The value includes array schema information.
+                        $node = array_replace($node, $value);
+                    } elseif (isset($value['type'])) {
+                        // The value is a long-form schema.
+                        $node['items'] = $value;
+                    } else {
+                        // The value is another shorthand schema.
+                        $node['items'] = [
+                            'type' => 'object',
+                            'required' => true,
+                            'properties' => $this->parse($value)
+                        ];
+                    }
+                    break;
+                case 'object':
+                    // The value is a schema of the object.
+                    if (isset($value['properties'])) {
+                        list($node['properties']) = $this->parseProperties($value['properties']);
+                    } else {
+                        list($node['properties'], $required) = $this->parseProperties($value);
+                        if (!empty($required)) {
+                            $node['required'] = $required;
+                        }
+                    }
+                    break;
+                default:
+                    $node = array_replace($node, $value);
+                    break;
+            }
+        } elseif (is_string($value)) {
+            if ($node['type'] === 'array' && $arrType = $this->getType($value)) {
+                    $node['items'] = ['type' => $arrType, 'required' => true];
+            } elseif (!empty($value)) {
+                $node['description'] = $value;
+            }
+        }
+
+        return $node;
+    }
+
+    /**
+     * @param array $arr
+     * @return array
+     */
+    private function parseProperties(array $arr) {
         $properties = [];
+        $requiredProperties = [];
         foreach ($arr as $key => $value) {
             // Fix a schema specified as just a value.
             if (is_int($key)) {
@@ -289,102 +377,44 @@ class Schema implements \JsonSerializable {
             }
 
             // The parameter is defined in the key.
-            list($name, $param) = static::parseShortParam($key, $value);
+            list($name, $param, $required) = $this->parseShortParam($key, $value);
 
-            if (is_array($value)) {
-                // The value describes a bit more about the schema.
-                switch ($param['type']) {
-                    case 'array':
-                        if (isset($value['items'])) {
-                            // The value includes array schema information.
-                            $param = array_replace($param, $value);
-                        } elseif (isset($value['type'])) {
-                            // The value is a long-form schema.
-                            $param['items'] = $value;
-                        } else {
-                            // The value is another shorthand schema.
-                            $param['items'] = [
-                                'type' => 'object',
-                                'required' => true,
-                                'properties' => $this->parse($value)
-                            ];
-                        }
-                        break;
-                    case 'object':
-                        // The value is a schema of the object.
-                        if (isset($value['properties'])) {
-                            $param['properties'] = $this->parse($value['properties'])['properties'];
-                        } else {
-                            $param['properties'] = $this->parse($value)['properties'];
-                        }
-                        break;
-                    default:
-                        $param = array_replace($param, $value);
-                        break;
-                }
-            } elseif (is_string($value)) {
-                if ($param['type'] === 'array') {
-                    // Check to see if the value is the item type in the array.
-                    if (isset(self::$types[$value])) {
-                        $arrType = self::$types[$value];
-                    } elseif (($index = array_search($value, self::$types)) !== false) {
-                        $arrType = self::$types[$index];
-                    }
+            $node = $this->parseNode($param, $value);
 
-                    if (isset($arrType)) {
-                        $param['items'] = ['type' => $arrType, 'required' => true];
-                        $value = '';
-                    }
-                }
-
-                if (!empty($value)) {
-                    // The value is the schema description.
-                    $param['description'] = $value;
-                }
+            $properties[$name] = $node;
+            if ($required) {
+                $requiredProperties[] = $name;
             }
-
-            $properties[$name] = $param;
         }
-
-        if (array_key_exists('', $properties)) {
-            $result = $properties[''];
-        } else {
-            $result = [
-                'type' => 'object',
-                'properties' => $properties
-            ];
-        }
-
-        return $result;
+        return array($properties, $requiredProperties);
     }
 
     /**
      * Parse a short parameter string into a full array parameter.
      *
-     * @param string $str The short parameter string to parse.
-     * @param array $other An array of other information that might help resolve ambiguity.
-     * @return array Returns an array in the form [name, [param]].
+     * @param string $key The short parameter string to parse.
+     * @param array $value An array of other information that might help resolve ambiguity.
+     * @return array Returns an array in the form `[string name, array param, bool required]`.
      * @throws \InvalidArgumentException Throws an exception if the short param is not in the correct format.
      */
-    public static function parseShortParam($str, $other = []) {
+    public function parseShortParam($key, $value = []) {
         // Is the parameter optional?
-        if (self::strEnds($str, '?')) {
+        if (substr($key, -1) === '?') {
             $required = false;
-            $str = substr($str, 0, -1);
+            $key = substr($key, 0, -1);
         } else {
             $required = true;
         }
 
         // Check for a type.
-        $parts = explode(':', $str);
+        $parts = explode(':', $key);
         $name = $parts[0];
         $type = !empty($parts[1]) && isset(self::$types[$parts[1]]) ? self::$types[$parts[1]] : null;
 
-
-        if ($other instanceof Schema) {
-            $param = $other;
-        } elseif (isset($other['type'])) {
-            $param = $other;
+        if ($value instanceof Schema) {
+            $param = $value;
+        } elseif (isset($value['type'])) {
+            $param = $value;
 
             if (!empty($type) && $type !== $param['type']) {
                 throw new \InvalidArgumentException("Type mismatch between $type and {$param['type']} for field $name.", 500);
@@ -394,12 +424,9 @@ class Schema implements \JsonSerializable {
                 throw new \InvalidArgumentException("Invalid type {$parts[1]} for field $name.", 500);
             }
             $param = ['type' => $type];
-            if ($required) {
-                $param['required'] = $required;
-            }
         }
 
-        return [$name, $param];
+        return [$name, $param, $required];
     }
 
     /**
@@ -882,6 +909,23 @@ class Schema implements \JsonSerializable {
      */
     public function jsonSerialize() {
         return $this->schema;
+    }
+
+    /**
+     * Look up a type based on its alias.
+     *
+     * @param string $alias The type alias or type name to lookup.
+     * @return mixed
+     */
+    private function getType($alias) {
+        if (isset(self::$types[$alias])) {
+            $type = self::$types[$alias];
+        } elseif (array_search($alias, self::$types) !== false) {
+            $type = $alias;
+        } else {
+            $type = null;
+        }
+        return $type;
     }
 }
 
