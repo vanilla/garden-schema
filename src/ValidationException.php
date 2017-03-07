@@ -17,7 +17,7 @@ class ValidationException extends \Exception implements \JsonSerializable {
     /**
      * @var Validation
      */
-    protected $validation;
+    private $validation;
 
     /**
      * Initialize an instance of the {@link ValidationException} class.
@@ -41,7 +41,7 @@ class ValidationException extends \Exception implements \JsonSerializable {
         if (count($errors) === 1) {
             $message = Validation::errorMessage($errors[0]);
         } else {
-            $message = t('Validation failed.');
+            $message = 'Validation failed.';
         }
 
         $result = [
@@ -50,5 +50,14 @@ class ValidationException extends \Exception implements \JsonSerializable {
             'errors' => $errors
         ];
         return $result;
+    }
+
+    /**
+     * Get the validation object that contain specific errors.
+     *
+     * @return Validation Returns a validation object.
+     */
+    public function getValidation() {
+        return $this->validation;
     }
 }

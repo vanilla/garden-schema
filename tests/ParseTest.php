@@ -23,7 +23,7 @@ class ParseTest extends AbstractSchemaTest {
             'type' => 'object',
             'properties' => [
                 'id' => ['type' => 'integer'],
-                'name' => ['type' => 'string', 'description' => 'The name of the object.'],
+                'name' => ['type' => 'string', 'minLength' => 1, 'description' => 'The name of the object.'],
                 'description' => ['type' => 'string'],
                 'timestamp' => ['type' => 'timestamp'],
                 'date' => ['type' => 'datetime'],
@@ -145,8 +145,8 @@ class ParseTest extends AbstractSchemaTest {
                 'type' => 'object',
                 'properties' => [
                     'userID' => ['type' => 'integer'],
-                    'name' => ['type' => 'string'],
-                    'email' => ['type' => 'string']
+                    'name' => ['type' => 'string', 'minLength' => 1],
+                    'email' => ['type' => 'string', 'minLength' => 1]
                 ],
                 'required' => ['userID', 'name', 'email']
             ]

@@ -9,6 +9,7 @@ namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
 use Garden\Schema\Validation;
+use Garden\Schema\ValidationException;
 
 /**
  * Tess for the {@link Schema} object.
@@ -24,22 +25,16 @@ class BasicSchemaTest extends AbstractSchemaTest {
             'name' => 'foo',
             'timestamp' => '13 oct 1975',
             'amount' => '99.50',
-            '64ish' => base64_encode(openssl_random_pseudo_bytes(20)),
             'enabled' => 'yes'
         ];
-        $dataBefore = $data;
 
-        $isValid = $schema->isValid($data, $validation);
-        $this->assertTrue($isValid);
-        $data = $dataBefore;
+        $valid = $schema->validate($data);
 
         $expected = $data;
         $expected['timestamp'] = strtotime($data['timestamp']);
-        $expected['64ish'] = base64_decode($expected['64ish']);
         $expected['enabled'] = true;
 
-        $schema->validate($data);
-        $this->assertEquals($expected, $data);
+        $this->assertEquals($expected, $valid);
     }
 
     /**
@@ -54,13 +49,10 @@ class BasicSchemaTest extends AbstractSchemaTest {
             'timestamp' => time(),
             'date' => new \DateTime(),
             'amount' => 5.99,
-            '64ish' => base64_encode(123),
             'enabled' => true
         ];
 
-        $validated = $data;
-        $data['64ish'] = base64_decode($data['64ish']);
-        $schema->validate($validated);
+        $validated = $schema->validate($data);
         $this->assertEquals($data, $validated);
     }
 
@@ -72,14 +64,9 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideBooleanData
      */
     public function testBooleanSchema($input, $expected) {
-        $schema = new Schema(['bool:b']);
-        $expected = ['bool' => $expected];
-
-        // Test some false data.
-        $data = ['bool' => $input];
-
-        $schema->validate($data);
-        $this->assertEquals($expected, $data);
+        $schema = new Schema([':b']);
+        $valid = $schema->validate($input);
+        $this->assertSame($expected, $valid);
     }
 
     /**
@@ -89,36 +76,34 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $schema = new Schema([':a']);
 
         $expectedSchema = [
-            'type' => 'array',
-            'required' => true
+            'type' => 'array'
         ];
 
         // Basic array without a type.
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
 
-        $data = ['arr' => [1, 2, 3]];
+        $data = [1, 2, 3];
         $this->assertTrue($schema->isValid($data));
-        $data = ['arr' => []];
+        $data = [];
         $this->assertTrue($schema->isValid($data));
 
         // Array with a description and not a type.
-        $expectedSchema['arr']['description'] = 'Hello world!';
-        $schema = new Schema(['arr:a' => 'Hello world!']);
+        $expectedSchema['description'] = 'Hello world!';
+        $schema = new Schema([':a' => 'Hello world!']);
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
 
         // Array with an items type.
-        unset($expectedSchema['arr']['description']);
-        $expectedSchema['arr']['items']['type'] = 'integer';
-        $expectedSchema['arr']['items']['required'] = true;
+        unset($expectedSchema['description']);
+        $expectedSchema['items']['type'] = 'integer';
 
-        $schema = new Schema(['arr:a' => 'i']);
+        $schema = new Schema([':a' => 'i']);
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
 
         // Test the longer syntax.
-        $expectedSchema['arr']['description'] = 'Hello world!';
-        $schema = new Schema(['arr:a' => [
+        $expectedSchema['description'] = 'Hello world!';
+        $schema = new Schema([':a' => [
             'description' => 'Hello world!',
-            'items' => ['type' => 'integer', 'required' => true]
+            'items' => ['type' => 'integer']
         ]]);
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
     }
@@ -145,18 +130,13 @@ class BasicSchemaTest extends AbstractSchemaTest {
             "col:$shortType?"
         ]);
 
-        $emptyData = ['col' => ''];
-        $isValid = $schema->isValid($emptyData, $validation);
-        $this->assertTrue($isValid);
-        $this->assertNull($emptyData['col']);
-
         $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData, $validation);
+        $isValid = $schema->isValid($nullData);
         $this->assertTrue($isValid);
         $this->assertNull($nullData['col']);
 
         $missingData = [];
-        $isValid = $schema->isValid($missingData, $validation);
+        $isValid = $schema->isValid($missingData);
         $this->assertTrue($isValid);
         $this->assertArrayNotHasKey('col', $missingData);
     }
@@ -179,17 +159,17 @@ class BasicSchemaTest extends AbstractSchemaTest {
         ]);
 
         $emptyData = ['col' => ''];
-        $isValid = $schema->isValid($emptyData, $validation);
+        $isValid = $schema->isValid($emptyData);
         $this->assertFalse($isValid);
 
         $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData, $validation);
+        $isValid = $schema->isValid($nullData);
         $this->assertFalse($isValid);
     }
 
     /**
      * Test empty boolean values.
-     * In genreal, bools should be cast to false if they are passed, but falsey.
+     * In general, bools should be cast to false if they are passed, but falsey.
      */
     public function testRequiredEmptyBool() {
         $schema = new Schema([
@@ -197,19 +177,19 @@ class BasicSchemaTest extends AbstractSchemaTest {
         ]);
         /* @var Validation $validation */
         $emptyData = ['col' => ''];
-        $isValid = $schema->isValid($emptyData, $validation);
-        $this->assertTrue($isValid);
-        $this->assertFalse($emptyData['col']);
+        $valid = $schema->validate($emptyData);
+        $this->assertFalse($valid['col']);
 
         $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData, $validation);
-        $this->assertTrue($isValid);
-        $this->assertFalse($nullData['col']);
+        $isValid = $schema->isValid($nullData);
+        $this->assertFalse($isValid);
 
         $missingData = [];
-        $isValid = $schema->isValid($missingData, $validation);
-        $this->assertFalse($isValid);
-        $this->assertFalse($validation->fieldValid('col'));
+        try {
+            $schema->validate($missingData);
+        } catch (ValidationException $ex) {
+            $this->assertFalse($ex->getValidation()->fieldValid('col'));
+        }
     }
 
     /**
@@ -220,23 +200,18 @@ class BasicSchemaTest extends AbstractSchemaTest {
             'col:s' => ['minLength' => 0]
         ]);
 
-        /* @var Validation $validation */
         $emptyData = ['col' => ''];
-        $isValid = $schema->isValid($emptyData, $validation);
-        $this->assertTrue($isValid);
-        $this->assertEmpty($emptyData['col']);
-        $this->assertInternalType('string', $emptyData['col']);
+        $valid = $schema->validate($emptyData);
+        $this->assertEmpty($valid['col']);
+        $this->assertInternalType('string', $valid['col']);
 
         $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData, $validation);
-        $this->assertTrue($isValid);
-        $this->assertEmpty($nullData['col']);
-        $this->assertInternalType('string', $nullData['col']);
+        $isValid = $schema->isValid($nullData);
+        $this->assertFalse($isValid);
 
         $missingData = [];
-        $isValid = $schema->isValid($missingData, $validation);
+        $isValid = $schema->isValid($missingData);
         $this->assertFalse($isValid);
-        $this->assertFalse($validation->fieldValid('col'));
     }
 
     /**
