@@ -717,11 +717,11 @@ class Schema implements \JsonSerializable {
      */
     private function validateDatetime(&$value, array $field) {
         $validType = true;
-        if ($value instanceof \DateTime) {
+        if ($value instanceof \DateTimeInterface) {
             $validType = true;
         } elseif (is_string($value) && $value !== '') {
             try {
-                $dt = new \DateTime($value);
+                $dt = new \DateTimeImmutable($value);
                 if ($dt) {
                     $value = $dt;
                 } else {
@@ -731,7 +731,7 @@ class Schema implements \JsonSerializable {
                 $validType = false;
             }
         } elseif (is_numeric($value) && $value > 0) {
-            $value = new \DateTime('@'.(string)round($value));
+            $value = new \DateTimeImmutable('@'.(string)round($value));
             $validType = true;
         } else {
             $validType = false;
