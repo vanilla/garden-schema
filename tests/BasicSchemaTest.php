@@ -282,14 +282,18 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test merging basic schemas.
      */
     public function testBasicMerge() {
-        $schemaOne = new Schema(['foo:s']);
+        $schemaOne = new Schema(['foo:s?']);
         $schemaTwo = new Schema(['bar:s']);
 
         $schemaOne->merge($schemaTwo);
 
         $expected = [
-            'foo' => ['name' => 'foo', 'type' => 'string', 'required' => true],
-            'bar' => ['name' => 'bar', 'type' => 'string', 'required' => true]
+            'type' => 'object',
+            'properties' => [
+                'foo' => ['type' => 'string'],
+                'bar' => ['type' => 'string', 'minLength' => 1]
+            ],
+            'required' => ['bar']
         ];
 
         $this->assertEquals($expected, $schemaOne->jsonSerialize());
