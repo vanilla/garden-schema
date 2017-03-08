@@ -16,6 +16,42 @@ use Garden\Schema\ValidationException;
  */
 class BasicSchemaTest extends AbstractSchemaTest {
     /**
+     * An empty schema should validate to anything.
+     */
+    public function testEmptySchema() {
+        $schema = new Schema([]);
+
+        $val = [123];
+        $r = $schema->validate($val);
+        $this->assertSame($val, $r);
+
+        $val = true;
+        $r = $schema->validate($val);
+        $this->assertSame($val, $r);
+    }
+
+    /**
+     * An object with no types should validate, but still require values.
+     */
+    public function testEmptyTypes() {
+        $schema = new Schema(['a', 'b' => 'Yup', 'c' => []]);
+
+        $data = ['a' => [], 'b' => 1111, 'c' => 'hey!!!'];
+        $valid = $schema->validate($data);
+        $this->assertSame($data, $valid);
+
+        try {
+            $schema->validate([]);
+            $this->fail('The data should not be valid.');
+        } catch (ValidationException $ex) {
+            $errors = $ex->getValidation()->getErrors();
+            foreach ($errors as $error) {
+                $this->assertSame('missingField', $error['code']);
+            }
+        }
+    }
+
+    /**
      * Test some basic validation.
      */
     public function testAtomicValidation() {
@@ -67,6 +103,37 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $schema = new Schema([':b']);
         $valid = $schema->validate($input);
         $this->assertSame($expected, $valid);
+    }
+
+    /**
+     * Test different date/time parsing.
+     *
+     * @param mixed $value The value to parse.
+     * @param \DateTimeInterface $expected The expected datetime.
+     * @dataProvider provideDateTimes
+     */
+    public function testDateTimeFormats($value, \DateTimeInterface $expected) {
+        $schema = new Schema([':dt']);
+
+        $valid = $schema->validate($value);
+        $this->assertInstanceOf(\DateTimeInterface::class, $valid);
+        $this->assertEquals($expected, $valid);
+    }
+
+    /**
+     * Provide date/time test data.
+     *
+     * @return Returns a data provider.
+     */
+    public function provideDateTimes() {
+        $dt = new \DateTimeImmutable('1975-11-11T12:31');
+
+        $r = [
+            'string' => [$dt->format('c'), $dt],
+            'timestamp' => [$dt->getTimestamp(), $dt]
+        ];
+
+        return $r;
     }
 
     /**
