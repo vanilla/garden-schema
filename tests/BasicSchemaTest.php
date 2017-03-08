@@ -348,9 +348,16 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test throwing an exception when removing unexpected parameters from validated data.
      *
      * @expectedException \Garden\Schema\ValidationException
+     * @expectedExceptionMessage The value has unexpected fields: admin, role.
+     * @expectedExceptionCode 422
      */
     public function testValidateException() {
-        $this->doValidationBehavior(Schema::VALIDATE_EXCEPTION);
+        try {
+            $this->doValidationBehavior(Schema::VALIDATE_EXCEPTION);
+        } catch (\Exception $ex) {
+            $msg = $ex->getMessage();
+            throw $ex;
+        }
     }
 
     /**
@@ -366,6 +373,6 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test silently removing unexpected parameters from validated data.
      */
     public function testValidateRemove() {
-        $this->doValidationBehavior(Schema::VALIDATE_REMOVE);
+        $this->doValidationBehavior(Schema::VALIDATE_CONTINUE);
     }
 }

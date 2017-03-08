@@ -205,6 +205,8 @@ class Validation {
     private function formatMessage($format, $context = []) {
         $format = $this->translate($format);
 
+        $context['field'] = $context['field'] ?: 'value';
+
         $msg = preg_replace_callback('`({[^{}]+})`', function ($m) use ($context) {
             $args = array_filter(array_map('trim', explode(',', trim($m[1], '{}'))));
             $field = array_shift($args);

@@ -14,7 +14,7 @@ class Schema implements \JsonSerializable {
     /// Constants ///
 
     /** Silently remove invalid parameters when validating input. */
-    const VALIDATE_REMOVE = 1;
+    const VALIDATE_CONTINUE = 1;
 
     /** Automatically remove invalid parameters from input and trigger an E_USER_NOTICE error during validation. */
     const VALIDATE_NOTICE = 2;
@@ -24,7 +24,6 @@ class Schema implements \JsonSerializable {
 
     /// Properties ///
     protected static $types = [
-//        '@' => 'file',
         'a' => 'array',
         'o' => 'object',
         'i' => 'integer',
@@ -173,7 +172,7 @@ class Schema implements \JsonSerializable {
                 case self::VALIDATE_NOTICE:
                     // Trigger a notice then fall to the next case.
                     trigger_error($errorMessage, E_USER_NOTICE);
-                case self::VALIDATE_REMOVE:
+                case self::VALIDATE_CONTINUE:
                 default:
                     unset($data[$key]);
             }
@@ -225,7 +224,7 @@ class Schema implements \JsonSerializable {
      */
     public function setValidationBehavior($validationBehavior) {
         switch ($validationBehavior) {
-            case self::VALIDATE_REMOVE:
+            case self::VALIDATE_CONTINUE:
             case self::VALIDATE_NOTICE:
             case self::VALIDATE_EXCEPTION:
                 $this->validationBehavior = $validationBehavior;
@@ -784,7 +783,7 @@ class Schema implements \JsonSerializable {
             return false;
         } elseif (isset($field['properties'])) {
             // Validate the data against the internal schema.
-            $value = $this->validateObjectProperties($value, $field, $validation, $name, $sparse);
+            $value = $this->validateProperties($value, $field, $validation, $name, $sparse);
         }
         return true;
     }
@@ -799,10 +798,11 @@ class Schema implements \JsonSerializable {
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return array Returns a clean array with only the appropriate properties and the data coerced to proper types.
      */
-    private function validateObjectProperties(array $data, array $field, Validation $validation, $name = '', $sparse = false) {
+    private function validateProperties(array $data, array $field, Validation $validation, $name = '', $sparse = false) {
         $properties = $field['properties'];
         $required = isset($field['required']) ? array_flip($field['required']) : [];
-        $lData = array_change_key_case($data);
+        $keys = array_keys($data);
+        $keys = array_combine(array_map('strtolower', $keys), $keys);
 
 
         // Loop through the schema fields and validate each one.
@@ -813,18 +813,37 @@ class Schema implements \JsonSerializable {
             $isRequired = isset($required[$propertyName]);
 
             // First check for required fields.
-            if (!array_key_exists($lName, $lData)) {
+            if (!array_key_exists($lName, $keys)) {
                 // A sparse validation can leave required fields out.
                 if ($isRequired && !$sparse) {
-                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} is required.', 'status' => 422]);
+                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} is required.']);
                 }
-            } elseif ($lData[$lName] === null) {
+            } elseif ($data[$keys[$lName]] === null) {
                 $clean[$propertyName] = null;
                 if ($isRequired) {
-                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} is cannot be null.', 'status' => 422]);
+                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} cannot be null.']);
                 }
             } else {
-                $clean[$propertyName] = $this->validateField($lData[$lName], $propertyField, $validation, $fullName, $sparse);
+                $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyField, $validation, $fullName, $sparse);
+            }
+
+            unset($keys[$lName]);
+        }
+
+        // Look for extraneous properties.
+        if (!empty($keys)) {
+            switch ($this->getValidationBehavior()) {
+                case Schema::VALIDATE_NOTICE:
+                    $msg = sprintf("The %s has unexpected field(s): %s.", $name ?: 'value', implode(', ', $keys));
+                    trigger_error($msg, E_USER_NOTICE);
+                    break;
+                case Schema::VALIDATE_EXCEPTION:
+                    $validation->addError($name, 'invalid', [
+                        'messageCode' => 'The {field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
+                        'extra' => array_values($keys),
+                        'status' => 422
+                    ]);
+                    break;
             }
         }
 

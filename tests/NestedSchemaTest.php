@@ -220,7 +220,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * Test silently removing unexpected parameters from validated data.
      */
     public function testValidateRemove() {
-        $this->doValidationBehavior(Schema::VALIDATE_REMOVE);
+        $this->doValidationBehavior(Schema::VALIDATE_CONTINUE);
     }
 
     /**
