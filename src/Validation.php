@@ -27,6 +27,11 @@ class Validation {
     private $mainStatus = 0;
 
     /**
+     * @var bool Whether or not fields should be translated.
+     */
+    private $translateFieldNames = false;
+
+    /**
      * Add an error.
      *
      * @param string $field The name and path of the field to add or an empty string if this is a global error.
@@ -193,11 +198,18 @@ class Validation {
         }
 
         // Massage the field name for better formatting.
-        if (isset($error['index'])) {
+        if (!$this->getTranslateFieldNames()) {
+            $field = (isset($error['path']) ? $error['path'].'.' : '').$error['field'];
+            $field = $field ?: (isset($error['index']) ? 'item' : 'value');
+            if (isset($error['index'])) {
+                $field .= '['.$error['index'].']';
+            }
+            $error['field'] = $field;
+        } elseif (isset($error['index'])) {
             if (empty($error['field'])) {
-                $error['field'] = '@'.sprintf($this->translate('item %s'), $error['index']);
+                $error['field'] = '@'.$this->formatMessage('item {index}', $error);
             } else {
-                $error['field'] = '@'.sprintf($this->translate('%s[%s]'), $this->translate($error['field']), $error['index']);
+                $error['field'] = '@'.$this->formatMessage('{field} at position {index}', $error);
             }
         } elseif (empty($error['field'])) {
             $error['field'] = 'value';
@@ -220,7 +232,7 @@ class Validation {
         $msg = preg_replace_callback('`({[^{}]+})`', function ($m) use ($context) {
             $args = array_filter(array_map('trim', explode(',', trim($m[1], '{}'))));
             $field = array_shift($args);
-            return $this->translateField(isset($context[$field]) ? $context[$field] : null, $args);
+            return $this->formatField(isset($context[$field]) ? $context[$field] : null, $args);
         }, $format);
         return $msg;
     }
@@ -232,13 +244,13 @@ class Validation {
      * @param array $args Formatting arguments.
      * @return string Returns the translated string.
      */
-    private function translateField($value, array $args = []) {
+    private function formatField($value, array $args = []) {
         if (is_string($value)) {
             $r = $this->translate($value);
         } elseif (is_numeric($value)) {
             $r = $value;
         } elseif (is_array($value)) {
-            $argArray = array_map([$this, 'translateField'], $value);
+            $argArray = array_map([$this, 'formatField'], $value);
             $r = implode(', ', $argArray);
         } elseif ($value instanceof \DateTimeInterface) {
             $r = $value->format('c');
@@ -317,6 +329,26 @@ class Validation {
      */
     public function setMainStatus($status) {
         $this->mainStatus = $status;
+        return $this;
+    }
+
+    /**
+     * Whether or not fields should be translated.
+     *
+     * @return bool Returns **true** if field names are translated or **false** otherwise.
+     */
+    public function getTranslateFieldNames() {
+        return $this->translateFieldNames;
+    }
+
+    /**
+     * Set whether or not fields should be translated.
+     *
+     * @param bool $translate Whether or not fields should be translated.
+     * @return $this
+     */
+    public function setTranslateFieldNames($translate) {
+        $this->translateFieldNames = $translate;
         return $this;
     }
 }
