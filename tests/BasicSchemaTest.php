@@ -331,7 +331,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test throwing an exception when removing unexpected parameters from validated data.
      *
      * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessage The value has unexpected fields: admin, role.
+     * @expectedExceptionMessage value has unexpected fields: admin, role.
      * @expectedExceptionCode 422
      */
     public function testValidateException() {

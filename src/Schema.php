@@ -617,7 +617,7 @@ class Schema implements \JsonSerializable {
             'invalid',
             [
                 'type' => $type,
-                'messageCode' => 'The {field} is not a valid {type}.',
+                'messageCode' => '{field} is not a valid {type}.',
                 'status' => 422
             ]
         );
@@ -829,12 +829,12 @@ class Schema implements \JsonSerializable {
             if (!array_key_exists($lName, $keys)) {
                 // A sparse validation can leave required fields out.
                 if ($isRequired && !$sparse) {
-                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} is required.']);
+                    $validation->addError($fullName, 'missingField', ['messageCode' => '{field} is required.']);
                 }
             } elseif ($data[$keys[$lName]] === null) {
                 $clean[$propertyName] = null;
                 if ($isRequired) {
-                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} cannot be null.']);
+                    $validation->addError($fullName, 'missingField', ['messageCode' => '{field} cannot be null.']);
                 }
             } else {
                 $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyField, $validation, $fullName, $sparse);
@@ -847,12 +847,12 @@ class Schema implements \JsonSerializable {
         if (!empty($keys)) {
             switch ($this->getValidationBehavior()) {
                 case Schema::VALIDATE_NOTICE:
-                    $msg = sprintf("The %s has unexpected field(s): %s.", $name ?: 'value', implode(', ', $keys));
+                    $msg = sprintf("%s has unexpected field(s): %s.", $name ?: 'value', implode(', ', $keys));
                     trigger_error($msg, E_USER_NOTICE);
                     break;
                 case Schema::VALIDATE_EXCEPTION:
                     $validation->addError($name, 'invalid', [
-                        'messageCode' => 'The {field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
+                        'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
                         'extra' => array_values($keys),
                         'status' => 422
                     ]);
@@ -884,13 +884,13 @@ class Schema implements \JsonSerializable {
 
         if (($minLength = self::val('minLength', $field, 0)) > 0 && mb_strlen($value) < $minLength) {
             if ($minLength === 1) {
-                $validation->addError($name, 'missingField', ['messageCode' => 'The {field} is required.', 'status' => 422]);
+                $validation->addError($name, 'missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
             } else {
                 $validation->addError(
                     $name,
                     'minLength',
                     [
-                        'messageCode' => 'The {field} should be at least {minLength} characters long.',
+                        'messageCode' => '{field} should be at least {minLength} characters long.',
                         'minLength' => $minLength,
                         'status' => 422
                     ]
@@ -903,7 +903,7 @@ class Schema implements \JsonSerializable {
                 $name,
                 'maxLength',
                 [
-                    'messageCode' => 'The {field} is {overflow} {overflow,plural,characters} too long.',
+                    'messageCode' => '{field} is {overflow} {overflow,plural,characters} too long.',
                     'maxLength' => $maxLength,
                     'overflow' => mb_strlen($value) - $maxLength,
                     'status' => 422
@@ -919,7 +919,7 @@ class Schema implements \JsonSerializable {
                     $name,
                     'invalid',
                     [
-                        'messageCode' => 'The {field} is in the incorrect format.',
+                        'messageCode' => '{field} is in the incorrect format.',
                         'status' => 422
                     ]
                 );
