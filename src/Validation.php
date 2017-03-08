@@ -11,155 +11,89 @@ namespace Garden\Schema;
  * An class for collecting validation errors.
  */
 class Validation {
-    /// Properties ///
-
-    protected $errors = [];
-
-    protected $mainMessage;
-
-    protected $status;
-
-    /// Methods ///
+    /**
+     * @var array
+     */
+    private $errors = [];
 
     /**
-     * Initialize an instance of the {@link Validation} class.
-     *
-     * @param array $errors An array of errors.
-     * @param string $mainMessage The main message of the error.
-     * @param int $status The http status code of the error or 0 to build the status code from the indivdual errors.
+     * @var string
      */
-    public function __construct(array $errors = [], $mainMessage = '', $status = 0) {
-        $this->errors = $errors;
-        $this->mainMessage = $mainMessage;
-        $this->status = $status;
-    }
+    private $mainMessage = '';
 
     /**
-     * Gets the error message from an error.
-     *
-     * Errors are stored with either a message or a translation code.
-     * This method will look at both to determine the full message.
-     *
-     * @param array $error The error array.
-     * @return string Returns the message from the error.
+     * @var int
      */
-    public static function errorMessage(array $error) {
-        if (isset($error['message'])) {
-            return $error['message'];
-        } else {
-            $field = val('field', $error, '*');
-            if (is_array($field)) {
-                $field = implode(', ', $field);
-            }
-            return sprintft($error['code'].': %s.', $field);
-        }
-    }
+    private $mainStatus = 0;
 
     /**
      * Add an error.
      *
-     * @param string $messageCode The message translation code.
-     * @param string|array $field The name of the field to add or an array of fields if the error applies to
-     * more than one field.
+     * @param string $field The name and path of the field to add or an empty string if this is a global error.
+     * @param string $error The message code.
      * @param int|array $options An array of additional information to add to the error entry or a numeric error code.
-     * @return Validation Returns $this for fluent calls.
+     * @return $this
      */
-    public function addError($messageCode, $field = '*', $options = []) {
-        $error = [];
-        if (substr($messageCode, 0, 1) === '@') {
-            $error['message'] = substr($messageCode, 1);
-        } else {
-            $error['code'] = $messageCode;
+    public function addError($field, $error, $options = []) {
+        if (empty($error)) {
+            throw new \InvalidArgumentException('The error code cannot be empty.', 500);
         }
-        if (is_array($field)) {
-            $fieldname = self::arraySelect(['path', 'name'], $field);
 
-            if ($fieldname) {
-                // This is a full field object.
-                $fieldKey = $fieldname;
-                $error['field'] = $fieldKey;
-            } else {
-                $fieldKey = '*';
-                $error['field'] = $field;
-            }
-        } else {
-            $fieldKey = $field;
-            if ($field !== '*') {
-                $error['field'] = $field;
-            }
+        $fieldKey = $field;
+        $row = ['field' => null, 'code' => null, 'path' => null, 'index' => null];
+
+        // Split the field out into a path, field, and possible index.
+        if (($pos = strrpos($field, '.')) !== false) {
+            $row['path'] = substr($field, 0, $pos);
+            $field = substr($field, $pos + 1);
         }
+        if (preg_match('`^([^[]+)\[(\d+)\]$`', $field, $m)) {
+            $row['index'] = (int)$m[2];
+            $field = $m[1];
+        }
+        $row['field'] = $field;
+        $row['code'] = $error;
+
+        $row = array_filter($row, function ($v) {
+            return $v !== null;
+        });
 
         if (is_array($options)) {
-            $error += $options;
-        } else if (is_int($options)) {
-            $error['status'] = $options;
+            $row += $options;
+        } elseif (is_int($options)) {
+            $row['status'] = $options;
         }
 
-        $this->errors[$fieldKey][] = $error;
+        $this->errors[$fieldKey][] = $row;
 
         return $this;
     }
 
     /**
-     * Select the first non-empty value from an array.
-     *
-     * @param array $keys An array of keys to try.
-     * @param array $array The array to select from.
-     * @param mixed $default The default value if non of the keys exist.
-     * @return mixed Returns the first non-empty value of {@link $default} if none are found.
-     * @category Array Functions
-     */
-    private static function arraySelect(array $keys, array $array, $default = null) {
-        foreach ($keys as $key) {
-            if (isset($array[$key]) && $array[$key]) {
-                return $array[$key];
-            }
-        }
-        return $default;
-    }
-
-    /**
-     * Gets the main error message for the validation.
-     *
-     * @param string|null $value Pass a new main message or null to get the current main message.
-     * @return Validation|string Returns the main message or $this for fluent sets.
-     */
-    public function mainMessage($value = null) {
-        if ($value !== null) {
-            $this->mainMessage = $value;
-            return $this;
-        }
-
-        return $this->mainMessage;
-    }
-
-    /**
      * Get or set the error status code.
      *
-     * The status code is an http resonse code and should be of the 4xx variety.
+     * The status code is an http response code and should be of the 4xx variety.
      *
-     * @param int|null $value Pass a new status code or null to get the current code.
-     * @return Validation|int Returns the current status code or $this for fluent sets.
+     * @return int Returns the current status code.
      */
-    public function status($value = null) {
-        if ($value !== null) {
-            $this->status = $value;
-            return $this;
+    public function getStatus() {
+        if ($this->mainStatus) {
+            return $this->mainStatus;
         }
-        if ($this->status) {
-            return $this->status;
+
+        if ($this->isValid()) {
+            return 200;
         }
 
         // There was no status so loop through the errors and look for the highest one.
-        $maxStatus = 400;
-        foreach ($this->errors as $field => $errors) {
-            foreach ($errors as $error) {
-                if (isset($error['status']) && $error['status'] > $maxStatus) {
-                    $maxStatus = $error['status'];
-                }
+        $maxStatus = 0;
+        foreach ($this->getRawErrors() as $error) {
+            if (isset($error['status']) && $error['status'] > $maxStatus) {
+                $maxStatus = $error['status'];
             }
         }
-        return $maxStatus;
+
+        return $maxStatus?: 400;
     }
 
     /**
@@ -172,25 +106,16 @@ class Validation {
             return $this->mainMessage;
         }
 
+        $sentence = $this->translate('%s.');
+
         // Generate the message by concatenating all of the errors together.
         $messages = [];
-        foreach ($this->errors as $errors) {
-            foreach ($errors as $error) {
-                $field = val('field', $error, '*');
-                if (is_array($field)) {
-                    $field = implode(', ', $field);
-                }
-
-                if (isset($error['message'])) {
-                    $message = $error['message'];
-                } elseif (strpos($error['code'], '%s') === false) {
-                    $message = sprintft($error['code'].': %s.', $field);
-                } else {
-                    $message = sprintft($error['code'], $field);
-                }
-
-                $messages[] = $message;
+        foreach ($this->getRawErrors() as $error) {
+            $message = $this->getErrorMessage($error);
+            if (preg_match('`\PP$`u', $message)) {
+                $message = sprintf($sentence, $message);
             }
+            $messages[] = $message;
         }
         return implode(' ', $messages);
     }
@@ -202,14 +127,34 @@ class Validation {
      *
      * @return array Returns all of the errors.
      */
-    public function getErrorsFlat() {
+    public function getErrors() {
         $result = [];
-        foreach ($this->errors as $errors) {
-            foreach ($errors as $error) {
-                $result[] = $error;
-            }
+        foreach ($this->getRawErrors() as $error) {
+            $row = array_intersect_key(
+                $error,
+                ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1]
+            );
+
+            $row['message'] = $this->getErrorMessage($error);
+
+            $result[] = $row;
         }
         return $result;
+    }
+
+    /**
+     * Gets all of the errors as a flat array.
+     *
+     * The errors are internally stored indexed by field. This method flattens them for final error returns.
+     *
+     * @return \Traversable Returns all of the errors.
+     */
+    protected function getRawErrors() {
+        foreach ($this->errors as $errors) {
+            foreach ($errors as $error) {
+                yield $error;
+            }
+        }
     }
 
     /**
@@ -218,7 +163,7 @@ class Validation {
      * @return bool Returns true if there are no errors, false otherwise.
      */
     public function isValid() {
-        return count($this->errors) === 0;
+        return empty($this->errors);
     }
 
     /**
@@ -227,8 +172,139 @@ class Validation {
      * @param string $field The name of the field to check for validity.
      * @return bool Returns true if the field has no errors, false otherwise.
      */
-    public function fieldValid($field) {
+    public function isValidField($field) {
         $result = !isset($this->errors[$field]) || count($this->errors[$field]) === 0;
         return $result;
+    }
+
+    /**
+     * Get the error message for an error row.
+     *
+     * @param array $error The error row.
+     * @return string Returns a formatted/translated error message.
+     */
+    private function getErrorMessage(array $error) {
+        if (isset($error['messageCode'])) {
+            $messageCode = $error['messageCode'];
+        } elseif (isset($error['message'])) {
+            return $error['message'];
+        } else {
+            $messageCode = $error['code'];
+        }
+        $msg = $this->formatMessage($messageCode, $error);
+        return $msg;
+    }
+
+    /**
+     * Expand and translate a message format against an array of values.
+     *
+     * @param string $format The message format.
+     * @param array $context The context arguments to apply to the message.
+     * @return string Returns a formatted string.
+     */
+    private function formatMessage($format, $context = []) {
+        $format = $this->translate($format);
+
+        $msg = preg_replace_callback('`({[^{}]+})`', function ($m) use ($context) {
+            $args = array_filter(array_map('trim', explode(',', trim($m[1], '{}'))));
+            $field = array_shift($args);
+            return $this->translateField(isset($context[$field]) ? $context[$field] : null, $args);
+        }, $format);
+        return $msg;
+    }
+
+    /**
+     * Translate an argument being placed in an error message.
+     *
+     * @param mixed $value The argument to translate.
+     * @param array $args Formatting arguments.
+     * @return string Returns the translated string.
+     */
+    private function translateField($value, array $args = []) {
+        if (is_string($value)) {
+            $r = $this->translate($value);
+        } elseif (is_numeric($value)) {
+            $r = $value;
+        } elseif (is_array($value)) {
+            $argArray = array_map([$this, 'translateField'], $value);
+            $r = implode(', ', $argArray);
+        } elseif ($value instanceof \DateTimeInterface) {
+            $r = $value->format('c');
+        } else {
+            $r = $value;
+        }
+
+        $format = array_shift($args);
+        switch ($format) {
+            case 'plural':
+                $singular = array_shift($args);
+                $plural = array_shift($args) ?: $singular.'s';
+                $count = is_array($value) ? count($value) : $value;
+                $r = $count == 1 ? $singular : $plural;
+                break;
+        }
+
+        return (string)$r;
+    }
+
+    /**
+     * Translate a string.
+     *
+     * This method doesn't do any translation itself, but is meant for subclasses wanting to add translation ability to
+     * this class.
+     *
+     * @param string $str The string to translate.
+     * @return string Returns the translated string.
+     */
+    protected function translate($str) {
+        if (substr($str, 0, 1) === '@') {
+            // This is a literal string that bypasses translation.
+            return substr($str, 1);
+        } else {
+            return $str;
+        }
+    }
+
+    /**
+     * Get the main error message.
+     *
+     * If set, this message will be returned as the error message. Otherwise the message will be set from individual
+     * errors.
+     *
+     * @return string Returns the main message.
+     */
+    public function getMainMessage() {
+        return $this->mainMessage;
+    }
+
+    /**
+     * Set the main error message.
+     *
+     * @param string $message The new message.
+     * @return $this
+     */
+    public function setMainMessage($message) {
+        $this->mainMessage = $message;
+        return $this;
+    }
+
+    /**
+     * Get the main status.
+     *
+     * @return int Returns an HTTP response code or zero to indicate it should be calculated.
+     */
+    public function getMainStatus() {
+        return $this->mainStatus;
+    }
+
+    /**
+     * Set the main status.
+     *
+     * @param int $status An HTTP response code or zero.
+     * @return $this
+     */
+    public function setMainStatus($status) {
+        $this->mainStatus = $status;
+        return $this;
     }
 }

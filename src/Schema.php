@@ -163,9 +163,7 @@ class Schema implements \JsonSerializable {
             switch ($this->validationBehavior) {
                 case self::VALIDATE_EXCEPTION:
                     $validation->addError(
-                        'unexpected_parameter',
-                        $key,
-                        [
+                        $key, 'unexpected_parameter', [
                             'parameter' => $key,
                             'message' => $errorMessage,
                             'status' => 500
@@ -343,7 +341,7 @@ class Schema implements \JsonSerializable {
             }
         } elseif (is_string($value)) {
             if ($node['type'] === 'array' && $arrType = $this->getType($value)) {
-                    $node['items'] = ['type' => $arrType];
+                $node['items'] = ['type' => $arrType];
             } elseif (!empty($value)) {
                 $node['description'] = $value;
             }
@@ -432,6 +430,8 @@ class Schema implements \JsonSerializable {
      * Add a custom validator to to validate the schema.
      *
      * @param string $fieldname The name of the field to validate, if any.
+     *
+     * If you are adding a validator to a deeply nested field then separate the path with dots.
      * @param callable $callback The callback to validate with.
      * @return Schema Returns `$this` for fluent calls.
      */
@@ -443,58 +443,57 @@ class Schema implements \JsonSerializable {
     /**
      * Require one of a given set of fields in the schema.
      *
-     * @param array $fieldnames The field names to require.
+     * @param array $required The field names to require.
+     * @param string $fieldname The name of the field to attach to.
      * @param int $count The count of required items.
      * @return Schema Returns `$this` for fluent calls.
      */
-    public function requireOneOf(array $fieldnames, $count = 1) {
-        $result = $this->addValidator('*', function ($data, Validation $validation) use ($fieldnames, $count) {
-            $hasCount = 0;
-            $flattened = [];
+    public function requireOneOf(array $required, $fieldname = '', $count = 1) {
+        $result = $this->addValidator(
+            $fieldname,
+            function ($data, $field, Validation $validation, $fieldname = '', $sparse = false) use ($required, $count) {
+                $hasCount = 0;
+                $flattened = [];
 
-            foreach ($fieldnames as $name) {
-                $flattened = array_merge($flattened, (array)$name);
+                foreach ($required as $name) {
+                    $flattened = array_merge($flattened, (array)$name);
 
-                if (is_array($name)) {
-                    // This is an array of required names. They all must match.
-                    $hasCountInner = 0;
-                    foreach ($name as $nameInner) {
-                        if (isset($data[$nameInner]) && $data[$nameInner]) {
-                            $hasCountInner++;
-                        } else {
-                            break;
+                    if (is_array($name)) {
+                        // This is an array of required names. They all must match.
+                        $hasCountInner = 0;
+                        foreach ($name as $nameInner) {
+                            if (isset($data[$nameInner]) && $data[$nameInner]) {
+                                $hasCountInner++;
+                            } else {
+                                break;
+                            }
                         }
-                    }
-                    if ($hasCountInner >= count($name)) {
+                        if ($hasCountInner >= count($name)) {
+                            $hasCount++;
+                        }
+                    } elseif (isset($data[$name]) && $data[$name]) {
                         $hasCount++;
                     }
-                } elseif (isset($data[$name]) && $data[$name]) {
-                    $hasCount++;
+
+                    if ($hasCount >= $count) {
+                        return true;
+                    }
                 }
 
-                if ($hasCount >= $count) {
-                    return true;
+                if ($count === 1) {
+                    $message = 'One of {required} are required.';
+                } else {
+                    $message = '{count} of {required} are required.';
                 }
+
+                $validation->addError($fieldname, 'missingField', [
+                    'messageCode' => $message,
+                    'required' => $required,
+                    'count' => $count
+                ]);
+                return false;
             }
-
-            $messageFields = array_map(function ($v) {
-                if (is_array($v)) {
-                    return '('.implode(', ', $v).')';
-                }
-                return $v;
-            }, $fieldnames);
-
-            if ($count === 1) {
-                $message = sprintft('One of %s are required.', implode(', ', $messageFields));
-            } else {
-                $message = sprintft('%1$s of %2$s are required.', $count, implode(', ', $messageFields));
-            }
-
-            $validation->addError('missing_field', $flattened, [
-                'message' => $message
-            ]);
-            return false;
-        });
+        );
 
         return $result;
     }
@@ -536,20 +535,6 @@ class Schema implements \JsonSerializable {
     }
 
     /**
-     * Returns whether or not a string ends with another string.
-     *
-     * This function is not case-sensitive.
-     *
-     * @param string $haystack The string to test.
-     * @param string $needle The substring to test against.
-     * @return bool Whether or not `$string` ends with `$with`.
-     * @category String Functions
-     */
-    private static function strEnds($haystack, $needle) {
-        return strcasecmp(substr($haystack, -strlen($needle)), $needle) === 0;
-    }
-
-    /**
      * Validate a field.
      *
      * @param mixed $value The value to validate.
@@ -558,7 +543,6 @@ class Schema implements \JsonSerializable {
      * @param string $name The name of the field being validated or an empty string for the root.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return mixed Returns a clean version of the value with all extra fields stripped out.
-     * @throws \InvalidArgumentException Throws an exception when there is something wrong in the {@link $params}.
      */
     private function validateField($value, array $field, Validation $validation, $name = '', $sparse = false) {
         $type = isset($field['type']) ? $field['type'] : '';
@@ -598,26 +582,54 @@ class Schema implements \JsonSerializable {
                 throw new \InvalidArgumentException("Unrecognized type $type.", 500);
         }
         if (!$validType) {
-            $validation->addError(
-                'invalid_type',
-                $name,
-                [
-                    'type' => $type,
-                    'message' => sprintft('%1$s is not a valid %2$s.', $name, $type),
-                    'status' => 422
-                ]
-            );
+            $this->addTypeError($validation, $name, $type);
         }
 
         // Validate a custom field validator.
-        $validatorName = isset($field['validatorName']) ? $field['validatorName'] : $name;
-        if (isset($this->validators[$validatorName])) {
-            foreach ($this->validators[$validatorName] as $callback) {
-                call_user_func_array($callback, [&$value, $field, $validation]);
-            }
-        }
+        $this->callValidators($value, $field, $validation, $name, $sparse);
 
         return $value;
+    }
+
+    /**
+     * Add an invalid type error.
+     *
+     * @param Validation $validation The validation to add the error to.
+     * @param string $name The full field name.
+     * @param string $type The type that was checked.
+     * @return $this
+     */
+    protected function addTypeError(Validation $validation, $name, $type) {
+        $validation->addError(
+            $name,
+            'invalid',
+            [
+                'type' => $type,
+                'messageCode' => 'The {field} is not a valid {type}.',
+                'status' => 422
+            ]
+        );
+
+        return $this;
+    }
+
+    /**
+     * Call all of the validators attached to a field.
+     *
+     * @param mixed $value The field value being validated.
+     * @param array $field The field schema.
+     * @param Validation $validation The validation object to add errors.
+     * @param string $name The full path to the field.
+     * @param bool $sparse Whether this is a sparse validation.
+     */
+    private function callValidators($value, $field, Validation $validation, $name = '', $sparse = false) {
+        // Strip array references in the name.
+        $key = preg_replace('`\[\d+\]`', '', $name);
+        if (!empty($this->validators[$key])) {
+            foreach ($this->validators[$key] as $validator) {
+                call_user_func($validator, $value, $field, $validation, $name, $sparse);
+            }
+        }
     }
 
     /**
@@ -802,65 +814,21 @@ class Schema implements \JsonSerializable {
 
             // First check for required fields.
             if (!array_key_exists($lName, $lData)) {
+                // A sparse validation can leave required fields out.
                 if ($isRequired && !$sparse) {
-                    // A sparse validation can leave required fields out.
-                    $validation->addError('missing_field', $fullName);
+                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} is required.', 'status' => 422]);
                 }
-            } elseif (!isset($lData[$lName])) {
+            } elseif ($lData[$lName] === null) {
                 $clean[$propertyName] = null;
                 if ($isRequired) {
-                    $validation->addError('null_field', $fullName);
+                    $validation->addError($fullName, 'missingField', ['messageCode' => 'The {field} is cannot be null.', 'status' => 422]);
                 }
             } else {
                 $clean[$propertyName] = $this->validateField($lData[$lName], $propertyField, $validation, $fullName, $sparse);
             }
         }
 
-        // Validate the global validators.
-//        if ($name == '' && isset($this->validators['*'])) {
-//            foreach ($this->validators['*'] as $callback) {
-//                call_user_func($callback, $data, $validation);
-//            }
-//        }
-
         return $clean;
-    }
-
-    /**
-     * Validate a required field.
-     *
-     * @param mixed &$value The field value.
-     * @param array $field The field definition.
-     * @param Validation $validation A {@link Validation} object to collect errors.
-     * @return bool|null Returns one of the following:
-     * - null: The field is not required.
-     * - true: The field is required and {@link $value} is not empty.
-     * - false: The field is required and {@link $value} is empty.
-     */
-    private function validateRequired(&$value, array $field, Validation $validation) {
-        $type = $field['type'];
-
-        if ($value === '' || $value === null) {
-            if (!$required) {
-                $value = null;
-                return true;
-            }
-
-            switch ($type) {
-                case 'boolean':
-                    $value = false;
-                    return true;
-                case 'string':
-                    $minLength = (isset($field['minLength']) ? $field['minLength'] : 1);
-                    if ($minLength == 0) {
-                        $value = '';
-                        return true;
-                    }
-            }
-            $validation->addError('missing_field', $field);
-            return false;
-        }
-        return null;
     }
 
     /**
@@ -869,9 +837,10 @@ class Schema implements \JsonSerializable {
      * @param mixed &$value The value to validate.
      * @param array $field The field definition.
      * @param Validation $validation The validation results to add.
+     * @param string $name The name of the field being validated.
      * @return bool Returns true if {@link $value} is valid or false otherwise.
      */
-    private function validateString(&$value, array $field, Validation $validation) {
+    private function validateString(&$value, array $field, Validation $validation, $name = '') {
         if (is_string($value)) {
             $validType = true;
         } elseif (is_numeric($value)) {
@@ -881,12 +850,50 @@ class Schema implements \JsonSerializable {
             return false;
         }
 
-        if (($minLength = self::val('minLength', $field, 0)) > 0 && strlen($value) < $minLength) {
-            $validation->addError('minLength', '', ['minLength' => $minLength]);
+        if (($minLength = self::val('minLength', $field, 0)) > 0 && mb_strlen($value) < $minLength) {
+            if ($minLength === 1) {
+                $validation->addError($name, 'missingField', ['messageCode' => 'The {field} is required.', 'status' => 422]);
+            } else {
+                $validation->addError(
+                    $name,
+                    'minLength',
+                    [
+                        'messageCode' => 'The {field} should be at least {minLength} characters long.',
+                        'minLength' => $minLength,
+                        'status' => 422
+                    ]
+                );
+            }
             return false;
         }
-        if (($maxLength = self::val('maxLength', $field, 0)) > 0 && strlen($value) > $maxLength) {
-            $validation->addError('maxLength', '', ['maxLength' => $maxLength]);
+        if (($maxLength = self::val('maxLength', $field, 0)) > 0 && mb_strlen($value) > $maxLength) {
+            $validation->addError(
+                $name,
+                'maxLength',
+                [
+                    'messageCode' => 'The {field} is {overflow} {overflow,plural,characters} too long.',
+                    'maxLength' => $maxLength,
+                    'overflow' => mb_strlen($value) - $maxLength,
+                    'status' => 422
+                ]
+            );
+            return false;
+        }
+        if ($pattern = self::val('pattern', $field)) {
+            $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
+
+            if (!preg_match($regex, $value)) {
+                $validation->addError(
+                    $name,
+                    'invalid',
+                    [
+                        'messageCode' => 'The {field} is in the incorrect format.',
+                        'status' => 422
+                    ]
+                );
+            }
+
+            return false;
         }
 
         return $validType;
@@ -941,10 +948,12 @@ class Schema implements \JsonSerializable {
     }
 
     /**
-     * @param string|int $key
-     * @param array $arr
-     * @param mixed $default
-     * @return mixed
+     * Look up a value in array.
+     *
+     * @param string|int $key The array key.
+     * @param array $arr The array to search.
+     * @param mixed $default The default if key is not found.
+     * @return mixed Returns the array value or the default.
      */
     private static function val($key, array $arr, $default = null) {
         return isset($arr[$key]) ? $arr[$key] : $default;
@@ -953,8 +962,4 @@ class Schema implements \JsonSerializable {
 
 function sprintft($format, ...$args) {
     return sprintf($format, ...$args);
-}
-
-function val($key, array $arr, $default = null) {
-    return isset($arr[$key]) ? $arr[$key] : $default;
 }

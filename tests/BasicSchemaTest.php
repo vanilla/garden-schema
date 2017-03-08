@@ -188,7 +188,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         try {
             $schema->validate($missingData);
         } catch (ValidationException $ex) {
-            $this->assertFalse($ex->getValidation()->fieldValid('col'));
+            $this->assertFalse($ex->getValidation()->isValidField('col'));
         }
     }
 
@@ -253,9 +253,6 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         $valid4 = ['id' => 123, 'name' => 'Foo', 'description' => 'Hello', 'enabled' => true];
         $this->assertTrue($schema->isValid($valid4));
-
-        $this->assertFalse($schema->isValid($valid1));
-        $this->assertFalse($schema->isValid($valid2));
     }
 
     /**
@@ -263,19 +260,22 @@ class BasicSchemaTest extends AbstractSchemaTest {
      *
      * @param string $type The type short code.
      * @param mixed $value A value that should be invalid for the type.
-     * @dataProvider provideInvalideData
+     * @dataProvider provideInvalidData
      */
     public function testInvalidValues($type, $value) {
         $schema = new Schema([
             "col:$type?"
         ]);
-        $strval = print_r($value, true);
+        $strVal = print_r($value, true);
 
-        $invaldData = ['col' => $value];
-        /* @var Validation $validation */
-        $isValid = $schema->isValid($invaldData, $validation);
-        $this->assertFalse($isValid, "isValid: type $type with value $strval should not be valid.");
-        $this->assertFalse($validation->fieldValid('col'), "fieldValid: type $type with value $strval should not be valid.");
+        $invalidData = ['col' => $value];
+        try {
+            $schema->validate($invalidData);
+            $this->fail("isValid: type $type with value $strVal should not be valid.");
+        } catch (ValidationException $ex) {
+            $validation = $ex->getValidation();
+            $this->assertFalse($validation->isValidField('col'), "fieldValid: type $type with value $strVal should not be valid.");
+        }
     }
 
     /**
@@ -320,8 +320,8 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
     /**
      * Call validate on an instance of Schema where the data contains unexpected parameters.
-     * *
-     * @param int $validationBehavior
+     *
+     * @param int $validationBehavior One of the **Schema::VALIDATE_*** constants.
      */
     protected function doValidationBehavior($validationBehavior) {
         $schema = new Schema([
@@ -339,9 +339,9 @@ class BasicSchemaTest extends AbstractSchemaTest {
             'role' => 'Administrator'
         ];
 
-        $schema->validate($data);
-        $this->assertArrayNotHasKey('admin', $data);
-        $this->assertArrayNotHasKey('role', $data);
+        $valid = $schema->validate($data);
+        $this->assertArrayNotHasKey('admin', $valid);
+        $this->assertArrayNotHasKey('role', $valid);
     }
 
     /**

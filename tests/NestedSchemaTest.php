@@ -51,8 +51,8 @@ class NestedSchemaTest extends AbstractSchemaTest {
         $isValid = $schema->isValid($invalidData, $validation);
         $this->assertFalse($isValid);
 
-        $this->assertFalse($validation->fieldValid('addr.city'), "addr.street should be invalid.");
-        $this->assertFalse($validation->fieldValid('addr.zip'), "addr.zip should be invalid.");
+        $this->assertFalse($validation->isValidField('addr.city'), "addr.street should be invalid.");
+        $this->assertFalse($validation->isValidField('addr.zip'), "addr.zip should be invalid.");
     }
 
     /**
@@ -70,12 +70,12 @@ class NestedSchemaTest extends AbstractSchemaTest {
         // Try a custom validator for the items.
         $schema->addValidator('arr.items', function (&$value, $field, Validation $validation) {
             if ($value > 2) {
-                $validation->addError('%s must be less than 2.', $field, 422);
+                $validation->addError($field, '%s must be less than 2.', 422);
             }
         });
         /* @var Validation $validation2 */
         $this->assertFalse($schema->isValid($validData, $validation2));
-        $this->assertFalse($validation2->fieldValid('arr.2'));
+        $this->assertFalse($validation2->isValidField('arr.2'));
         $this->assertEquals('arr.2 must be less than 2.', $validation2->getMessage());
     }
 
@@ -137,19 +137,19 @@ class NestedSchemaTest extends AbstractSchemaTest {
         $missingData = [];
         $isValid = $schema->isValid($missingData, $v1);
         $this->assertFalse($isValid);
-        $this->assertFalse($v1->fieldValid('rows'));
+        $this->assertFalse($v1->isValidField('rows'));
 
         /* @var Validation $v2 */
         $notArrayData = ['rows' => 123];
         $isValid = $schema->isValid($notArrayData, $v2);
         $this->assertFalse($isValid);
-        $this->assertFalse($v2->fieldValid('rows'));
+        $this->assertFalse($v2->isValidField('rows'));
 
         /* @var Validation $v3 */
         $nullItemData = ['rows' => [null]];
         $isValid = $schema->isValid($nullItemData, $v3);
         $this->assertFalse($isValid);
-        $this->assertFalse($v3->fieldValid('rows.0'));
+        $this->assertFalse($v3->isValidField('rows.0'));
 
         /* @var Validation $v4 */
         $invalidRowsData = ['rows' => [
@@ -159,9 +159,9 @@ class NestedSchemaTest extends AbstractSchemaTest {
         ]];
         $isValid = $schema->isValid($invalidRowsData, $v4);
         $this->assertFalse($isValid);
-        $this->assertFalse($v4->fieldValid('rows.0.id'));
-        $this->assertTrue($v4->fieldValid('rows.1.id'));
-        $this->assertFalse($v4->fieldValid('rows.2.id'));
+        $this->assertFalse($v4->isValidField('rows.0.id'));
+        $this->assertTrue($v4->isValidField('rows.1.id'));
+        $this->assertFalse($v4->isValidField('rows.2.id'));
 
     }
 

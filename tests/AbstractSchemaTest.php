@@ -37,7 +37,7 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
      *
      * @return array Returns an data set with rows in the form [short type, value].
      */
-    public function provideInvalideData() {
+    public function provideInvalidData() {
         $result = [
             ['a', false],
             ['a', 123],
