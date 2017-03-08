@@ -43,7 +43,7 @@ class Schema implements \JsonSerializable {
     protected $schema = [];
 
     /** @var int */
-    protected $validationBehavior = self::VALIDATE_NOTICE;
+    protected $validationBehavior = self::VALIDATE_CONTINUE;
 
     /**
      * @var array An array of callbacks that will custom validate the schema.
@@ -403,7 +403,11 @@ class Schema implements \JsonSerializable {
         $type = !empty($parts[1]) && isset(self::$types[$parts[1]]) ? self::$types[$parts[1]] : null;
 
         if ($value instanceof Schema) {
-            $param = $value;
+            if ($type === 'array') {
+                $param = ['type' => $type, 'items' => $value];
+            } else {
+                $param = $value;
+            }
         } elseif (isset($value['type'])) {
             $param = $value;
 
@@ -537,51 +541,60 @@ class Schema implements \JsonSerializable {
      * Validate a field.
      *
      * @param mixed $value The value to validate.
-     * @param array $field Parameters on the field.
+     * @param array|Schema $field Parameters on the field.
      * @param Validation $validation A validation object to add errors to.
      * @param string $name The name of the field being validated or an empty string for the root.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return mixed Returns a clean version of the value with all extra fields stripped out.
      */
-    private function validateField($value, array $field, Validation $validation, $name = '', $sparse = false) {
-        $type = isset($field['type']) ? $field['type'] : '';
+    private function validateField($value, $field, Validation $validation, $name = '', $sparse = false) {
+        if ($field instanceof Schema) {
+            try {
+                $value = $field->validate($value, $sparse);
+            } catch (ValidationException $ex) {
+                // The validation failed, so merge the validations together.
+                $validation->merge($ex->getValidation(), $name);
+            }
+        } else {
+            $type = isset($field['type']) ? $field['type'] : '';
 
-        // Validate the field's type.
-        $validType = true;
-        switch ($type) {
-            case 'boolean':
-                $validType &= $this->validateBoolean($value, $field);
-                break;
-            case 'integer':
-                $validType &= $this->validateInteger($value, $field);
-                break;
-            case 'float':
-                $validType &= $this->validateFloat($value, $field);
-                break;
-            case 'string':
-                $validType &= $this->validateString($value, $field, $validation);
-                break;
-            case 'timestamp':
-                $validType &= $this->validateTimestamp($value, $field, $validation);
-                break;
-            case 'datetime':
-                $validType &= $this->validateDatetime($value, $field);
-                break;
-            case 'array':
-                $validType &= $this->validateArray($value, $field, $validation, $name, $sparse);
-                break;
-            case 'object':
-                $validType &= $this->validateObject($value, $field, $validation, $name, $sparse);
-                break;
-            case '':
-                // No type was specified so we are valid.
-                $validType = true;
-                break;
-            default:
-                throw new \InvalidArgumentException("Unrecognized type $type.", 500);
-        }
-        if (!$validType) {
-            $this->addTypeError($validation, $name, $type);
+            // Validate the field's type.
+            $validType = true;
+            switch ($type) {
+                case 'boolean':
+                    $validType &= $this->validateBoolean($value, $field);
+                    break;
+                case 'integer':
+                    $validType &= $this->validateInteger($value, $field);
+                    break;
+                case 'float':
+                    $validType &= $this->validateFloat($value, $field);
+                    break;
+                case 'string':
+                    $validType &= $this->validateString($value, $field, $validation);
+                    break;
+                case 'timestamp':
+                    $validType &= $this->validateTimestamp($value, $field, $validation);
+                    break;
+                case 'datetime':
+                    $validType &= $this->validateDatetime($value, $field);
+                    break;
+                case 'array':
+                    $validType &= $this->validateArray($value, $field, $validation, $name, $sparse);
+                    break;
+                case 'object':
+                    $validType &= $this->validateObject($value, $field, $validation, $name, $sparse);
+                    break;
+                case '':
+                    // No type was specified so we are valid.
+                    $validType = true;
+                    break;
+                default:
+                    throw new \InvalidArgumentException("Unrecognized type $type.", 500);
+            }
+            if (!$validType) {
+                $this->addTypeError($validation, $name, $type);
+            }
         }
 
         // Validate a custom field validator.

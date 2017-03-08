@@ -199,7 +199,7 @@ class Validation {
 
         // Massage the field name for better formatting.
         if (!$this->getTranslateFieldNames()) {
-            $field = (isset($error['path']) ? $error['path'].'.' : '').$error['field'];
+            $field = (!empty($error['path']) ? ($error['path'][0] !== '[' ?: 'item').$error['path'].'.' : '').$error['field'];
             $field = $field ?: (isset($error['index']) ? 'item' : 'value');
             if (isset($error['index'])) {
                 $field .= '['.$error['index'].']';
@@ -287,6 +287,27 @@ class Validation {
         } else {
             return $str;
         }
+    }
+
+    /**
+     * Merge another validation object with this one.
+     *
+     * @param Validation $validation The validation object to merge.
+     * @param string $name The path to merge to. Use this parameter when the validation object is meant to be a subset of this one.
+     * @return $this
+     */
+    public function merge(Validation $validation, $name = '') {
+        $paths = $validation->errors;
+
+        foreach ($paths as $path => $errors) {
+            foreach ($errors as $error) {
+                if (!empty($name)) {
+                    $fullPath = "{$name}.{$path}";
+                    $this->addError($fullPath, $error['code'], $error);
+                }
+            }
+        }
+        return $this;
     }
 
     /**

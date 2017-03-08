@@ -282,6 +282,37 @@ class NestedSchemaTest extends AbstractSchemaTest {
     }
 
     /**
+     * Nested schemas should properly validate by calling the nested schema's validation.
+     */
+    public function testNestedSchemaValidation() {
+        $userSchema = new Schema([
+            'name:s',
+            'email:s?'
+        ]);
+
+        $schema = new Schema([':a' => $userSchema]);
+
+        $clean = $schema->validate([
+            ['name' => 'Todd', 'wut' => 'foo'],
+            ['name' => 'Ryan', 'email' => 'ryan@example.com']
+        ]);
+        $this->assertArrayNotHasKey('wut', $clean[0]);
+
+        try {
+            $schema->validate([
+                ['email' => 'foo@bar.com'],
+                ['name' => new Schema([])]
+            ]);
+            $this->fail("The data is not supposed to validate.");
+        } catch (ValidationException $ex) {
+            $errors = $ex->getValidation()->getErrors();
+            $this->assertCount(2, $errors);
+            $this->assertEquals('The item[0].name is required.', $errors[0]['message']);
+            $this->assertEquals('The item[1].name is not a valid string.', $errors[1]['message']);
+        }
+    }
+
+    /**
      * Call validate on an instance of Schema where the data contains unexpected parameters.
      *
      * @param int $validationBehavior One of the **Schema::VALIDATE_*** constants.
