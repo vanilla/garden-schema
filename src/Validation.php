@@ -191,6 +191,18 @@ class Validation {
         } else {
             $messageCode = $error['code'];
         }
+
+        // Massage the field name for better formatting.
+        if (isset($error['index'])) {
+            if (empty($error['field'])) {
+                $error['field'] = '@'.sprintf($this->translate('item %s'), $error['index']);
+            } else {
+                $error['field'] = '@'.sprintf($this->translate('%s[%s]'), $this->translate($error['field']), $error['index']);
+            }
+        } elseif (empty($error['field'])) {
+            $error['field'] = 'value';
+        }
+
         $msg = $this->formatMessage($messageCode, $error);
         return $msg;
     }
@@ -204,8 +216,6 @@ class Validation {
      */
     private function formatMessage($format, $context = []) {
         $format = $this->translate($format);
-
-        $context['field'] = $context['field'] ?: 'value';
 
         $msg = preg_replace_callback('`({[^{}]+})`', function ($m) use ($context) {
             $args = array_filter(array_map('trim', explode(',', trim($m[1], '{}'))));

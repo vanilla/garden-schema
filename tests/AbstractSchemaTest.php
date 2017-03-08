@@ -105,4 +105,20 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
 
         return $schema;
     }
+
+    /**
+     * Get a schema that consists of an array of objects.
+     *
+     * @return Schema Returns the schema.
+     */
+    public function getArrayOfObjectsSchema() {
+        $schema = new Schema([
+            'rows:a' => [
+                'id:i',
+                'name:s?'
+            ]
+        ]);
+
+        return $schema;
+    }
 }

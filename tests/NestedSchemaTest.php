@@ -9,6 +9,7 @@ namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
 use Garden\Schema\Validation;
+use Garden\Schema\ValidationException;
 
 /**
  * Tests for nested object schemas.
@@ -47,12 +48,14 @@ class NestedSchemaTest extends AbstractSchemaTest {
             ]
         ];
 
-        /* @var Validation $validation */
-        $isValid = $schema->isValid($invalidData, $validation);
-        $this->assertFalse($isValid);
-
-        $this->assertFalse($validation->isValidField('addr.city'), "addr.street should be invalid.");
-        $this->assertFalse($validation->isValidField('addr.zip'), "addr.zip should be invalid.");
+        try {
+            $schema->validate($invalidData);
+            $this->fail("The data should not be valid.");
+        } catch (ValidationException $ex) {
+            $validation = $ex->getValidation();
+            $this->assertFalse($validation->isValidField('addr.city'), "addr.street should be invalid.");
+            $this->assertFalse($validation->isValidField('addr.zip'), "addr.zip should be invalid.");
+        }
     }
 
     /**
@@ -65,18 +68,22 @@ class NestedSchemaTest extends AbstractSchemaTest {
         $this->assertTrue($schema->isValid($validData));
 
         $invalidData = ['arr' => [1, 'foo', 'bar']];
-        $this->assertFalse($schema->isValid($invalidData, $validation));
+        $this->assertFalse($schema->isValid($invalidData));
 
         // Try a custom validator for the items.
-        $schema->addValidator('arr.items', function (&$value, $field, Validation $validation) {
+        $schema->addValidator('arr[]', function ($value, $field, Validation $validation) {
             if ($value > 2) {
-                $validation->addError($field, '%s must be less than 2.', 422);
+                $validation->addError($field, '{field} must be less than 2.', 422);
             }
         });
-        /* @var Validation $validation2 */
-        $this->assertFalse($schema->isValid($validData, $validation2));
-        $this->assertFalse($validation2->isValidField('arr.2'));
-        $this->assertEquals('arr.2 must be less than 2.', $validation2->getMessage());
+        try {
+            $schema->validate($validData);
+            $this->fail("The data should not validate.");
+        } catch (ValidationException $ex) {
+            $validation = $ex->getValidation();
+            $this->assertFalse($validation->isValidField('arr[2]'));
+            $this->assertEquals('arr[2] must be less than 2.', $validation->getMessage());
+        }
     }
 
     /**
@@ -86,19 +93,21 @@ class NestedSchemaTest extends AbstractSchemaTest {
         $schema = $this->getArrayOfObjectsSchema();
 
         $expected = [
-            'rows' => [
-                'name' => 'rows',
-                'type' => 'array',
-                'required' => true,
-                'items' => [
-                    'type' => 'object',
-                    'required' => true,
-                    'properties' => [
-                        'id' => ['name' => 'id', 'type' => 'integer', 'required' => true],
-                        'name' => ['name' => 'name', 'type' => 'string', 'required' => false]
+            'type' => 'object',
+            'properties' => [
+                'rows' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'id' => ['type' => 'integer'],
+                            'name' => ['type' => 'string']
+                        ],
+                        'required' => ['id']
                     ]
                 ]
-            ]
+            ],
+            'required' => ['rows']
         ];
 
         $actual = $schema->jsonSerialize();
@@ -119,12 +128,10 @@ class NestedSchemaTest extends AbstractSchemaTest {
             ]
         ];
 
-        /* @var Validation $validation */
-        $isValid = $schema->isValid($data, $validation);
-        $this->assertTrue($isValid);
+        $valid = $schema->validate($data);
 
-        $this->assertInternalType('int', $data['rows'][2]['id']);
-        $this->assertInternalType('string', $data['rows'][2]['name']);
+        $this->assertInternalType('int', $valid['rows'][2]['id']);
+        $this->assertInternalType('string', $valid['rows'][2]['name']);
     }
 
     /**
@@ -133,69 +140,43 @@ class NestedSchemaTest extends AbstractSchemaTest {
     public function testArrayOfObjectsInvalid() {
         $schema = $this->getArrayOfObjectsSchema();
 
-        /* @var Validation $v1 */
-        $missingData = [];
-        $isValid = $schema->isValid($missingData, $v1);
-        $this->assertFalse($isValid);
-        $this->assertFalse($v1->isValidField('rows'));
+        try {
+            $missingData = [];
+            $schema->validate($missingData);
+            $this->fail('$missingData should not be valid.');
+        } catch (ValidationException $ex) {
+            $this->assertFalse($ex->getValidation()->isValidField('rows'));
+        }
 
-        /* @var Validation $v2 */
-        $notArrayData = ['rows' => 123];
-        $isValid = $schema->isValid($notArrayData, $v2);
-        $this->assertFalse($isValid);
-        $this->assertFalse($v2->isValidField('rows'));
+        try {
+            $notArrayData = ['rows' => 123];
+            $schema->validate($notArrayData);
+            $this->fail('$notArrayData should not be valid.');
+        } catch (ValidationException $ex) {
+            $this->assertFalse($ex->getValidation()->isValidField('rows'));
+        }
 
-        /* @var Validation $v3 */
-        $nullItemData = ['rows' => [null]];
-        $isValid = $schema->isValid($nullItemData, $v3);
-        $this->assertFalse($isValid);
-        $this->assertFalse($v3->isValidField('rows.0'));
+        try {
+            $nullItemData = ['rows' => [null]];
+            $schema->validate($nullItemData);
+        } catch (ValidationException $ex) {
+            $this->assertFalse($ex->getValidation()->isValidField('rows[0]'));
+        }
 
-        /* @var Validation $v4 */
-        $invalidRowsData = ['rows' => [
-            ['id' => 'foo'],
-            ['id' => 123],
-            ['name' => 'Todd']
-        ]];
-        $isValid = $schema->isValid($invalidRowsData, $v4);
-        $this->assertFalse($isValid);
-        $this->assertFalse($v4->isValidField('rows.0.id'));
-        $this->assertTrue($v4->isValidField('rows.1.id'));
-        $this->assertFalse($v4->isValidField('rows.2.id'));
+        try {
+            $invalidRowsData = ['rows' => [
+                ['id' => 'foo'],
+                ['id' => 123],
+                ['name' => 'Todd']
+            ]];
+            $schema->validate($invalidRowsData);
+        } catch (ValidationException $ex) {
+            $v4 = $ex->getValidation();
+            $this->assertFalse($v4->isValidField('rows[0].id'));
+            $this->assertTrue($v4->isValidField('rows[1].id'));
+            $this->assertFalse($v4->isValidField('rows[2].id'));
+        }
 
-    }
-
-    /**
-     * Test merging nested schemas.
-     */
-    public function testNestedMerge() {
-        $schemaOne = $this->getArrayOfObjectsSchema();
-        $schemaTwo = new Schema([
-            'rows:a' => [
-                'email:s'
-            ]
-        ]);
-
-        $expected = [
-            'rows' => [
-                'name' => 'rows',
-                'type' => 'array',
-                'required' => true,
-                'items' => [
-                    'type' => 'object',
-                    'required' => true,
-                    'properties' => [
-                        'id' => ['name' => 'id', 'type' => 'integer', 'required' => true],
-                        'name' => ['name' => 'name', 'type' => 'string', 'required' => false],
-                        'email' => ['name' => 'email', 'type' => 'string', 'required' => true]
-                    ]
-                ]
-            ]
-        ];
-
-        $schemaOne->merge($schemaTwo);
-
-        $this->assertEquals($expected, $schemaOne->jsonSerialize());
     }
 
     /**
@@ -241,7 +222,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
             ]
         ];
 
-        $schema->validate($data);
+        $valid = $schema->validate($data);
 
         $expected = [
             'obj' => [
@@ -250,7 +231,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
             ]
         ];
 
-        $this->assertEquals($expected, $data);
+        $this->assertEquals($expected, $valid);
     }
 
     /**
@@ -271,53 +252,39 @@ class NestedSchemaTest extends AbstractSchemaTest {
         ]);
 
         $expected = [
-            'name' => ['name' => 'name', 'type' => 'string', 'required' => true, 'description' => 'The title of the discussion.'],
-            'body' => ['name' => 'body', 'type' => 'string', 'required' => true, 'description' => 'The body of the discussion.'],
-            'insertUser' => [
-                'name' => 'insertUser',
-                'type' => 'object',
-                'required' => true,
-                'properties' => [
-                        'userID' => ['name' => 'userID', 'type' => 'integer', 'required' => true],
-                        'name' => ['name' => 'name', 'type' => 'string', 'required' => true],
-                        'email' => ['name' => 'email', 'type' => 'string', 'required' => true]
+            'type' => 'object',
+            'properties' => [
+                'name' => ['type' => 'string', 'description' => 'The title of the discussion.', 'minLength' => 1],
+                'body' => ['type' => 'string', 'description' => 'The body of the discussion.', 'minLength' => 1],
+                'insertUser' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'userID' => ['type' => 'integer'],
+                        'name' => ['type' => 'string', 'minLength' => 1],
+                        'email' => ['type' => 'string', 'minLength' => 1]
+                    ],
+                    'required' => ['userID', 'name', 'email']
+                ],
+                'updateUser' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'userID' => ['type' => 'integer'],
+                        'name' => ['type' => 'string', 'minLength' => 1],
+                        'email' => ['type' => 'string', 'minLength' => 1]
+                    ],
+                    'required' => ['userID', 'name', 'email']
                 ]
             ],
-            'updateUser' => [
-                    'name' => 'updateUser',
-                    'type' => 'object',
-                    'required' => false,
-                    'properties' => [
-                        'userID' => ['name' => 'userID', 'type' => 'integer', 'required' => true],
-                        'name' => ['name' => 'name', 'type' => 'string', 'required' => true],
-                        'email' => ['name' => 'email', 'type' => 'string', 'required' => true]
-                    ]
-                ]
+            'required' => ['name', 'body', 'insertUser']
         ];
 
-        $this->assertEquals($expected, $schema->getParameters());
-    }
-
-    /**
-     * Get a schema that consists of an array of objects.
-     *
-     * @return Schema Returns the schema.
-     */
-    public function getArrayOfObjectsSchema() {
-        $schema = new Schema([
-            'rows:a' => [
-                'id:i',
-                'name:s?'
-            ]
-        ]);
-
-        return $schema;
+        $this->assertEquals($expected, $schema->jsonSerialize());
     }
 
     /**
      * Call validate on an instance of Schema where the data contains unexpected parameters.
      *
-     * @param int $validationBehavior
+     * @param int $validationBehavior One of the **Schema::VALIDATE_*** constants.
      */
     protected function doValidationBehavior($validationBehavior) {
         $schema = new Schema([
@@ -340,7 +307,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
             ]
         ];
 
-        $schema->validate($data);
-        $this->assertArrayNotHasKey('role', $data['member']);
+        $valid = $schema->validate($data);
+        $this->assertArrayNotHasKey('role', $valid['member']);
     }
 }

@@ -237,15 +237,6 @@ class Schema implements \JsonSerializable {
     }
 
     /**
-     * Get the schema's currently configured parameters.
-     *
-     * @return array
-     */
-    public function getParameters() {
-        return $this->schema;
-    }
-
-    /**
      * Merge a schema with this one.
      *
      * @param Schema $schema A scheme instance. Its parameters will be merged into the current instance.
@@ -254,7 +245,16 @@ class Schema implements \JsonSerializable {
         $fn = function (array &$target, array $source) use (&$fn) {
             foreach ($source as $key => $val) {
                 if (is_array($val) && array_key_exists($key, $target) && is_array($target[$key])) {
-                    $target[$key] = $fn($target[$key], $val);
+                    if (isset($val[0]) || isset($target[$key][0])) {
+                        // This is a numeric array, so just do a merge.
+                        $merged = array_merge($target[$key], $val);
+                        if (is_string($merged[0])) {
+                            $merged = array_keys(array_flip($merged));
+                        }
+                        $target[$key] = $merged;
+                    } else {
+                        $target[$key] = $fn($target[$key], $val);
+                    }
                 } else {
                     $target[$key] = $val;
                 }
@@ -263,7 +263,7 @@ class Schema implements \JsonSerializable {
             return $target;
         };
 
-        $fn($this->schema, $schema->getParameters());
+        $fn($this->schema, $schema->jsonSerialize());
     }
 
     /**
@@ -450,7 +450,7 @@ class Schema implements \JsonSerializable {
     public function requireOneOf(array $required, $fieldname = '', $count = 1) {
         $result = $this->addValidator(
             $fieldname,
-            function ($data, $field, Validation $validation, $fieldname = '', $sparse = false) use ($required, $count) {
+            function ($data, $fieldname, Validation $validation) use ($required, $count) {
                 $hasCount = 0;
                 $flattened = [];
 
@@ -585,7 +585,7 @@ class Schema implements \JsonSerializable {
         }
 
         // Validate a custom field validator.
-        $this->callValidators($value, $field, $validation, $name, $sparse);
+        $this->callValidators($value, $name, $validation);
 
         return $value;
     }
@@ -616,17 +616,17 @@ class Schema implements \JsonSerializable {
      * Call all of the validators attached to a field.
      *
      * @param mixed $value The field value being validated.
-     * @param array $field The field schema.
-     * @param Validation $validation The validation object to add errors.
      * @param string $name The full path to the field.
-     * @param bool $sparse Whether this is a sparse validation.
+     * @param Validation $validation The validation object to add errors.
+     * @internal param array $field The field schema.
+     * @internal param bool $sparse Whether this is a sparse validation.
      */
-    private function callValidators($value, $field, Validation $validation, $name = '', $sparse = false) {
-        // Strip array references in the name.
-        $key = preg_replace('`\[\d+\]`', '', $name);
+    private function callValidators($value, $name, Validation $validation) {
+        // Strip array references in the name except for the last one.
+        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $name);
         if (!empty($this->validators[$key])) {
             foreach ($this->validators[$key] as $validator) {
-                call_user_func($validator, $value, $field, $validation, $name, $sparse);
+                call_user_func($validator, $value, $name, $validation);
             }
         }
     }
@@ -652,7 +652,7 @@ class Schema implements \JsonSerializable {
 
                 // Validate each of the types.
                 foreach ($value as $i => &$item) {
-                    $itemName = $name ? "$name[$i]" : $i;
+                    $itemName = "{$name}[{$i}]";
                     $validItem = $this->validateField($item, $field['items'], $validation, $itemName, $sparse);
                     $result[] = $validItem;
                 }
@@ -946,7 +946,13 @@ class Schema implements \JsonSerializable {
      * which is a value of any type other than a resource.
      */
     public function jsonSerialize() {
-        return $this->schema;
+        $result = $this->schema;
+        array_walk_recursive($result, function (&$value, $key) {
+            if ($value instanceof \JsonSerializable) {
+                $value = $value->jsonSerialize();
+            }
+        });
+        return $result;
     }
 
     /**
