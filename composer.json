@@ -1,6 +1,6 @@
 {
 	"name": "vanilla/garden-schema",
-	"description": "Validate and clean data with a simple class.",
+	"description": "A simple data validation and cleaning library based on JSON Schema.",
 	"type": "library",
 	"license": "MIT",
 	"authors": [
