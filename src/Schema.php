@@ -439,11 +439,11 @@ class Schema implements \JsonSerializable {
     /**
      * Validate data against the schema and return the result.
      *
-     * @param array &$data The data to validate.
+     * @param array $data The data to validate.
      * @param bool $sparse Whether or not to do a sparse validation.
      * @return bool Returns true if the data is valid. False otherwise.
      */
-    public function isValid(array &$data, $sparse = false) {
+    public function isValid($data, $sparse = false) {
         try {
             $this->validate($data, $sparse);
             return true;
@@ -509,6 +509,8 @@ class Schema implements \JsonSerializable {
             }
             if (!$validType) {
                 $this->addTypeError($validation, $name, $type);
+            } elseif (!empty($field['enum'])) {
+                $this->validateEnum($value, $field, $validation, $name);
             }
         }
 
@@ -868,6 +870,34 @@ class Schema implements \JsonSerializable {
             $validType = false;
         }
         return $validType;
+    }
+
+    /**
+     * Validate a value against an enum.
+     *
+     * @param mixed $value The value to test.
+     * @param array $field The field definition of the value.
+     * @param Validation $validation The validation object for adding errors.
+     * @param string $name The path to the value.
+     */
+    private function validateEnum($value, array $field, Validation $validation, $name) {
+        if (empty($field['enum'])) {
+            return;
+        }
+
+        $enum = $field['enum'];
+        if (!in_array($value, $enum, true)) {
+            $validation->addError(
+                $name,
+                'invalid',
+                [
+                    'messageCode' => '{field} must be one of: {enum}.',
+                    'enum' => $enum,
+                    'status' => 422
+                ]
+            );
+        }
+
     }
 
     /**
