@@ -136,6 +136,7 @@ class ValidationClassTest extends \PHPUnit_Framework_TestCase {
      */
     public function testMessageTranslation() {
         $vld = new TestValidation();
+        $vld->setTranslateFieldNames(true);
 
         $vld->addError('it', 'Keeping {field} {status}', 100);
 

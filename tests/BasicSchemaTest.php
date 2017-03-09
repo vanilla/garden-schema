@@ -260,28 +260,6 @@ class BasicSchemaTest extends AbstractSchemaTest {
     }
 
     /**
-     * Test a required empty string with a min length of 0.
-     */
-    public function testRequiredEmptyString() {
-        $schema = new Schema([
-            'col:s' => ['minLength' => 0]
-        ]);
-
-        $emptyData = ['col' => ''];
-        $valid = $schema->validate($emptyData);
-        $this->assertEmpty($valid['col']);
-        $this->assertInternalType('string', $valid['col']);
-
-        $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData);
-        $this->assertFalse($isValid);
-
-        $missingData = [];
-        $isValid = $schema->isValid($missingData);
-        $this->assertFalse($isValid);
-    }
-
-    /**
      * Test {@link Schema::requireOneOf()}.
      */
     public function testRequireOneOf() {

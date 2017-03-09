@@ -135,16 +135,27 @@ class Validation {
     public function getErrors() {
         $result = [];
         foreach ($this->getRawErrors() as $error) {
-            $row = array_intersect_key(
-                $error,
-                ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1]
-            );
-
-            $row['message'] = $this->getErrorMessage($error);
-
-            $result[] = $row;
+            $result[] = $this->formatError($error);
         }
         return $result;
+    }
+
+    /**
+     * Get the errors for a specific field.
+     *
+     * @param string $field The full path to the field.
+     * @return array Returns an array of errors.
+     */
+    public function getFieldErrors($field) {
+        if (empty($this->errors[$field])) {
+            return [];
+        } else {
+            $result = [];
+            foreach ($this->errors[$field] as $error) {
+                $result[] = $this->formatError($error);
+            }
+            return $result;
+        }
     }
 
     /**
@@ -178,7 +189,7 @@ class Validation {
      * @return bool Returns true if the field has no errors, false otherwise.
      */
     public function isValidField($field) {
-        $result = !isset($this->errors[$field]) || count($this->errors[$field]) === 0;
+        $result = empty($this->errors[$field]);
         return $result;
     }
 
@@ -371,5 +382,19 @@ class Validation {
     public function setTranslateFieldNames($translate) {
         $this->translateFieldNames = $translate;
         return $this;
+    }
+
+    /**
+     * @param $error
+     * @return array
+     */
+    private function formatError($error) {
+        $row = array_intersect_key(
+            $error,
+            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1]
+        );
+
+        $row['message'] = $this->getErrorMessage($error);
+        return $row;
     }
 }

@@ -8,6 +8,7 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
+use Garden\Schema\Validation;
 
 /**
  * Base class for schema tests.
@@ -120,5 +121,32 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
         ]);
 
         return $schema;
+    }
+
+    /**
+     * Assert that a validation object has an error code for a field.
+     *
+     * @param Validation $validation The validation object to inspect.
+     * @param string $field The field to look for.
+     * @param string $code The error code that must be present.
+     */
+    public function assertFieldHasError(Validation $validation, $field, $code) {
+        $name = $field ?: 'value';
+
+        if ($validation->isValidField($field)) {
+            $this->fail("The $name does not have any errors.");
+            return;
+        }
+
+        $codes = [];
+        foreach ($validation->getFieldErrors($field) as $error) {
+            if ($code === $error['code']) {
+                return;
+            }
+            $codes[] = $error['code'];
+        }
+
+        $has = implode(', ', $codes);
+        $this->fail("The $name does not have the $code error (has $has).");
     }
 }
