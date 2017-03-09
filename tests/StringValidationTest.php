@@ -134,7 +134,7 @@ class StringValidationTest extends AbstractSchemaTest {
 
     /**
      * Test the enum constraint.
-     * 
+     *
      * @expectedException \Garden\Schema\ValidationException
      * @expectedExceptionMessage value must be one of: one, two, three.
      * @expectedExceptionCode 422

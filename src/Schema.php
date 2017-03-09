@@ -35,7 +35,7 @@ class Schema implements \JsonSerializable {
         'int' => 'integer',
         's' => 'string',
         'str' => 'string',
-        'f' => 'float',
+        'n' => 'number',
         'b' => 'boolean',
         'bool' => 'boolean',
         'ts' => 'timestamp',
@@ -482,8 +482,8 @@ class Schema implements \JsonSerializable {
                 case 'integer':
                     $validType &= $this->validateInteger($value, $field, $validation, $name);
                     break;
-                case 'float':
-                    $validType &= $this->validateFloat($value, $field, $validation, $name);
+                case 'number':
+                    $validType &= $this->validateNumber($value, $field, $validation, $name);
                     break;
                 case 'string':
                     $validType &= $this->validateString($value, $field, $validation, $name);
@@ -671,7 +671,7 @@ class Schema implements \JsonSerializable {
      * is valid or false otherwise.
      * @internal param Validation $validation The validation results to add.
      */
-    private function validateFloat(&$value, array $field, Validation $validation, $name) {
+    private function validateNumber(&$value, array $field, Validation $validation, $name) {
         if (is_float($value)) {
             $validType = true;
         } elseif (is_numeric($value)) {

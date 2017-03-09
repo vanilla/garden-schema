@@ -93,7 +93,7 @@ Type      | Short-form
 boolean   | b, bool
 string    | s, str
 integer   | i, int
-float     | f
+number    | n
 timestamp | ts
 datetime  | dt
 array     | a
