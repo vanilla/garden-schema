@@ -369,7 +369,7 @@ class Schema implements \JsonSerializable {
     public function requireOneOf(array $required, $fieldname = '', $count = 1) {
         $result = $this->addValidator(
             $fieldname,
-            function ($data, $fieldname, Validation $validation) use ($required, $count) {
+            function ($data, $field, Validation $validation, $fieldname) use ($required, $count) {
                 $hasCount = 0;
                 $flattened = [];
 
@@ -515,7 +515,7 @@ class Schema implements \JsonSerializable {
         }
 
         // Validate a custom field validator.
-        $this->callValidators($value, $name, $validation);
+        $this->callValidators($value, $field, $validation, $name);
 
         return $value;
     }
@@ -546,17 +546,18 @@ class Schema implements \JsonSerializable {
      * Call all of the validators attached to a field.
      *
      * @param mixed $value The field value being validated.
-     * @param string $name The full path to the field.
+     * @param $field
      * @param Validation $validation The validation object to add errors.
+     * @param string $name The full path to the field.
      * @internal param array $field The field schema.
      * @internal param bool $sparse Whether this is a sparse validation.
      */
-    private function callValidators($value, $name, Validation $validation) {
+    private function callValidators($value, $field, Validation $validation, $name) {
         // Strip array references in the name except for the last one.
         $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $name);
         if (!empty($this->validators[$key])) {
             foreach ($this->validators[$key] as $validator) {
-                call_user_func($validator, $value, $name, $validation);
+                call_user_func($validator, $value, $field, $validation, $name);
             }
         }
     }

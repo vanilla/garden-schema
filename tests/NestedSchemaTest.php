@@ -71,9 +71,9 @@ class NestedSchemaTest extends AbstractSchemaTest {
         $this->assertFalse($schema->isValid($invalidData));
 
         // Try a custom validator for the items.
-        $schema->addValidator('arr[]', function ($value, $field, Validation $validation) {
+        $schema->addValidator('arr[]', function ($value, $field, Validation $validation, $fieldname) {
             if ($value > 2) {
-                $validation->addError($field, '{field} must be less than 2.', 422);
+                $validation->addError($fieldname, '{field} must be less than 2.', 422);
             }
         });
         try {
