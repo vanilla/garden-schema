@@ -425,12 +425,12 @@ class Schema implements \JsonSerializable {
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      */
     public function validate($data, $sparse = false) {
-        $validation = $this->createValidation();
+        $validation = new ValidationField($this->createValidation(), $this->schema, '');
 
-        $clean = $this->validateField($data, $this->schema, $validation, '', $sparse);
+        $clean = $this->validateField($data, $validation, $sparse);
 
-        if (!$validation->isValid()) {
-            throw new ValidationException($validation);
+        if (!$validation->getValidation()->isValid()) {
+            throw new ValidationException($validation->getValidation());
         }
 
         return $clean;
@@ -456,51 +456,49 @@ class Schema implements \JsonSerializable {
      * Validate a field.
      *
      * @param mixed $value The value to validate.
-     * @param array|Schema $field Parameters on the field.
-     * @param Validation $validation A validation object to add errors to.
-     * @param string $name The name of the field being validated or an empty string for the root.
+     * @param ValidationField $validation A validation object to add errors to.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return mixed Returns a clean version of the value with all extra fields stripped out.
      */
-    private function validateField($value, $field, Validation $validation, $name = '', $sparse = false) {
-        if ($field instanceof Schema) {
+    private function validateField($value, ValidationField $validation, $sparse = false) {
+        if ($validation->getField() instanceof Schema) {
             try {
-                $value = $field->validate($value, $sparse);
+                $value = $validation->getField()->validate($value, $sparse);
             } catch (ValidationException $ex) {
                 // The validation failed, so merge the validations together.
-                $validation->merge($ex->getValidation(), $name);
+                $validation->getValidation()->merge($ex->getValidation(), $validation->getName());
             }
         } else {
-            $type = isset($field['type']) ? $field['type'] : '';
+            $type =  $validation->getType();
 
             // Validate the field's type.
             $validType = true;
             switch ($type) {
                 case 'boolean':
-                    $validType &= $this->validateBoolean($value, $field, $validation, $name);
+                    $validType &= $this->validateBoolean($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
                 case 'integer':
-                    $validType &= $this->validateInteger($value, $field, $validation, $name);
+                    $validType &= $this->validateInteger($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
                 case 'number':
-                    $validType &= $this->validateNumber($value, $field, $validation, $name);
+                    $validType &= $this->validateNumber($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
                 case 'string':
-                    $validType &= $this->validateString($value, $field, $validation, $name);
+                    $validType &= $this->validateString($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
                 case 'timestamp':
-                    $validType &= $this->validateTimestamp($value, $field, $validation, $name);
+                    $validType &= $this->validateTimestamp($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
                 case 'datetime':
-                    $validType &= $this->validateDatetime($value, $field, $validation, $name);
+                    $validType &= $this->validateDatetime($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
                 case 'array':
-                    $validType &= $this->validateArray($value, $field, $validation, $name, $sparse);
+                    $validType &= $this->validateArray($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
                 case 'object':
-                    $validType &= $this->validateObject($value, $field, $validation, $name, $sparse);
+                    $validType &= $this->validateObject($value, $validation->getField(), $validation->getValidation(), $validation->getName());
                     break;
-                case '':
+                case null:
                     // No type was specified so we are valid.
                     $validType = true;
                     break;
@@ -508,14 +506,14 @@ class Schema implements \JsonSerializable {
                     throw new \InvalidArgumentException("Unrecognized type $type.", 500);
             }
             if (!$validType) {
-                $this->addTypeError($validation, $name, $type);
-            } elseif (!empty($field['enum'])) {
-                $this->validateEnum($value, $field, $validation, $name);
+                $this->addTypeError($validation->getValidation(), $validation->getName(), $type);
+            } elseif (!empty($validation->getField()['enum'])) {
+                $this->validateEnum($value, $validation->getField(), $validation->getValidation(), $validation->getName());
             }
         }
 
         // Validate a custom field validator.
-        $this->callValidators($value, $field, $validation, $name);
+        $this->callValidators($value, $validation->getField(), $validation->getValidation(), $validation->getName());
 
         return $value;
     }
@@ -584,7 +582,8 @@ class Schema implements \JsonSerializable {
                 // Validate each of the types.
                 foreach ($value as $i => &$item) {
                     $itemName = "{$name}[{$i}]";
-                    $validItem = $this->validateField($item, $field['items'], $validation, $itemName, $sparse);
+                    $itemValidation = new ValidationField($validation, $field['items'], $itemName);
+                    $validItem = $this->validateField($item, $itemValidation, $sparse);
                     $result[] = $validItem;
                 }
             } else {
@@ -748,6 +747,7 @@ class Schema implements \JsonSerializable {
         $clean = [];
         foreach ($properties as $propertyName => $propertyField) {
             $fullName = ltrim("$name.$propertyName", '.');
+            $propertyValidation = new ValidationField($validation, $propertyField, $fullName);
             $lName = strtolower($propertyName);
             $isRequired = isset($required[$propertyName]);
 
@@ -763,7 +763,7 @@ class Schema implements \JsonSerializable {
                     $validation->addError($fullName, 'missingField', ['messageCode' => '{field} cannot be null.']);
                 }
             } else {
-                $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyField, $validation, $fullName, $sparse);
+                $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyValidation, $sparse);
             }
 
             unset($keys[$lName]);
