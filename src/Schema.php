@@ -943,10 +943,10 @@ class Schema implements \JsonSerializable {
     protected function createValidation() {
         $class = $this->getValidationClass();
 
-        if (is_string($this->getValidationClass())) {
-            $result = new $class;
-        } else {
+        if ($class instanceof Validation) {
             $result = clone $class;
+        } else {
+            $result = new $class;
         }
         return $result;
     }
