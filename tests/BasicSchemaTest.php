@@ -123,7 +123,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
     /**
      * Provide date/time test data.
      *
-     * @return Returns a data provider.
+     * @return array Returns a data provider.
      */
     public function provideDateTimes() {
         $dt = new \DateTimeImmutable('1975-11-11T12:31');
@@ -189,10 +189,9 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test data that is not required, but provided as empty.
      *
      * @param string $shortType The short data type.
-     * @param string $longType The long data type.
      * @dataProvider provideTypes
      */
-    public function testNotRequired($shortType, $longType) {
+    public function testNotRequired($shortType) {
         $schema = new Schema([
             "col:$shortType?"
         ]);
@@ -212,10 +211,9 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test data that is not required, but provided as empty.
      *
      * @param string $shortType The short data type.
-     * @param string $longType The long data type.
      * @dataProvider provideTypes
      */
-    public function testRequiredEmpty($shortType, $longType) {
+    public function testRequiredEmpty($shortType) {
         // Bools and strings are special cases.
         if (in_array($shortType, ['b'])) {
             return;
@@ -236,6 +234,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
     /**
      * Test empty boolean values.
+     *
      * In general, bools should be cast to false if they are passed, but falsey.
      */
     public function testRequiredEmptyBool() {
@@ -371,7 +370,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
     /**
      * Call validate on an instance of Schema where the data contains unexpected parameters.
      *
-     * @param int $validationBehavior One of the **Schema::VALIDATE_*** constants.
+     * @param int $validationBehavior One of the **Schema::FLAG_*** constants.
      */
     protected function doValidationBehavior($validationBehavior) {
         $schema = new Schema([
@@ -379,7 +378,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
             'name:s' => 'The username of the user.',
             'email:s' => 'The email of the user.',
         ]);
-        $schema->setValidationBehavior($validationBehavior);
+        $schema->setFlags($validationBehavior);
 
         $data = [
             'userID' => 123,
@@ -403,7 +402,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testValidateException() {
         try {
-            $this->doValidationBehavior(Schema::VALIDATE_EXCEPTION);
+            $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION);
         } catch (\Exception $ex) {
             $msg = $ex->getMessage();
             throw $ex;
@@ -416,13 +415,13 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @expectedException \PHPUnit_Framework_Error_Notice
      */
     public function testValidateNotice() {
-        $this->doValidationBehavior(Schema::VALIDATE_NOTICE);
+        $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_NOTICE);
     }
 
     /**
      * Test silently removing unexpected parameters from validated data.
      */
     public function testValidateRemove() {
-        $this->doValidationBehavior(Schema::VALIDATE_CONTINUE);
+        $this->doValidationBehavior(0);
     }
 }

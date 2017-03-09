@@ -13,14 +13,15 @@ namespace Garden\Schema;
 class Schema implements \JsonSerializable {
     /// Constants ///
 
-    /** Silently remove invalid parameters when validating input. */
-    const VALIDATE_CONTINUE = 1;
+    /**
+     * Throw a notice when extraneous properties are encountered during validation.
+     */
+    const FLAG_EXTRA_PROPERTIES_NOTICE = 0x1;
 
-    /** Automatically remove invalid parameters from input and trigger an E_USER_NOTICE error during validation. */
-    const VALIDATE_NOTICE = 2;
-
-    /** Throw a ValidationException when invalid parameters are encountered during validation. */
-    const VALIDATE_EXCEPTION = 4;
+    /**
+     * Throw a ValidationException when extraneous properties are encountered during validation.
+     */
+    const FLAG_EXTRA_PROPERTIES_EXCEPTION = 0x2;
 
     /// Properties ///
     protected static $types = [
@@ -37,13 +38,12 @@ class Schema implements \JsonSerializable {
         'dt' => 'datetime'
     ];
 
-    /** @var string */
-    protected $description = '';
-
     protected $schema = [];
 
-    /** @var int */
-    protected $validationBehavior = self::VALIDATE_CONTINUE;
+    /**
+     * @var int A bitwise combination of the various **Schema::FLAG_*** constants.
+     */
+    protected $flags = 0;
 
     /**
      * @var array An array of callbacks that will custom validate the schema.
@@ -62,177 +62,78 @@ class Schema implements \JsonSerializable {
     }
 
     /**
-     * Select the first non-empty value from an array.
-     *
-     * @param array $keys An array of keys to try.
-     * @param array $array The array to select from.
-     * @param mixed $default The default value if non of the keys exist.
-     * @return mixed Returns the first non-empty value of {@link $default} if none are found.
-     * @category Array Functions
-     */
-    private static function arraySelect(array $keys, array $array, $default = null) {
-        foreach ($keys as $key) {
-            if (isset($array[$key]) && $array[$key]) {
-                return $array[$key];
-            }
-        }
-        return $default;
-    }
-
-    /**
-     * Build an OpenAPI-compatible specification of the current schema.
-     *
-     * @see https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameter-object
-     * @return array
-     */
-    public function dumpSpec() {
-        $schema = $this->schema;
-
-        if (is_array($schema)) {
-            foreach ($schema as &$parameter) {
-                if (!is_array($parameter) || !$parameter['type']) {
-                    unset($parameter);
-                    continue;
-                }
-
-                // Massage schema's types into their Open API v2 counterparts, including potential formatting flags.
-                // Valid parameter types for OpenAPI v2: string, number, integer, boolean, array or file
-                switch ($parameter['type']) {
-                    case 'string':
-                    case 'boolean':
-                    case 'array':
-                        // string, boolean and array types should not be altered.
-                        break;
-                    case 'object':
-                        $parameter['type'] = 'array';
-                        break;
-                    case 'timestamp':
-                        $parameter['type'] = 'integer';
-                        break;
-                    case 'float':
-                        $parameter['type'] = 'number';
-                        $parameter['format'] = 'float';
-                        break;
-                    case 'datetime':
-                        $parameter['type'] = 'string';
-                        $parameter['format'] = 'dateTime';
-                        break;
-                    default:
-                        $parameter['type'] = 'string';
-                }
-            }
-        } else {
-            $schema = [];
-        }
-
-        $spec = [
-            'description' => $this->description,
-            'parameters' => $schema
-        ];
-
-        return $spec;
-    }
-
-    /**
-     * Filter fields not in the schema.  The action taken is determined by the configured validation behavior.
-     *
-     * @param array &$data The data to filter.
-     * @param array $schema The schema array.  Its configured parameters are used to filter $data.
-     * @param Validation &$validation This argument will be filled with the validation result.
-     * @param string $path The path to current parameters for nested objects.
-     * @return Schema Returns the current instance for fluent calls.
-     */
-    protected function filterData(array &$data, array $schema, Validation &$validation, $path = '') {
-        // Normalize schema key casing for case-insensitive data key comparisons.
-        $schemaKeys = array_combine(array_map('strtolower', array_keys($schema)), array_keys($schema));
-
-        foreach ($data as $key => $val) {
-            if (array_key_exists($key, $schema)) {
-                continue;
-            } elseif (array_key_exists(strtolower($key), $schemaKeys)) {
-                // Migrate the value to the properly-cased key.
-                $correctedKey = $schemaKeys[strtolower($key)];
-                $data[$correctedKey] = $data[$key];
-                unset($data[$key]);
-                continue;
-            }
-
-            $errorMessage = sprintft('Unexpected parameter: %1$s.', $path.$key);
-
-            switch ($this->validationBehavior) {
-                case self::VALIDATE_EXCEPTION:
-                    $validation->addError(
-                        $key, 'unexpected_parameter', [
-                            'parameter' => $key,
-                            'message' => $errorMessage,
-                            'status' => 500
-                        ]
-                    );
-                    continue;
-                case self::VALIDATE_NOTICE:
-                    // Trigger a notice then fall to the next case.
-                    trigger_error($errorMessage, E_USER_NOTICE);
-                case self::VALIDATE_CONTINUE:
-                default:
-                    unset($data[$key]);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
      * Grab the schema's current description.
      *
      * @return string
      */
     public function getDescription() {
-        return $this->description;
+        return isset($this->schema['description']) ? $this->schema['description'] : '';
     }
 
     /**
      * Set the description for the schema.
      *
-     * @param string $description
-     * @throws \InvalidArgumentException when the provided description is not a string.
+     * @param string $description The new description.
+     * @throws \InvalidArgumentException Throws an exception when the provided description is not a string.
      * @return Schema
      */
     public function setDescription($description) {
         if (is_string($description)) {
-            $this->description = $description;
+            $this->schema['description'] = $description;
         } else {
-            throw new \InvalidArgumentException("Invalid description type.", 500);
+            throw new \InvalidArgumentException("The description is not a valid string.", 500);
         }
 
         return $this;
     }
 
     /**
-     * Return a Schema::VALIDATE_* constant representing the currently configured validation behavior.
+     * Return the validation flags.
      *
-     * @return int Returns a Schema::VALIDATE_* constant to indicate this instance's validation behavior.
+     * @return int Returns a bitwise combination of flags.
      */
-    public function getValidationBehavior() {
-        return $this->validationBehavior;
+    public function getFlags() {
+        return $this->flags;
     }
 
     /**
-     * Set the validation behavior for the schema, which determines how invalid properties are handled.
+     * Set the validation flags.
      *
-     * @param int $validationBehavior One of the Schema::VALIDATE_* constants.
+     * @param int $flags One or more of the **Schema::FLAG_*** constants.
      * @return Schema Returns the current instance for fluent calls.
      */
-    public function setValidationBehavior($validationBehavior) {
-        switch ($validationBehavior) {
-            case self::VALIDATE_CONTINUE:
-            case self::VALIDATE_NOTICE:
-            case self::VALIDATE_EXCEPTION:
-                $this->validationBehavior = $validationBehavior;
-                break;
-            default:
-                throw new \InvalidArgumentException('Invalid validation behavior.', 500);
+    public function setFlags($flags) {
+        if (!is_int($flags)) {
+            throw new \InvalidArgumentException('Invalid flags.', 500);
         }
+        $this->flags = $flags;
 
+        return $this;
+    }
+
+    /**
+     * Whether or not the schema has a flag (or combination of flags).
+     *
+     * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
+     * @return bool Returns **true** if all of the flags are set or **false** otherwise.
+     */
+    public function hasFlag($flag) {
+        return ($this->flags & $flag) === $flag;
+    }
+
+    /**
+     * Set a flag.
+     *
+     * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
+     * @param bool $value Either true or false.
+     * @return $this
+     */
+    public function setFlag($flag, $value) {
+        if ($value) {
+            $this->flags = $this->flags | $flag;
+        } else {
+            $this->flags = $this->flags & ~$flag;
+        }
         return $this;
     }
 
@@ -845,18 +746,17 @@ class Schema implements \JsonSerializable {
 
         // Look for extraneous properties.
         if (!empty($keys)) {
-            switch ($this->getValidationBehavior()) {
-                case Schema::VALIDATE_NOTICE:
-                    $msg = sprintf("%s has unexpected field(s): %s.", $name ?: 'value', implode(', ', $keys));
-                    trigger_error($msg, E_USER_NOTICE);
-                    break;
-                case Schema::VALIDATE_EXCEPTION:
-                    $validation->addError($name, 'invalid', [
-                        'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
-                        'extra' => array_values($keys),
-                        'status' => 422
-                    ]);
-                    break;
+            if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE)) {
+                $msg = sprintf("%s has unexpected field(s): %s.", $name ?: 'value', implode(', ', $keys));
+                trigger_error($msg, E_USER_NOTICE);
+            }
+
+            if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION)) {
+                $validation->addError($name, 'invalid', [
+                    'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
+                    'extra' => array_values($keys),
+                    'status' => 422
+                ]);
             }
         }
 
@@ -996,8 +896,4 @@ class Schema implements \JsonSerializable {
     private static function val($key, array $arr, $default = null) {
         return isset($arr[$key]) ? $arr[$key] : $default;
     }
-}
-
-function sprintft($format, ...$args) {
-    return sprintf($format, ...$args);
 }

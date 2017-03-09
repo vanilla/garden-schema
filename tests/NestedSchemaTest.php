@@ -185,7 +185,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * @expectedException \Garden\Schema\ValidationException
      */
     public function testValidateException() {
-        $this->doValidationBehavior(Schema::VALIDATE_EXCEPTION);
+        $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION);
     }
 
     /**
@@ -194,14 +194,14 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * @expectedException \PHPUnit_Framework_Error_Notice
      */
     public function testValidateNotice() {
-        $this->doValidationBehavior(Schema::VALIDATE_NOTICE);
+        $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_NOTICE);
     }
 
     /**
      * Test silently removing unexpected parameters from validated data.
      */
     public function testValidateRemove() {
-        $this->doValidationBehavior(Schema::VALIDATE_CONTINUE);
+        $this->doValidationBehavior(0);
     }
 
     /**
@@ -326,7 +326,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
                 'email:s' => 'The ID of the new member.'
             ]
         ]);
-        $schema->setValidationBehavior($validationBehavior);
+        $schema->setFlags($validationBehavior);
 
         $data = [
             'groupID' => 123,
