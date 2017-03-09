@@ -117,7 +117,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         $valid = $schema->validate($value);
         $this->assertInstanceOf(\DateTimeInterface::class, $valid);
-        $this->assertEquals($expected, $valid);
+        $this->assertEquals($expected->getTimestamp(), $valid->getTimestamp());
     }
 
     /**
