@@ -47,8 +47,8 @@ class ValidationField {
      * @return $this
      * @see Validation::addError()
      */
-    public function addError($error, array $options = []) {
-        $this->validation->addError($this->field, $error, $options);
+    public function addError($error, $options = []) {
+        $this->validation->addError($this->getName(), $error, $options);
         return $this;
     }
 
@@ -128,5 +128,16 @@ class ValidationField {
      */
     public function getType() {
         return isset($this->field['type']) ? $this->field['type'] : null;
+    }
+
+    /**
+     * Get a value fom the field.
+     *
+     * @param string $key The key to look at.
+     * @param mixed $default The default to return if the key isn't found.
+     * @return mixed Returns a value or the default.
+     */
+    public function val($key, $default = null) {
+        return isset($this->field[$key]) ? $this->field[$key] : $default;
     }
 }

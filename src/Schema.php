@@ -475,28 +475,28 @@ class Schema implements \JsonSerializable {
             $validType = true;
             switch ($type) {
                 case 'boolean':
-                    $validType &= $this->validateBoolean($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateBoolean($value, $validation);
                     break;
                 case 'integer':
-                    $validType &= $this->validateInteger($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateInteger($value, $validation);
                     break;
                 case 'number':
-                    $validType &= $this->validateNumber($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateNumber($value, $validation);
                     break;
                 case 'string':
-                    $validType &= $this->validateString($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateString($value, $validation);
                     break;
                 case 'timestamp':
-                    $validType &= $this->validateTimestamp($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateTimestamp($value, $validation);
                     break;
                 case 'datetime':
-                    $validType &= $this->validateDatetime($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateDatetime($value, $validation);
                     break;
                 case 'array':
-                    $validType &= $this->validateArray($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateArray($value, $validation, $sparse);
                     break;
                 case 'object':
-                    $validType &= $this->validateObject($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+                    $validType &= $this->validateObject($value, $validation, $sparse);
                     break;
                 case null:
                     // No type was specified so we are valid.
@@ -564,25 +564,28 @@ class Schema implements \JsonSerializable {
      * Validate an array.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated or an empty string for the root.
+     * @param ValidationField $validation The validation results to add.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return bool Returns true if {@link $value} is valid or false otherwise.
+     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
      */
-    private function validateArray(&$value, array $field, Validation $validation, $name = '', $sparse = false) {
+    private function validateArray(&$value, ValidationField $validation, $sparse = false) {
         $validType = true;
 
         if (!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) {
             $validType = false;
         } else {
-            if (isset($field['items'])) {
+            if (isset($validation->getField()['items'])) {
                 $result = [];
 
                 // Validate each of the types.
+                $itemValidation = new ValidationField(
+                    $validation->getValidation(),
+                    $validation->getField()['items'],
+                    ''
+                );
+
                 foreach ($value as $i => &$item) {
-                    $itemName = "{$name}[{$i}]";
-                    $itemValidation = new ValidationField($validation, $field['items'], $itemName);
+                    $itemValidation->setName($validation->getName()."[{$i}]");
                     $validItem = $this->validateField($item, $itemValidation, $sparse);
                     $result[] = $validItem;
                 }
@@ -601,13 +604,10 @@ class Schema implements \JsonSerializable {
      * Validate a boolean value.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated or an empty string for the root.
+     * @param ValidationField $validation The validation results to add.
      * @return bool Returns true if the value is valid or false otherwise.
-     * @internal param Validation $validation The validation results to add.
      */
-    private function validateBoolean(&$value, array $field, Validation $validation, $name) {
+    private function validateBoolean(&$value, ValidationField $validation) {
         if (is_bool($value)) {
             $validType = true;
         } else {
@@ -629,14 +629,10 @@ class Schema implements \JsonSerializable {
      * Validate a date time.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated or an empty string for the root.
+     * @param ValidationField $validation The validation results to add.
      * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
-     * is valid or false otherwise.
-     * @internal param Validation $validation The validation results to add.
      */
-    private function validateDatetime(&$value, array $field, Validation $validation, $name) {
+    private function validateDatetime(&$value, ValidationField $validation) {
         $validType = true;
         if ($value instanceof \DateTimeInterface) {
             $validType = true;
@@ -664,14 +660,10 @@ class Schema implements \JsonSerializable {
      * Validate a float.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated or an empty string for the root.
+     * @param ValidationField $validation The validation results to add.
      * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
-     * is valid or false otherwise.
-     * @internal param Validation $validation The validation results to add.
      */
-    private function validateNumber(&$value, array $field, Validation $validation, $name) {
+    private function validateNumber(&$value, ValidationField $validation) {
         if (is_float($value)) {
             $validType = true;
         } elseif (is_numeric($value)) {
@@ -687,14 +679,10 @@ class Schema implements \JsonSerializable {
      * Validate and integer.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated or an empty string for the root.
+     * @param ValidationField $validation The validation results to add.
      * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
-     * is valid or false otherwise.
-     * @internal param Validation $validation The validation results to add.
      */
-    private function validateInteger(&$value, array $field, Validation $validation, $name) {
+    private function validateInteger(&$value, ValidationField $validation) {
         if (is_int($value)) {
             $validType = true;
         } elseif (is_numeric($value)) {
@@ -710,18 +698,16 @@ class Schema implements \JsonSerializable {
      * Validate an object.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated or an empty string for the root.
+     * @param ValidationField $validation The validation results to add.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return bool Returns true if {@link $value} is valid or false otherwise.
+     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
      */
-    private function validateObject(&$value, array $field, Validation $validation, $name = '', $sparse = false) {
+    private function validateObject(&$value, ValidationField $validation, $sparse = false) {
         if (!is_array($value) || isset($value[0])) {
             return false;
-        } elseif (isset($field['properties'])) {
+        } elseif (is_array($validation->val('properties'))) {
             // Validate the data against the internal schema.
-            $value = $this->validateProperties($value, $field, $validation, $name, $sparse);
+            $value = $this->validateProperties($value, $validation, $sparse);
         }
         return true;
     }
@@ -730,24 +716,27 @@ class Schema implements \JsonSerializable {
      * Validate data against the schema and return the result.
      *
      * @param array $data The data to validate.
-     * @param array $field The schema array to validate against.
-     * @param Validation $validation This argument will be filled with the validation result.
-     * @param string $name The path to the current path for nested objects.
+     * @param Validation|ValidationField $validation This argument will be filled with the validation result.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return array Returns a clean array with only the appropriate properties and the data coerced to proper types.
+     * @internal param array $field The schema array to validate against.
+     * @internal param string $name The path to the current path for nested objects.
      */
-    private function validateProperties(array $data, array $field, Validation $validation, $name = '', $sparse = false) {
-        $properties = $field['properties'];
-        $required = isset($field['required']) ? array_flip($field['required']) : [];
+    private function validateProperties(array $data, ValidationField $validation, $sparse = false) {
+        $properties = $validation->val('properties', []);
+        $required = array_flip($validation->val('required', []));
         $keys = array_keys($data);
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
+        $propertyValidation = new ValidationField($validation->getValidation(), [], null);
 
         // Loop through the schema fields and validate each one.
         $clean = [];
         foreach ($properties as $propertyName => $propertyField) {
-            $fullName = ltrim("$name.$propertyName", '.');
-            $propertyValidation = new ValidationField($validation, $propertyField, $fullName);
+            $propertyValidation
+                ->setField($propertyField)
+                ->setName(ltrim($validation->getName().".$propertyName", '.'));
+
             $lName = strtolower($propertyName);
             $isRequired = isset($required[$propertyName]);
 
@@ -755,12 +744,12 @@ class Schema implements \JsonSerializable {
             if (!array_key_exists($lName, $keys)) {
                 // A sparse validation can leave required fields out.
                 if ($isRequired && !$sparse) {
-                    $validation->addError($fullName, 'missingField', ['messageCode' => '{field} is required.']);
+                    $propertyValidation->addError('missingField', ['messageCode' => '{field} is required.']);
                 }
             } elseif ($data[$keys[$lName]] === null) {
                 $clean[$propertyName] = null;
                 if ($isRequired) {
-                    $validation->addError($fullName, 'missingField', ['messageCode' => '{field} cannot be null.']);
+                    $propertyValidation->addError('missingField', ['messageCode' => '{field} cannot be null.']);
                 }
             } else {
                 $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyValidation, $sparse);
@@ -772,12 +761,12 @@ class Schema implements \JsonSerializable {
         // Look for extraneous properties.
         if (!empty($keys)) {
             if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE)) {
-                $msg = sprintf("%s has unexpected field(s): %s.", $name ?: 'value', implode(', ', $keys));
+                $msg = sprintf("%s has unexpected field(s): %s.", $validation->getName() ?: 'value', implode(', ', $keys));
                 trigger_error($msg, E_USER_NOTICE);
             }
 
             if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION)) {
-                $validation->addError($name, 'invalid', [
+                $validation->addError('invalid', [
                     'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
                     'extra' => array_values($keys),
                     'status' => 422
@@ -792,12 +781,10 @@ class Schema implements \JsonSerializable {
      * Validate a string.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated.
-     * @return bool Returns true if {@link $value} is valid or false otherwise.
+     * @param ValidationField $validation The validation results to add.
+     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
      */
-    private function validateString(&$value, array $field, Validation $validation, $name) {
+    private function validateString(&$value, ValidationField $validation) {
         if (is_string($value)) {
             $validType = true;
         } elseif (is_numeric($value)) {
@@ -807,12 +794,11 @@ class Schema implements \JsonSerializable {
             return false;
         }
 
-        if (($minLength = self::val('minLength', $field, 0)) > 0 && mb_strlen($value) < $minLength) {
-            if (!empty($name) && $minLength === 1) {
-                $validation->addError($name, 'missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
+        if (($minLength = $validation->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
+            if (!empty($validation->getName()) && $minLength === 1) {
+                $validation->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
             } else {
                 $validation->addError(
-                    $name,
                     'minLength',
                     [
                         'messageCode' => '{field} should be at least {minLength} {minLength,plural,character} long.',
@@ -822,9 +808,8 @@ class Schema implements \JsonSerializable {
                 );
             }
         }
-        if (($maxLength = self::val('maxLength', $field, 0)) > 0 && mb_strlen($value) > $maxLength) {
+        if (($maxLength = $validation->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
             $validation->addError(
-                $name,
                 'maxLength',
                 [
                     'messageCode' => '{field} is {overflow} {overflow,plural,characters} too long.',
@@ -834,12 +819,11 @@ class Schema implements \JsonSerializable {
                 ]
             );
         }
-        if ($pattern = self::val('pattern', $field)) {
+        if ($pattern = $validation->val('pattern')) {
             $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
 
             if (!preg_match($regex, $value)) {
                 $validation->addError(
-                    $name,
                     'invalid',
                     [
                         'messageCode' => '{field} is in the incorrect format.',
@@ -856,12 +840,10 @@ class Schema implements \JsonSerializable {
      * Validate a unix timestamp.
      *
      * @param mixed &$value The value to validate.
-     * @param array $field The field definition.
-     * @param Validation $validation The validation results to add.
-     * @param string $name The name of the field being validated.
+     * @param ValidationField $validation The field being validated.
      * @return bool Returns true if {@link $value} is valid or false otherwise.
      */
-    private function validateTimestamp(&$value, array $field, Validation $validation, $name) {
+    private function validateTimestamp(&$value, ValidationField $validation) {
         $validType = true;
         if (is_numeric($value)) {
             $value = (int)$value;
