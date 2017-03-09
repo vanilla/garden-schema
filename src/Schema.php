@@ -23,8 +23,12 @@ class Schema implements \JsonSerializable {
      */
     const FLAG_EXTRA_PROPERTIES_EXCEPTION = 0x2;
 
-    /// Properties ///
-    protected static $types = [
+    /**
+     * @var array All the known types.
+     *
+     * If this is ever given some sort of public access then remove the static.
+     */
+    private static $types = [
         'a' => 'array',
         'o' => 'object',
         'i' => 'integer',
@@ -38,17 +42,23 @@ class Schema implements \JsonSerializable {
         'dt' => 'datetime'
     ];
 
-    protected $schema = [];
+    private $schema = [];
 
     /**
      * @var int A bitwise combination of the various **Schema::FLAG_*** constants.
      */
-    protected $flags = 0;
+    private $flags = 0;
 
     /**
      * @var array An array of callbacks that will custom validate the schema.
      */
-    protected $validators = [];
+    private $validators = [];
+
+    /**
+     * @var string|Validation The name of the class or an instance that will be cloned.
+     */
+    private $validationClass = Validation::class;
+
 
     /// Methods ///
 
@@ -208,9 +218,11 @@ class Schema implements \JsonSerializable {
     }
 
     /**
-     * @param array $node
-     * @param mixed $value
-     * @return array
+     * Parse a schema node.
+     *
+     * @param array $node The node to parse.
+     * @param mixed $value Additional information from the node.
+     * @return array Returns a JSON schema compatible node.
      */
     private function parseNode($node, $value = null) {
         if (is_array($value)) {
@@ -251,8 +263,10 @@ class Schema implements \JsonSerializable {
     }
 
     /**
-     * @param array $arr
-     * @return array
+     * Parse the schema for an object's properties.
+     *
+     * @param array $arr An object property schema.
+     * @return array Returns a schema array suitable to be placed in the **properties** key of a schema.
      */
     private function parseProperties(array $arr) {
         $properties = [];
@@ -411,7 +425,7 @@ class Schema implements \JsonSerializable {
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      */
     public function validate($data, $sparse = false) {
-        $validation = new Validation();
+        $validation = $this->createValidation();
 
         $clean = $this->validateField($data, $this->schema, $validation, '', $sparse);
 
@@ -860,7 +874,7 @@ class Schema implements \JsonSerializable {
      */
     public function jsonSerialize() {
         $result = $this->schema;
-        array_walk_recursive($result, function (&$value, $key) {
+        array_walk_recursive($result, function (&$value) {
             if ($value instanceof \JsonSerializable) {
                 $value = $value->jsonSerialize();
             }
@@ -895,5 +909,45 @@ class Schema implements \JsonSerializable {
      */
     private static function val($key, array $arr, $default = null) {
         return isset($arr[$key]) ? $arr[$key] : $default;
+    }
+
+    /**
+     * Get the class that's used to contain validation information.
+     *
+     * @return Validation|string Returns the validation class.
+     */
+    public function getValidationClass() {
+        return $this->validationClass;
+    }
+
+    /**
+     * Set the class that's used to contain validation information.
+     *
+     * @param Validation|string $class Either the name of a class or a class that will be cloned.
+     * @return $this
+     */
+    public function setValidationClass($class) {
+        if (!is_a($class, Validation::class, true)) {
+            throw new \InvalidArgumentException("$class must be a subclass of ".Validation::class, 500);
+        }
+
+        $this->validationClass = $class;
+        return $this;
+    }
+
+    /**
+     * Create a new validation instance.
+     *
+     * @return Validation Returns a validation object.
+     */
+    protected function createValidation() {
+        $class = $this->getValidationClass();
+
+        if (is_string($this->getValidationClass())) {
+            $result = new $class;
+        } else {
+            $result = clone $class;
+        }
+        return $result;
     }
 }

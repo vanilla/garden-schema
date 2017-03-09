@@ -8,6 +8,7 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
+use Garden\Schema\Tests\Fixtures\TestValidation;
 use Garden\Schema\Validation;
 use Garden\Schema\ValidationException;
 
@@ -423,5 +424,34 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testValidateRemove() {
         $this->doValidationBehavior(0);
+    }
+
+    /**
+     * Test a custom validation class.
+     */
+    public function testDifferentValidationClass() {
+        $schema = new Schema([':i']);
+        $schema->setValidationClass(TestValidation::class);
+
+        try {
+            $schema->validate('aaa');
+        } catch (ValidationException $ex) {
+            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
+        }
+
+        $validation = new TestValidation();
+        $schema->setValidationClass($validation);
+        try {
+            $schema->validate('aaa');
+        } catch (ValidationException $ex) {
+            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
+        }
+
+        $validation->setTranslateFieldNames(true);
+        try {
+            $schema->validate('aaa');
+        } catch (ValidationException $ex) {
+            $this->assertSame('!!value is not a valid !integer.', $ex->getMessage());
+        }
     }
 }

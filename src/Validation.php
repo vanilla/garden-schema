@@ -82,8 +82,8 @@ class Validation {
      * @return int Returns the current status code.
      */
     public function getStatus() {
-        if ($this->mainStatus) {
-            return $this->mainStatus;
+        if ($status = $this->getMainStatus()) {
+            return $status;
         }
 
         if ($this->isValid()) {
@@ -107,8 +107,8 @@ class Validation {
      * @return string Returns the exception message.
      */
     public function getMessage() {
-        if ($this->mainMessage) {
-            return $this->mainMessage;
+        if ($message = $this->getMainMessage()) {
+            return $message;
         }
 
         $sentence = $this->translate('%s.');
@@ -204,7 +204,7 @@ class Validation {
             if (isset($error['index'])) {
                 $field .= '['.$error['index'].']';
             }
-            $error['field'] = $field;
+            $error['field'] = '@'.$field;
         } elseif (isset($error['index'])) {
             if (empty($error['field'])) {
                 $error['field'] = '@'.$this->formatMessage('item {index}', $error);
@@ -280,7 +280,7 @@ class Validation {
      * @param string $str The string to translate.
      * @return string Returns the translated string.
      */
-    protected function translate($str) {
+    public function translate($str) {
         if (substr($str, 0, 1) === '@') {
             // This is a literal string that bypasses translation.
             return substr($str, 1);

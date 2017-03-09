@@ -39,9 +39,9 @@ class ValidationException extends \Exception implements \JsonSerializable {
     public function jsonSerialize() {
         $errors = $this->validation->getErrors();
         if (count($errors) === 1) {
-            $message = Validation::errorMessage($errors[0]);
+            $message = $errors[0]['message'];
         } else {
-            $message = 'Validation failed.';
+            $message = $this->getValidation()->translate('Validation failed.');
         }
 
         $result = [

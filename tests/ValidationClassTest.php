@@ -150,4 +150,12 @@ class ValidationClassTest extends \PHPUnit_Framework_TestCase {
         $vld->addError('it', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
         $this->assertSame('!apple berries pears.', $vld->getMessage());
     }
+
+    /**
+     * Messages that start with "@" should not be translated.
+     */
+    public function testNoTranslate() {
+        $vld = new Validation();
+        $this->assertSame('foo', $vld->translate('@foo'));
+    }
 }
