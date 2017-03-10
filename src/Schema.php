@@ -808,6 +808,12 @@ class Schema implements \JsonSerializable {
         if ($format = $field->val('format')) {
             $type = $format;
             switch ($format) {
+                case 'date-time':
+                    $result = $this->validateDatetime($result, $field);
+                    if ($result instanceof \DateTimeInterface) {
+                        $result = $result->format(\DateTime::RFC3339);
+                    }
+                    break;
                 case 'email':
                     $result = filter_var($result, FILTER_VALIDATE_EMAIL);
                     break;

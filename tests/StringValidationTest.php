@@ -7,6 +7,7 @@
 
 namespace Garden\Schema\Tests;
 
+use DateTime;
 use Garden\Schema\Schema;
 use Garden\Schema\Validation;
 use Garden\Schema\ValidationException;
@@ -170,6 +171,45 @@ class StringValidationTest extends AbstractSchemaTest {
         $missingData = [];
         $isValid = $schema->isValid($missingData);
         $this->assertFalse($isValid);
+    }
+
+    /**
+     * Test different date/time parsing.
+     *
+     * @param mixed $value The value to parse.
+     * @param string $expected The expected datetime.
+     * @dataProvider provideDateTimeFormatTests
+     */
+    public function testDateTimeFormat($value, $expected) {
+        $schema = new Schema([':s' => ['format' => 'date-time']]);
+
+        $valid = $schema->validate($value);
+        $this->assertEquals($expected, $valid);
+    }
+
+    /**
+     * Provide date strings in various formats.
+     *
+     * @return array Returns a data provider array.
+     */
+    public function provideDateTimeFormatTests() {
+        $dt = new \DateTimeImmutable();
+        $dtStr = $dt->format(DateTime::RFC3339);
+
+        $r = [
+            $dt->format(DateTime::ATOM),
+            $dt->format(DateTime::COOKIE),
+            $dt->format(DateTime::RFC822),
+            $dt->format(DateTime::RFC850),
+            $dt->format(DateTime::RFC850),
+            $dt->format(DateTime::W3C),
+        ];
+
+        $r = array_map(function ($v) use ($dtStr) {
+            return [$v, $dtStr];
+        }, $r);
+        $r = array_column($r, null, 0);
+        return $r;
     }
 
     /**
