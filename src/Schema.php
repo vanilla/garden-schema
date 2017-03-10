@@ -27,18 +27,14 @@ class Schema implements \JsonSerializable {
      * If this is ever given some sort of public access then remove the static.
      */
     private static $types = [
-        'a' => 'array',
-        'o' => 'object',
-        'i' => 'integer',
-        'int' => 'integer',
-        's' => 'string',
-        'str' => 'string',
-        'f' => 'number',
-        'float' => 'number',
-        'b' => 'boolean',
-        'bool' => 'boolean',
-        'ts' => 'timestamp',
-        'dt' => 'datetime'
+        'array' => ['a'],
+        'object' => ['o'],
+        'integer' => ['i', 'int'],
+        'string' => ['s', 'str'],
+        'number' => ['f', 'float'],
+        'boolean' => ['b', 'bool'],
+        'timestamp' => ['ts'],
+        'datetime' => ['dt']
     ];
 
     private $schema = [];
@@ -334,7 +330,7 @@ class Schema implements \JsonSerializable {
         // Check for a type.
         $parts = explode(':', $key);
         $name = $parts[0];
-        $type = !empty($parts[1]) && isset(self::$types[$parts[1]]) ? self::$types[$parts[1]] : null;
+        $type = !empty($parts[1]) ? $this->getType($parts[1]) : null;
 
         if ($value instanceof Schema) {
             if ($type === 'array') {
@@ -949,13 +945,14 @@ class Schema implements \JsonSerializable {
      */
     private function getType($alias) {
         if (isset(self::$types[$alias])) {
-            $type = self::$types[$alias];
-        } elseif (array_search($alias, self::$types) !== false) {
-            $type = $alias;
-        } else {
-            $type = null;
+            return $alias;
         }
-        return $type;
+        foreach (self::$types as $type => $aliases) {
+            if (in_array($alias, $aliases, true)) {
+                return $type;
+            }
+        }
+        return null;
     }
 
     /**
