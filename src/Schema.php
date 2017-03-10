@@ -369,7 +369,7 @@ class Schema implements \JsonSerializable {
     public function requireOneOf(array $required, $fieldname = '', $count = 1) {
         $result = $this->addValidator(
             $fieldname,
-            function ($data, $field, Validation $validation, $fieldname) use ($required, $count) {
+            function ($data, ValidationField $field) use ($required, $count) {
                 $hasCount = 0;
                 $flattened = [];
 
@@ -404,7 +404,7 @@ class Schema implements \JsonSerializable {
                     $message = '{count} of {required} are required.';
                 }
 
-                $validation->addError($fieldname, 'missingField', [
+                $field->addError('missingField', [
                     'messageCode' => $message,
                     'required' => $required,
                     'count' => $count
@@ -456,106 +456,79 @@ class Schema implements \JsonSerializable {
      * Validate a field.
      *
      * @param mixed $value The value to validate.
-     * @param ValidationField $validation A validation object to add errors to.
+     * @param ValidationField $field A validation object to add errors to.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return mixed Returns a clean version of the value with all extra fields stripped out.
      */
-    private function validateField($value, ValidationField $validation, $sparse = false) {
-        if ($validation->getField() instanceof Schema) {
+    private function validateField($value, ValidationField $field, $sparse = false) {
+        $result = $value;
+        if ($field->getField() instanceof Schema) {
             try {
-                $value = $validation->getField()->validate($value, $sparse);
+                $result = $field->getField()->validate($value, $sparse);
             } catch (ValidationException $ex) {
                 // The validation failed, so merge the validations together.
-                $validation->getValidation()->merge($ex->getValidation(), $validation->getName());
+                $field->getValidation()->merge($ex->getValidation(), $field->getName());
             }
         } else {
-            $type =  $validation->getType();
-
             // Validate the field's type.
-            $validType = true;
+            $type = $field->getType();
             switch ($type) {
                 case 'boolean':
-                    $validType &= $this->validateBoolean($value, $validation);
+                    $result = $this->validateBoolean($value, $field);
                     break;
                 case 'integer':
-                    $validType &= $this->validateInteger($value, $validation);
+                    $result = $this->validateInteger($value, $field);
                     break;
                 case 'number':
-                    $validType &= $this->validateNumber($value, $validation);
+                    $result = $this->validateNumber($value, $field);
                     break;
                 case 'string':
-                    $validType &= $this->validateString($value, $validation);
+                    $result = $this->validateString($value, $field);
                     break;
                 case 'timestamp':
-                    $validType &= $this->validateTimestamp($value, $validation);
+                    $result = $this->validateTimestamp($value, $field);
                     break;
                 case 'datetime':
-                    $validType &= $this->validateDatetime($value, $validation);
+                    $result = $this->validateDatetime($value, $field);
                     break;
                 case 'array':
-                    $validType &= $this->validateArray($value, $validation, $sparse);
+                    $result = $this->validateArray($value, $field, $sparse);
                     break;
                 case 'object':
-                    $validType &= $this->validateObject($value, $validation, $sparse);
+                    $result = $this->validateObject($value, $field, $sparse);
                     break;
                 case null:
                     // No type was specified so we are valid.
-                    $validType = true;
+                    $result = $value;
                     break;
                 default:
                     throw new \InvalidArgumentException("Unrecognized type $type.", 500);
             }
-            if (!$validType) {
-                $this->addTypeError($validation->getValidation(), $validation->getName(), $type);
-            } elseif (!empty($validation->getField()['enum'])) {
-                $this->validateEnum($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+            if ($result !== null && !$this->validateEnum($value, $field)) {
+                $result = null;
             }
         }
 
         // Validate a custom field validator.
-        $this->callValidators($value, $validation->getField(), $validation->getValidation(), $validation->getName());
+        if ($result !== null) {
+            $this->callValidators($result, $field);
+        }
 
-        return $value;
-    }
-
-    /**
-     * Add an invalid type error.
-     *
-     * @param Validation $validation The validation to add the error to.
-     * @param string $name The full field name.
-     * @param string $type The type that was checked.
-     * @return $this
-     */
-    protected function addTypeError(Validation $validation, $name, $type) {
-        $validation->addError(
-            $name,
-            'invalid',
-            [
-                'type' => $type,
-                'messageCode' => '{field} is not a valid {type}.',
-                'status' => 422
-            ]
-        );
-
-        return $this;
+        return $result;
     }
 
     /**
      * Call all of the validators attached to a field.
      *
      * @param mixed $value The field value being validated.
-     * @param $field
-     * @param Validation $validation The validation object to add errors.
-     * @param string $name The full path to the field.
-     * @internal param array $field The field schema.
-     * @internal param bool $sparse Whether this is a sparse validation.
+     * @param ValidationField $field The validation object to add errors.
      */
-    private function callValidators($value, $field, Validation $validation, $name) {
+    private function callValidators($value, ValidationField $field) {
         // Strip array references in the name except for the last one.
-        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $name);
+        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $field->getName());
         if (!empty($this->validators[$key])) {
             foreach ($this->validators[$key] as $validator) {
-                call_user_func($validator, $value, $field, $validation, $name);
+                call_user_func($validator, $value, $field);
             }
         }
     }
@@ -563,179 +536,177 @@ class Schema implements \JsonSerializable {
     /**
      * Validate an array.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The validation results to add.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
+     * @return array|null Returns an array or **null** if validation fails.
      */
-    private function validateArray(&$value, ValidationField $validation, $sparse = false) {
-        $validType = true;
-
+    private function validateArray($value, ValidationField $field, $sparse = false) {
         if (!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) {
-            $validType = false;
-        } else {
-            if (isset($validation->getField()['items'])) {
-                $result = [];
+            $field->addTypeError('array');
+            return null;
+        } elseif (empty($value)) {
+            return [];
+        } elseif ($field->val('items') !== null) {
+            $result = [];
 
-                // Validate each of the types.
-                $itemValidation = new ValidationField(
-                    $validation->getValidation(),
-                    $validation->getField()['items'],
-                    ''
-                );
+            // Validate each of the types.
+            $itemValidation = new ValidationField(
+                $field->getValidation(),
+                $field->val('items'),
+                ''
+            );
 
-                foreach ($value as $i => &$item) {
-                    $itemValidation->setName($validation->getName()."[{$i}]");
-                    $validItem = $this->validateField($item, $itemValidation, $sparse);
+            foreach ($value as $i => &$item) {
+                $itemValidation->setName($field->getName()."[{$i}]");
+                $validItem = $this->validateField($item, $itemValidation, $sparse);
+                if ($validItem !== null) {
                     $result[] = $validItem;
                 }
-            } else {
-                // Cast the items into a proper numeric array.
-                $result = array_values($value);
             }
-            // Set the value to the clean version of itself.
-            $value = $result;
+        } else {
+            // Cast the items into a proper numeric array.
+            $result = array_values($value);
         }
 
-        return $validType;
+        return $result;
     }
 
     /**
      * Validate a boolean value.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The validation results to add.
-     * @return bool Returns true if the value is valid or false otherwise.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return bool|null Returns the cleaned value or **null** if validation fails.
      */
-    private function validateBoolean(&$value, ValidationField $validation) {
-        if (is_bool($value)) {
-            $validType = true;
-        } else {
+    private function validateBoolean($value, ValidationField $field) {
+        if (!is_bool($value)) {
             $bools = [
                 '0' => false, 'false' => false, 'no' => false, 'off' => false, '' => false,
                 '1' => true, 'true' => true, 'yes' => true, 'on' => true
             ];
             if ((is_string($value) || is_numeric($value)) && isset($bools[$value])) {
                 $value = $bools[$value];
-                $validType = true;
             } else {
-                $validType = false;
+                $field->addTypeError('boolean');
+                $value = null;
             }
         }
-        return $validType;
+        return $value;
     }
 
     /**
      * Validate a date time.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The validation results to add.
-     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return \DateTimeInterface|null Returns the cleaned value or **null** if it isn't valid.
      */
-    private function validateDatetime(&$value, ValidationField $validation) {
-        $validType = true;
+    private function validateDatetime($value, ValidationField $field) {
         if ($value instanceof \DateTimeInterface) {
-            $validType = true;
+            // do nothing, we're good
         } elseif (is_string($value) && $value !== '') {
             try {
                 $dt = new \DateTimeImmutable($value);
                 if ($dt) {
                     $value = $dt;
                 } else {
-                    $validType = false;
+                    $value = null;
                 }
             } catch (\Exception $ex) {
-                $validType = false;
+                $value = null;
             }
         } elseif (is_numeric($value) && $value > 0) {
             $value = new \DateTimeImmutable('@'.(string)round($value));
-            $validType = true;
         } else {
-            $validType = false;
+            $value = null;
         }
-        return $validType;
+
+        if ($value === null) {
+            $field->addTypeError('datetime');
+        }
+        return $value;
     }
 
     /**
      * Validate a float.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The validation results to add.
-     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return float|int|null Returns a number or **null** if validation fails.
      */
-    private function validateNumber(&$value, ValidationField $validation) {
-        if (is_float($value)) {
-            $validType = true;
+    private function validateNumber($value, ValidationField $field) {
+        if (is_float($value) || is_int($value)) {
+            $result = $value;
         } elseif (is_numeric($value)) {
-            $value = (float)$value;
-            $validType = true;
+            $result = (float)$value;
         } else {
-            $validType = false;
+            $result = null;
+            $field->addTypeError('number');
         }
-        return $validType;
+        return $result;
     }
 
     /**
      * Validate and integer.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The validation results to add.
-     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return int|null Returns the cleaned value or **null** if validation fails.
      */
-    private function validateInteger(&$value, ValidationField $validation) {
+    private function validateInteger($value, ValidationField $field) {
         if (is_int($value)) {
-            $validType = true;
+            // Do nothing, we're good.
         } elseif (is_numeric($value)) {
             $value = (int)$value;
-            $validType = true;
         } else {
-            $validType = false;
+            $value = null;
+            $field->addTypeError('integer');
         }
-        return $validType;
+        return $value;
     }
 
     /**
      * Validate an object.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The validation results to add.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
+     * @return object|null Returns a clean object or **null** if validation fails.
      */
-    private function validateObject(&$value, ValidationField $validation, $sparse = false) {
+    private function validateObject($value, ValidationField $field, $sparse = false) {
         if (!is_array($value) || isset($value[0])) {
-            return false;
-        } elseif (is_array($validation->val('properties'))) {
+            $field->addTypeError('object');
+            return null;
+        } elseif (is_array($field->val('properties'))) {
             // Validate the data against the internal schema.
-            $value = $this->validateProperties($value, $validation, $sparse);
+            $value = $this->validateProperties($value, $field, $sparse);
         }
-        return true;
+        return $value;
     }
 
     /**
      * Validate data against the schema and return the result.
      *
      * @param array $data The data to validate.
-     * @param Validation|ValidationField $validation This argument will be filled with the validation result.
+     * @param ValidationField $field This argument will be filled with the validation result.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return array Returns a clean array with only the appropriate properties and the data coerced to proper types.
-     * @internal param array $field The schema array to validate against.
-     * @internal param string $name The path to the current path for nested objects.
      */
-    private function validateProperties(array $data, ValidationField $validation, $sparse = false) {
-        $properties = $validation->val('properties', []);
-        $required = array_flip($validation->val('required', []));
+    private function validateProperties(array $data, ValidationField $field, $sparse = false) {
+        $properties = $field->val('properties', []);
+        $required = array_flip($field->val('required', []));
         $keys = array_keys($data);
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
-        $propertyValidation = new ValidationField($validation->getValidation(), [], null);
+        $propertyField = new ValidationField($field->getValidation(), [], null);
 
         // Loop through the schema fields and validate each one.
         $clean = [];
-        foreach ($properties as $propertyName => $propertyField) {
-            $propertyValidation
-                ->setField($propertyField)
-                ->setName(ltrim($validation->getName().".$propertyName", '.'));
+        foreach ($properties as $propertyName => $property) {
+            $propertyField
+                ->setField($property)
+                ->setName(ltrim($field->getName().".$propertyName", '.'));
 
             $lName = strtolower($propertyName);
             $isRequired = isset($required[$propertyName]);
@@ -744,15 +715,16 @@ class Schema implements \JsonSerializable {
             if (!array_key_exists($lName, $keys)) {
                 // A sparse validation can leave required fields out.
                 if ($isRequired && !$sparse) {
-                    $propertyValidation->addError('missingField', ['messageCode' => '{field} is required.']);
+                    $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
                 }
             } elseif ($data[$keys[$lName]] === null) {
-                $clean[$propertyName] = null;
                 if ($isRequired) {
-                    $propertyValidation->addError('missingField', ['messageCode' => '{field} cannot be null.']);
+                    $propertyField->addError('missingField', ['messageCode' => '{field} cannot be null.']);
+                } else {
+                    $clean[$propertyName] = null;
                 }
             } else {
-                $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyValidation, $sparse);
+                $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyField, $sparse);
             }
 
             unset($keys[$lName]);
@@ -761,12 +733,12 @@ class Schema implements \JsonSerializable {
         // Look for extraneous properties.
         if (!empty($keys)) {
             if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE)) {
-                $msg = sprintf("%s has unexpected field(s): %s.", $validation->getName() ?: 'value', implode(', ', $keys));
+                $msg = sprintf("%s has unexpected field(s): %s.", $field->getName() ?: 'value', implode(', ', $keys));
                 trigger_error($msg, E_USER_NOTICE);
             }
 
             if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION)) {
-                $validation->addError('invalid', [
+                $field->addError('invalid', [
                     'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
                     'extra' => array_values($keys),
                     'status' => 422
@@ -780,25 +752,23 @@ class Schema implements \JsonSerializable {
     /**
      * Validate a string.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The validation results to add.
-     * @return bool Returns true if <a href='psi_element://$value'>$value</a> is valid or false otherwise.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return string|null Returns the valid string or **null** if validation fails.
      */
-    private function validateString(&$value, ValidationField $validation) {
-        if (is_string($value)) {
-            $validType = true;
-        } elseif (is_numeric($value)) {
-            $value = (string)$value;
-            $validType = true;
+    private function validateString($value, ValidationField $field) {
+        if (is_string($value) || is_numeric($value)) {
+            $value = $result = (string)$value;
         } else {
-            return false;
+            $field->addTypeError('string');
+            return null;
         }
 
-        if (($minLength = $validation->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
-            if (!empty($validation->getName()) && $minLength === 1) {
-                $validation->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
+        if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
+            if (!empty($field->getName()) && $minLength === 1) {
+                $field->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
             } else {
-                $validation->addError(
+                $field->addError(
                     'minLength',
                     [
                         'messageCode' => '{field} should be at least {minLength} {minLength,plural,character} long.',
@@ -807,9 +777,10 @@ class Schema implements \JsonSerializable {
                     ]
                 );
             }
+            $result = null;
         }
-        if (($maxLength = $validation->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
-            $validation->addError(
+        if (($maxLength = $field->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
+            $field->addError(
                 'maxLength',
                 [
                     'messageCode' => '{field} is {overflow} {overflow,plural,characters} too long.',
@@ -818,12 +789,13 @@ class Schema implements \JsonSerializable {
                     'status' => 422
                 ]
             );
+            $result = null;
         }
-        if ($pattern = $validation->val('pattern')) {
+        if ($pattern = $field->val('pattern')) {
             $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
 
             if (!preg_match($regex, $value)) {
-                $validation->addError(
+                $field->addError(
                     'invalid',
                     [
                         'messageCode' => '{field} is in the incorrect format.',
@@ -831,47 +803,46 @@ class Schema implements \JsonSerializable {
                     ]
                 );
             }
+            $result = null;
         }
 
-        return $validType;
+        return $result;
     }
 
     /**
      * Validate a unix timestamp.
      *
-     * @param mixed &$value The value to validate.
-     * @param ValidationField $validation The field being validated.
-     * @return bool Returns true if {@link $value} is valid or false otherwise.
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The field being validated.
+     * @return int|null Returns a valid timestamp or **null** if the value doesn't validate.
      */
-    private function validateTimestamp(&$value, ValidationField $validation) {
-        $validType = true;
-        if (is_numeric($value)) {
-            $value = (int)$value;
+    private function validateTimestamp($value, ValidationField $field) {
+        if (is_numeric($value) && $value > 0) {
+            $result = (int)$value;
         } elseif (is_string($value) && $ts = strtotime($value)) {
-            $value = $ts;
+            $result = $ts;
         } else {
-            $validType = false;
+            $field->addTypeError('timestamp');
+            $result = null;
         }
-        return $validType;
+        return $result;
     }
 
     /**
      * Validate a value against an enum.
      *
      * @param mixed $value The value to test.
-     * @param array $field The field definition of the value.
-     * @param Validation $validation The validation object for adding errors.
-     * @param string $name The path to the value.
+     * @param ValidationField $field The validation object for adding errors.
+     * @return bool Returns **true** if the value one of the enumerated values or **false** otherwise.
      */
-    private function validateEnum($value, array $field, Validation $validation, $name) {
-        if (empty($field['enum'])) {
-            return;
+    private function validateEnum($value, ValidationField $field) {
+        $enum = $field->val('enum');
+        if (empty($enum)) {
+            return true;
         }
 
-        $enum = $field['enum'];
         if (!in_array($value, $enum, true)) {
-            $validation->addError(
-                $name,
+            $field->addError(
                 'invalid',
                 [
                     'messageCode' => '{field} must be one of: {enum}.',
@@ -879,8 +850,9 @@ class Schema implements \JsonSerializable {
                     'status' => 422
                 ]
             );
+            return false;
         }
-
+        return true;
     }
 
     /**
@@ -915,18 +887,6 @@ class Schema implements \JsonSerializable {
             $type = null;
         }
         return $type;
-    }
-
-    /**
-     * Look up a value in array.
-     *
-     * @param string|int $key The array key.
-     * @param array $arr The array to search.
-     * @param mixed $default The default if key is not found.
-     * @return mixed Returns the array value or the default.
-     */
-    private static function val($key, array $arr, $default = null) {
-        return isset($arr[$key]) ? $arr[$key] : $default;
     }
 
     /**

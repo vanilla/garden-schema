@@ -53,6 +53,28 @@ class ValidationField {
     }
 
     /**
+     * Add an invalid type error.
+     *
+     * @param string $type The type that was checked.
+     * @return $this
+     */
+    public function addTypeError($type = '') {
+        $type = $type ?: $this->getType();
+
+        $this->validation->addError(
+            $this->getName(),
+            'invalid',
+            [
+                'type' => $type,
+                'messageCode' => '{field} is not a valid {type}.',
+                'status' => 422
+            ]
+        );
+
+        return $this;
+    }
+
+    /**
      * Check whether or not this field is has errors.
      *
      * @return bool Returns true if the field has no errors, false otherwise.
@@ -84,6 +106,8 @@ class ValidationField {
     /**
      * Set the field.
      *
+     * This method is only meant to be called from within the schema class.
+     *
      * @param array|Schema $field The new field.
      * @return $this
      */
@@ -112,6 +136,8 @@ class ValidationField {
 
     /**
      * Set the name.
+     *
+     * This method is only meant to be called from within the schema class.
      *
      * @param string $name The new name.
      * @return $this
