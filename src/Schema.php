@@ -647,15 +647,13 @@ class Schema implements \JsonSerializable {
      * @return int|null Returns the cleaned value or **null** if validation fails.
      */
     private function validateInteger($value, ValidationField $field) {
-        if (is_int($value)) {
-            // Do nothing, we're good.
-        } elseif (is_numeric($value)) {
-            $value = (int)$value;
-        } else {
-            $value = null;
+        $result = filter_var($value, FILTER_VALIDATE_INT);
+
+        if ($result === false) {
             $field->addTypeError('integer');
+            return null;
         }
-        return $value;
+        return $result;
     }
 
     /**
