@@ -11,8 +11,6 @@ namespace Garden\Schema;
  * A class for defining and validating data schemas.
  */
 class Schema implements \JsonSerializable {
-    /// Constants ///
-
     /**
      * Throw a notice when extraneous properties are encountered during validation.
      */
@@ -35,7 +33,8 @@ class Schema implements \JsonSerializable {
         'int' => 'integer',
         's' => 'string',
         'str' => 'string',
-        'n' => 'number',
+        'f' => 'number',
+        'float' => 'number',
         'b' => 'boolean',
         'bool' => 'boolean',
         'ts' => 'timestamp',
@@ -174,7 +173,17 @@ class Schema implements \JsonSerializable {
             return $target;
         };
 
-        $fn($this->schema, $schema->jsonSerialize());
+        $fn($this->schema, $schema->getSchemaArray());
+    }
+
+    /**
+     * Returns the internal schema array.
+     *
+     * @return array
+     * @see Schema::jsonSerialize()
+     */
+    public function getSchemaArray() {
+        return $this->schema;
     }
 
     /**
@@ -184,7 +193,7 @@ class Schema implements \JsonSerializable {
      * @return array The full schema array.
      * @throws \InvalidArgumentException Throws an exception when an item in the schema is invalid.
      */
-    public function parse(array $arr) {
+    protected function parse(array $arr) {
         if (empty($arr)) {
             // An empty schema validates to anything.
             return [];
@@ -257,7 +266,17 @@ class Schema implements \JsonSerializable {
             } elseif (!empty($value)) {
                 $node['description'] = $value;
             }
+        } elseif ($value === null) {
+            // Parse child elements.
+            if ($node['type'] === 'array' && isset($node['items'])) {
+                // The value includes array schema information.
+                $node['items'] = $this->parse($node['items']);
+            } elseif ($node['type'] === 'object' && isset($node['properties'])) {
+                list($node['properties']) = $this->parseProperties($node['properties']);
+
+            }
         }
+
 
         return $node;
     }
@@ -439,7 +458,7 @@ class Schema implements \JsonSerializable {
     /**
      * Validate data against the schema and return the result.
      *
-     * @param array $data The data to validate.
+     * @param mixed $data The data to validate.
      * @param bool $sparse Whether or not to do a sparse validation.
      * @return bool Returns true if the data is valid. False otherwise.
      */
@@ -580,17 +599,9 @@ class Schema implements \JsonSerializable {
      * @return bool|null Returns the cleaned value or **null** if validation fails.
      */
     private function validateBoolean($value, ValidationField $field) {
-        if (!is_bool($value)) {
-            $bools = [
-                '0' => false, 'false' => false, 'no' => false, 'off' => false, '' => false,
-                '1' => true, 'true' => true, 'yes' => true, 'on' => true
-            ];
-            if ((is_string($value) || is_numeric($value)) && isset($bools[$value])) {
-                $value = $bools[$value];
-            } else {
-                $field->addTypeError('boolean');
-                $value = null;
-            }
+        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($value === null) {
+            $field->addTypeError('boolean');
         }
         return $value;
     }
@@ -616,7 +627,7 @@ class Schema implements \JsonSerializable {
             } catch (\Exception $ex) {
                 $value = null;
             }
-        } elseif (is_numeric($value) && $value > 0) {
+        } elseif (is_int($value) && $value > 0) {
             $value = new \DateTimeImmutable('@'.(string)round($value));
         } else {
             $value = null;
@@ -636,13 +647,10 @@ class Schema implements \JsonSerializable {
      * @return float|int|null Returns a number or **null** if validation fails.
      */
     private function validateNumber($value, ValidationField $field) {
-        if (is_float($value) || is_int($value)) {
-            $result = $value;
-        } elseif (is_numeric($value)) {
-            $result = (float)$value;
-        } else {
-            $result = null;
+        $result = filter_var($value, FILTER_VALIDATE_FLOAT);
+        if ($result === false) {
             $field->addTypeError('number');
+            return null;
         }
         return $result;
     }
@@ -655,15 +663,13 @@ class Schema implements \JsonSerializable {
      * @return int|null Returns the cleaned value or **null** if validation fails.
      */
     private function validateInteger($value, ValidationField $field) {
-        if (is_int($value)) {
-            // Do nothing, we're good.
-        } elseif (is_numeric($value)) {
-            $value = (int)$value;
-        } else {
-            $value = null;
+        $result = filter_var($value, FILTER_VALIDATE_INT);
+
+        if ($result === false) {
             $field->addTypeError('integer');
+            return null;
         }
-        return $value;
+        return $result;
     }
 
     /**
@@ -805,6 +811,41 @@ class Schema implements \JsonSerializable {
             }
             $result = null;
         }
+        if ($format = $field->val('format')) {
+            $type = $format;
+            switch ($format) {
+                case 'date-time':
+                    $result = $this->validateDatetime($result, $field);
+                    if ($result instanceof \DateTimeInterface) {
+                        $result = $result->format(\DateTime::RFC3339);
+                    }
+                    break;
+                case 'email':
+                    $result = filter_var($result, FILTER_VALIDATE_EMAIL);
+                    break;
+                case 'ipv4':
+                    $type = 'IPv4 address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
+                    break;
+                case 'ipv6':
+                    $type = 'IPv6 address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
+                    break;
+                case 'ip':
+                    $type = 'IP address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP);
+                    break;
+                case 'uri':
+                    $type = 'URI';
+                    $result = filter_var($result, FILTER_VALIDATE_URL, FILTER_FLAG_HOST_REQUIRED | FILTER_FLAG_SCHEME_REQUIRED);
+                    break;
+                default:
+                    trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
+            }
+            if ($result === false) {
+                $field->addTypeError($type);
+            }
+        }
 
         return $result;
     }
@@ -858,17 +899,45 @@ class Schema implements \JsonSerializable {
     /**
      * Specify data which should be serialized to JSON.
      *
+     * This method specifically returns data compatible with the JSON schema format.
+     *
+     * @return mixed Returns data which can be serialized by **json_encode()**, which is a value of any type other than a resource.
      * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
-     * @return mixed data which can be serialized by <b>json_encode</b>,
-     * which is a value of any type other than a resource.
+     * @link http://json-schema.org/
      */
     public function jsonSerialize() {
-        $result = $this->schema;
-        array_walk_recursive($result, function (&$value) {
-            if ($value instanceof \JsonSerializable) {
-                $value = $value->jsonSerialize();
+        $fix = function ($schema) use (&$fix) {
+            if ($schema instanceof Schema) {
+                return $schema->jsonSerialize();
             }
-        });
+
+            if (!empty($schema['type'])) {
+                // Swap datetime and timestamp to other types with formats.
+                if ($schema['type'] === 'datetime') {
+                    $schema['type'] = 'string';
+                    $schema['format'] = 'date-time';
+                } elseif ($schema['type'] === 'timestamp') {
+                    $schema['type'] = 'integer';
+                    $schema['format'] = 'timestamp';
+                }
+            }
+
+            if (!empty($schema['items'])) {
+                $schema['items'] = $fix($schema['items']);
+            }
+            if (!empty($schema['properties'])) {
+                $properties = [];
+                foreach ($schema['properties'] as $key => $property) {
+                    $properties[$key] = $fix($property);
+                }
+                $schema['properties'] = $properties;
+            }
+
+            return $schema;
+        };
+
+        $result = $fix($this->schema);
+
         return $result;
     }
 

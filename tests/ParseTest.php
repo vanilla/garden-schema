@@ -33,7 +33,7 @@ class ParseTest extends AbstractSchemaTest {
             'required' => ['id', 'name']
         ];
 
-        $this->assertEquals($expected, $schema->jsonSerialize());
+        $this->assertEquals($expected, $schema->getSchemaArray());
     }
 
     /**
@@ -124,7 +124,7 @@ class ParseTest extends AbstractSchemaTest {
         $schema = new Schema([":$short" => 'desc']);
 
         $expected = ['type' => $type, 'description' => 'desc'];
-        $this->assertEquals($expected, $schema->jsonSerialize());
+        $this->assertEquals($expected, $schema->getSchemaArray());
     }
 
     /**
@@ -209,5 +209,45 @@ class ParseTest extends AbstractSchemaTest {
         $schemaOne->merge($schemaTwo);
 
         $this->assertEquals($expected, $schemaOne->jsonSerialize());
+    }
+
+    /**
+     * Test JSON schema format to type conversion (and back).
+     *
+     * @param array $arr The schema array.
+     * @param array $json A expected JSON schema array.
+     * @dataProvider provideFormatToTypeConversionTests
+     */
+    public function testTypeToFormatConversion($arr, $json) {
+        $schema = new Schema($arr);
+        $this->assertEquals($json, $schema->jsonSerialize());
+    }
+
+    /**
+     * Provide JSON schema formats that are schema types.
+     *
+     * @return array Returns a data provider array.
+     */
+    public function provideFormatToTypeConversionTests() {
+        $r = [
+            'datetime' => [
+                ['type' => 'datetime'],
+                ['type' => 'string', 'format' => 'date-time'],
+            ],
+            'timestamp' => [
+                ['type' => 'timestamp'],
+                ['type' => 'integer', 'format' => 'timestamp'],
+            ]
+        ];
+
+        $result = $r;
+        foreach ($r as $key => $value) {
+            $result["nested $key"] = [
+                ['type' => 'object', 'properties' => ['prop' => $value[0]]],
+                ['type' => 'object', 'properties' => ['prop' => $value[1]]],
+            ];
+        }
+
+        return $result;
     }
 }
