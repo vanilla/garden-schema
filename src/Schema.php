@@ -628,13 +628,10 @@ class Schema implements \JsonSerializable {
      * @return float|int|null Returns a number or **null** if validation fails.
      */
     private function validateNumber($value, ValidationField $field) {
-        if (is_float($value) || is_int($value)) {
-            $result = $value;
-        } elseif (is_numeric($value)) {
-            $result = (float)$value;
-        } else {
-            $result = null;
+        $result = filter_var($value, FILTER_VALIDATE_FLOAT);
+        if ($result === false) {
             $field->addTypeError('number');
+            return null;
         }
         return $result;
     }
