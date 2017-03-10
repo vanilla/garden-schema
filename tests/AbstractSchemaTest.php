@@ -62,6 +62,7 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
             ['ts', false],
             ['ts', 'foo'],
             ['ts', [1, 2, 3]],
+            ['dt', (string)time()],
             ['dt', 'foo'],
             ['dt', [1, 2, 3]]
         ];

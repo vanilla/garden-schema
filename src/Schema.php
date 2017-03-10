@@ -608,7 +608,7 @@ class Schema implements \JsonSerializable {
             } catch (\Exception $ex) {
                 $value = null;
             }
-        } elseif (is_numeric($value) && $value > 0) {
+        } elseif (is_int($value) && $value > 0) {
             $value = new \DateTimeImmutable('@'.(string)round($value));
         } else {
             $value = null;
