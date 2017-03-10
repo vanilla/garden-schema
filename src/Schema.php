@@ -11,8 +11,6 @@ namespace Garden\Schema;
  * A class for defining and validating data schemas.
  */
 class Schema implements \JsonSerializable {
-    /// Constants ///
-
     /**
      * Throw a notice when extraneous properties are encountered during validation.
      */
@@ -175,7 +173,17 @@ class Schema implements \JsonSerializable {
             return $target;
         };
 
-        $fn($this->schema, $schema->jsonSerialize());
+        $fn($this->schema, $schema->getSchemaArray());
+    }
+
+    /**
+     * Returns the internal schema array.
+     *
+     * @return array
+     * @see Schema::jsonSerialize()
+     */
+    public function getSchemaArray() {
+        return $this->schema;
     }
 
     /**
@@ -185,7 +193,7 @@ class Schema implements \JsonSerializable {
      * @return array The full schema array.
      * @throws \InvalidArgumentException Throws an exception when an item in the schema is invalid.
      */
-    public function parse(array $arr) {
+    protected function parse(array $arr) {
         if (empty($arr)) {
             // An empty schema validates to anything.
             return [];
@@ -258,7 +266,17 @@ class Schema implements \JsonSerializable {
             } elseif (!empty($value)) {
                 $node['description'] = $value;
             }
+        } elseif ($value === null) {
+            // Parse child elements.
+            if ($node['type'] === 'array' && isset($node['items'])) {
+                // The value includes array schema information.
+                $node['items'] = $this->parse($node['items']);
+            } elseif ($node['type'] === 'object' && isset($node['properties'])) {
+                list($node['properties']) = $this->parseProperties($node['properties']);
+
+            }
         }
+
 
         return $node;
     }
@@ -881,17 +899,45 @@ class Schema implements \JsonSerializable {
     /**
      * Specify data which should be serialized to JSON.
      *
+     * This method specifically returns data compatible with the JSON schema format.
+     *
+     * @return mixed Returns data which can be serialized by **json_encode()**, which is a value of any type other than a resource.
      * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
-     * @return mixed data which can be serialized by <b>json_encode</b>,
-     * which is a value of any type other than a resource.
+     * @link http://json-schema.org/
      */
     public function jsonSerialize() {
-        $result = $this->schema;
-        array_walk_recursive($result, function (&$value) {
-            if ($value instanceof \JsonSerializable) {
-                $value = $value->jsonSerialize();
+        $fix = function ($schema) use (&$fix) {
+            if ($schema instanceof Schema) {
+                return $schema->jsonSerialize();
             }
-        });
+
+            if (!empty($schema['type'])) {
+                // Swap datetime and timestamp to other types with formats.
+                if ($schema['type'] === 'datetime') {
+                    $schema['type'] = 'string';
+                    $schema['format'] = 'date-time';
+                } elseif ($schema['type'] === 'timestamp') {
+                    $schema['type'] = 'integer';
+                    $schema['format'] = 'timestamp';
+                }
+            }
+
+            if (!empty($schema['items'])) {
+                $schema['items'] = $fix($schema['items']);
+            }
+            if (!empty($schema['properties'])) {
+                $properties = [];
+                foreach ($schema['properties'] as $key => $property) {
+                    $properties[$key] = $fix($property);
+                }
+                $schema['properties'] = $properties;
+            }
+
+            return $schema;
+        };
+
+        $result = $fix($this->schema);
+
         return $result;
     }
 
