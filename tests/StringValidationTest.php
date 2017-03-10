@@ -171,4 +171,85 @@ class StringValidationTest extends AbstractSchemaTest {
         $isValid = $schema->isValid($missingData);
         $this->assertFalse($isValid);
     }
+
+    /**
+     * Test the email string format.
+     */
+    public function testEmailFormat() {
+        $schema = new Schema([':s' => ['format' => 'email']]);
+
+        $this->assertTrue($schema->isValid('todd@example.com'));
+        $this->assertTrue($schema->isValid('todd+foo@example.com'));
+        $this->assertFalse($schema->isValid('todd@example'));
+    }
+
+    /**
+     * Test the IPv4 format.
+     */
+    public function testIPv4Format() {
+        $schema = new Schema([':s' => ['format' => 'ipv4']]);
+
+        $this->assertTrue($schema->isValid('127.0.0.1'));
+        $this->assertTrue($schema->isValid('192.168.5.5'));
+        $this->assertFalse($schema->isValid('todd@example'));
+    }
+
+    /**
+     * Test the IPv6 format.
+     */
+    public function testIPv6Format() {
+        $schema = new Schema([':s' => ['format' => 'ipv6']]);
+
+        $this->assertTrue($schema->isValid('2001:0db8:0a0b:12f0:0000:0000:0000:0001'));
+        $this->assertTrue($schema->isValid('2001:db8::1'));
+        $this->assertFalse($schema->isValid('127.0.0.1'));
+    }
+
+    /**
+     * Test the IPv6 format.
+     */
+    public function testIPFormat() {
+        $schema = new Schema([':s' => ['format' => 'ip']]);
+
+        $this->assertTrue($schema->isValid('2001:0db8:0a0b:12f0:0000:0000:0000:0001'));
+        $this->assertTrue($schema->isValid('2001:db8::1'));
+        $this->assertTrue($schema->isValid('127.0.0.1'));
+        $this->assertFalse($schema->isValid('todd@example'));
+    }
+
+    /**
+     * Test the IPv6 format.
+     *
+     * @param string $uri A URI.
+     * @param bool $valid Whether the URI should be valid or invalid.
+     * @dataProvider provideUris
+     */
+    public function testUriFormat($uri, $valid = true) {
+        $schema = new Schema([':s' => ['format' => 'uri']]);
+
+        if ($valid) {
+            $this->assertTrue($schema->isValid($uri));
+        } else {
+            $this->assertFalse($schema->isValid($uri));
+        }
+    }
+
+    /**
+     * Provide test data for {@link testUriFormat()}.
+     *
+     * @return array Returns a data provider.
+     */
+    public function provideUris() {
+        $r = [
+            ['ftp://ftp.is.co.za/rfc/rfc1808.txt1'],
+            ['http://www.ietf.org/rfc/rfc2396.txt'],
+            ['ldap://[2001:db8::7]/c=GB?objectClass?one'],
+            ['mailto:John.Doe@example.com'],
+            ['news:comp.infosystems.www.servers.unix'],
+            ['telnet://192.0.2.16:80/'],
+            ['aaa', false]
+        ];
+
+        return array_column($r, null, 0);
+    }
 }

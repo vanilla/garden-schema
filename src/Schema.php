@@ -439,7 +439,7 @@ class Schema implements \JsonSerializable {
     /**
      * Validate data against the schema and return the result.
      *
-     * @param array $data The data to validate.
+     * @param mixed $data The data to validate.
      * @param bool $sparse Whether or not to do a sparse validation.
      * @return bool Returns true if the data is valid. False otherwise.
      */
@@ -804,6 +804,35 @@ class Schema implements \JsonSerializable {
                 );
             }
             $result = null;
+        }
+        if ($format = $field->val('format')) {
+            $type = $format;
+            switch ($format) {
+                case 'email':
+                    $result = filter_var($result, FILTER_VALIDATE_EMAIL);
+                    break;
+                case 'ipv4':
+                    $type = 'IPv4 address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
+                    break;
+                case 'ipv6':
+                    $type = 'IPv6 address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
+                    break;
+                case 'ip':
+                    $type = 'IP address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP);
+                    break;
+                case 'uri':
+                    $type = 'URI';
+                    $result = filter_var($result, FILTER_VALIDATE_URL, FILTER_FLAG_HOST_REQUIRED | FILTER_FLAG_SCHEME_REQUIRED);
+                    break;
+                default:
+                    trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
+            }
+            if ($result === false) {
+                $field->addTypeError($type);
+            }
         }
 
         return $result;
