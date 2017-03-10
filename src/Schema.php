@@ -580,17 +580,9 @@ class Schema implements \JsonSerializable {
      * @return bool|null Returns the cleaned value or **null** if validation fails.
      */
     private function validateBoolean($value, ValidationField $field) {
-        if (!is_bool($value)) {
-            $bools = [
-                '0' => false, 'false' => false, 'no' => false, 'off' => false, '' => false,
-                '1' => true, 'true' => true, 'yes' => true, 'on' => true
-            ];
-            if ((is_string($value) || is_numeric($value)) && isset($bools[$value])) {
-                $value = $bools[$value];
-            } else {
-                $field->addTypeError('boolean');
-                $value = null;
-            }
+        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($value === null) {
+            $field->addTypeError('boolean');
         }
         return $value;
     }
