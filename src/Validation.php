@@ -194,6 +194,22 @@ class Validation {
     }
 
     /**
+     * Get the error count, optionally for a particular field.
+     *
+     * @param string $field The name of a field or an empty string for all errors.
+     * @return int Returns the error count.
+     */
+    public function getErrorCount($field = '') {
+        if (empty($field)) {
+            return iterator_count($this->getRawErrors());
+        } elseif (empty($this->errors[$field])) {
+            return 0;
+        } else {
+            return count($this->errors[$field]);
+        }
+    }
+
+    /**
      * Get the error message for an error row.
      *
      * @param array $error The error row.

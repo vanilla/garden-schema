@@ -166,4 +166,11 @@ class ValidationField {
     public function val($key, $default = null) {
         return isset($this->field[$key]) ? $this->field[$key] : $default;
     }
+
+    /**
+     * Get the error count for this field.
+     */
+    public function getErrorCount() {
+        return $this->getValidation()->getErrorCount($this->getName());
+    }
 }
