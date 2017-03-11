@@ -80,7 +80,7 @@ class ValidationField {
      * @return bool Returns true if the field has no errors, false otherwise.
      */
     public function isValid() {
-        return $this->validation->isValidField($this->field);
+        return $this->getValidation()->isValidField($this->getName());
     }
 
     /**

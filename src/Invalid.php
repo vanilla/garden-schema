@@ -12,7 +12,7 @@ namespace Garden\Schema;
  * A singleton that represents an invalid value.
  *
  * The purpose of this class is to provide an alternative to **null** for invalid values when **null** could be considered
- * valid.
+ * valid. This class is not meant to be used outside of this library unless you are extended the schema somehow.
  */
 class Invalid {
     private static $value;
@@ -44,5 +44,17 @@ class Invalid {
      */
     public static function isInvalid($value) {
         return $value === self::value();
+    }
+
+    /**
+     * Tests whether a value could be valid.
+     *
+     * Unlike {@link Invalid::inValid()} a value could still be invalid in some way even if this method returns true.
+     *
+     * @param mixed $value The value to test.
+     * @return bool Returns **true** of the value could be invalid or **false** otherwise.
+     */
+    public static function isValid($value) {
+        return $value !== self::value();
     }
 }

@@ -12,7 +12,7 @@ namespace Garden\Schema;
  */
 class Schema implements \JsonSerializable {
     /**
-     * Throw a notice when extraneous properties are encountered during validation.
+     * Trigger a notice when extraneous properties are encountered during validation.
      */
     const FLAG_EXTRA_PROPERTIES_NOTICE = 0x1;
 
@@ -473,9 +473,10 @@ class Schema implements \JsonSerializable {
      * @param mixed $value The value to validate.
      * @param ValidationField $field A validation object to add errors to.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return mixed Returns a clean version of the value with all extra fields stripped out.
+     * @return mixed|Invalid Returns a clean version of the value with all extra fields stripped out or invalid if the value
+     * is completely invalid.
      */
-    private function validateField($value, ValidationField $field, $sparse = false) {
+    protected function validateField($value, ValidationField $field, $sparse = false) {
         $result = $value;
         if ($field->getField() instanceof Schema) {
             try {
@@ -519,33 +520,17 @@ class Schema implements \JsonSerializable {
                 default:
                     throw new \InvalidArgumentException("Unrecognized type $type.", 500);
             }
-            if ($result !== null && !$this->validateEnum($value, $field)) {
-                $result = null;
+            if (Invalid::isValid($result)) {
+                $result = $this->validateEnum($result, $field);
             }
         }
 
         // Validate a custom field validator.
-        if ($result !== null) {
+        if (Invalid::isValid($result)) {
             $this->callValidators($result, $field);
         }
 
         return $result;
-    }
-
-    /**
-     * Call all of the validators attached to a field.
-     *
-     * @param mixed $value The field value being validated.
-     * @param ValidationField $field The validation object to add errors.
-     */
-    private function callValidators($value, ValidationField $field) {
-        // Strip array references in the name except for the last one.
-        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $field->getName());
-        if (!empty($this->validators[$key])) {
-            foreach ($this->validators[$key] as $validator) {
-                call_user_func($validator, $value, $field);
-            }
-        }
     }
 
     /**
@@ -554,12 +539,12 @@ class Schema implements \JsonSerializable {
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return array|null Returns an array or **null** if validation fails.
+     * @return array|Invalid Returns an array or invalid if validation fails.
      */
-    private function validateArray($value, ValidationField $field, $sparse = false) {
+    protected function validateArray($value, ValidationField $field, $sparse = false) {
         if (!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) {
             $field->addTypeError('array');
-            return null;
+            return Invalid::value();
         } elseif (empty($value)) {
             return [];
         } elseif ($field->val('items') !== null) {
@@ -575,7 +560,7 @@ class Schema implements \JsonSerializable {
             foreach ($value as $i => &$item) {
                 $itemValidation->setName($field->getName()."[{$i}]");
                 $validItem = $this->validateField($item, $itemValidation, $sparse);
-                if ($validItem !== null) {
+                if (Invalid::isValid($validItem)) {
                     $result[] = $validItem;
                 }
             }
@@ -584,7 +569,7 @@ class Schema implements \JsonSerializable {
             $result = array_values($value);
         }
 
-        return $result;
+        return empty($result) ? Invalid::value() : $result;
     }
 
     /**
@@ -592,12 +577,13 @@ class Schema implements \JsonSerializable {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
-     * @return bool|null Returns the cleaned value or **null** if validation fails.
+     * @return bool|Invalid Returns the cleaned value or invalid if validation fails.
      */
-    private function validateBoolean($value, ValidationField $field) {
+    protected function validateBoolean($value, ValidationField $field) {
         $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if ($value === null) {
             $field->addTypeError('boolean');
+            return Invalid::value();
         }
         return $value;
     }
@@ -607,9 +593,9 @@ class Schema implements \JsonSerializable {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
-     * @return \DateTimeInterface|null Returns the cleaned value or **null** if it isn't valid.
+     * @return \DateTimeInterface|Invalid Returns the cleaned value or **null** if it isn't valid.
      */
-    private function validateDatetime($value, ValidationField $field) {
+    protected function validateDatetime($value, ValidationField $field) {
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
         } elseif (is_string($value) && $value !== '') {
@@ -621,15 +607,15 @@ class Schema implements \JsonSerializable {
                     $value = null;
                 }
             } catch (\Exception $ex) {
-                $value = null;
+                $value = Invalid::value();
             }
         } elseif (is_int($value) && $value > 0) {
             $value = new \DateTimeImmutable('@'.(string)round($value));
         } else {
-            $value = null;
+            $value = Invalid::value();
         }
 
-        if ($value === null) {
+        if (Invalid::isInvalid($value)) {
             $field->addTypeError('datetime');
         }
         return $value;
@@ -640,13 +626,13 @@ class Schema implements \JsonSerializable {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
-     * @return float|int|null Returns a number or **null** if validation fails.
+     * @return float|Invalid Returns a number or **null** if validation fails.
      */
-    private function validateNumber($value, ValidationField $field) {
+    protected function validateNumber($value, ValidationField $field) {
         $result = filter_var($value, FILTER_VALIDATE_FLOAT);
         if ($result === false) {
             $field->addTypeError('number');
-            return null;
+            return Invalid::value();
         }
         return $result;
     }
@@ -656,14 +642,14 @@ class Schema implements \JsonSerializable {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
-     * @return int|null Returns the cleaned value or **null** if validation fails.
+     * @return int|Invalid Returns the cleaned value or **null** if validation fails.
      */
-    private function validateInteger($value, ValidationField $field) {
+    protected function validateInteger($value, ValidationField $field) {
         $result = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($result === false) {
             $field->addTypeError('integer');
-            return null;
+            return Invalid::value();
         }
         return $result;
     }
@@ -674,12 +660,12 @@ class Schema implements \JsonSerializable {
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return object|null Returns a clean object or **null** if validation fails.
+     * @return object|Invalid Returns a clean object or **null** if validation fails.
      */
-    private function validateObject($value, ValidationField $field, $sparse = false) {
+    protected function validateObject($value, ValidationField $field, $sparse = false) {
         if (!is_array($value) || isset($value[0])) {
             $field->addTypeError('object');
-            return null;
+            return Invalid::value();
         } elseif (is_array($field->val('properties'))) {
             // Validate the data against the internal schema.
             $value = $this->validateProperties($value, $field, $sparse);
@@ -693,9 +679,10 @@ class Schema implements \JsonSerializable {
      * @param array $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
      * @param bool $sparse Whether or not this is a sparse validation.
-     * @return array Returns a clean array with only the appropriate properties and the data coerced to proper types.
+     * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
+     * or invalid if there are no valid properties.
      */
-    private function validateProperties(array $data, ValidationField $field, $sparse = false) {
+    protected function validateProperties(array $data, ValidationField $field, $sparse = false) {
         $properties = $field->val('properties', []);
         $required = array_flip($field->val('required', []));
         $keys = array_keys($data);
@@ -748,7 +735,7 @@ class Schema implements \JsonSerializable {
             }
         }
 
-        return $clean;
+        return empty($clean) ? Invalid::value() : $clean;
     }
 
     /**
@@ -756,16 +743,17 @@ class Schema implements \JsonSerializable {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
-     * @return string|null Returns the valid string or **null** if validation fails.
+     * @return string|Invalid Returns the valid string or **null** if validation fails.
      */
-    private function validateString($value, ValidationField $field) {
+    protected function validateString($value, ValidationField $field) {
         if (is_string($value) || is_numeric($value)) {
             $value = $result = (string)$value;
         } else {
             $field->addTypeError('string');
-            return null;
+            return Invalid::value();
         }
 
+        $errorCount = $field->getErrorCount();
         if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
             if (!empty($field->getName()) && $minLength === 1) {
                 $field->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
@@ -779,7 +767,6 @@ class Schema implements \JsonSerializable {
                     ]
                 );
             }
-            $result = null;
         }
         if (($maxLength = $field->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
             $field->addError(
@@ -791,7 +778,6 @@ class Schema implements \JsonSerializable {
                     'status' => 422
                 ]
             );
-            $result = null;
         }
         if ($pattern = $field->val('pattern')) {
             $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
@@ -805,7 +791,6 @@ class Schema implements \JsonSerializable {
                     ]
                 );
             }
-            $result = null;
         }
         if ($format = $field->val('format')) {
             $type = $format;
@@ -843,7 +828,11 @@ class Schema implements \JsonSerializable {
             }
         }
 
-        return $result;
+        if ($field->isValid()) {
+            return $result;
+        } else {
+            return Invalid::value();
+        }
     }
 
     /**
@@ -853,7 +842,7 @@ class Schema implements \JsonSerializable {
      * @param ValidationField $field The field being validated.
      * @return int|null Returns a valid timestamp or **null** if the value doesn't validate.
      */
-    private function validateTimestamp($value, ValidationField $field) {
+    protected function validateTimestamp($value, ValidationField $field) {
         if (is_numeric($value) && $value > 0) {
             $result = (int)$value;
         } elseif (is_string($value) && $ts = strtotime($value)) {
@@ -870,12 +859,12 @@ class Schema implements \JsonSerializable {
      *
      * @param mixed $value The value to test.
      * @param ValidationField $field The validation object for adding errors.
-     * @return bool Returns **true** if the value one of the enumerated values or **false** otherwise.
+     * @return mixed|Invalid Returns the value if it is one of the enumerated values or invalid otherwise.
      */
-    private function validateEnum($value, ValidationField $field) {
+    protected function validateEnum($value, ValidationField $field) {
         $enum = $field->val('enum');
         if (empty($enum)) {
-            return true;
+            return $value;
         }
 
         if (!in_array($value, $enum, true)) {
@@ -887,9 +876,36 @@ class Schema implements \JsonSerializable {
                     'status' => 422
                 ]
             );
-            return false;
+            return Invalid::value();
         }
-        return true;
+        return $value;
+    }
+
+    /**
+     * Call all of the validators attached to a field.
+     *
+     * @param mixed $value The field value being validated.
+     * @param ValidationField $field The validation object to add errors.
+     */
+    protected function callValidators($value, ValidationField $field) {
+        $valid = true;
+
+        // Strip array references in the name except for the last one.
+        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $field->getName());
+        if (!empty($this->validators[$key])) {
+            foreach ($this->validators[$key] as $validator) {
+                $r = call_user_func($validator, $value, $field);
+
+                if ($r === false || Invalid::isInvalid($r)) {
+                    $valid = false;
+                }
+            }
+        }
+
+        // Add an error on the field if the validator hasn't done so.
+        if (!$valid && $field->isValid()) {
+            $field->addError('invalid', ['messageCode' => '{field} is invalid.', 'status' => 422]);
+        }
     }
 
     /**
@@ -943,7 +959,7 @@ class Schema implements \JsonSerializable {
      * @param string $alias The type alias or type name to lookup.
      * @return mixed
      */
-    private function getType($alias) {
+    protected function getType($alias) {
         if (isset(self::$types[$alias])) {
             return $alias;
         }
