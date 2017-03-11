@@ -23,8 +23,8 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
 
         $this->assertSame(0, $schema->getFlags());
         $behaviors = [
-            Schema::FLAG_EXTRA_PROPERTIES_NOTICE,
-            Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION
+            Schema::VALIDATE_EXTRA_PROPERTY_NOTICE,
+            Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION
         ];
         foreach ($behaviors as $behavior) {
             $schema->setFlags($behavior);
@@ -38,16 +38,16 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
     public function testGetSetFlag() {
         $schema = new Schema();
 
-        $schema->setFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE, true);
-        $this->assertTrue($schema->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE));
+        $schema->setFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE, true);
+        $this->assertTrue($schema->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE));
 
-        $schema->setFlag(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION, true);
-        $this->assertTrue($schema->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION));
-        $this->assertTrue($schema->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE));
+        $schema->setFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION, true);
+        $this->assertTrue($schema->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION));
+        $this->assertTrue($schema->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE));
 
-        $schema->setFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE, false);
-        $this->assertFalse($schema->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE));
-        $this->assertTrue($schema->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION));
+        $schema->setFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE, false);
+        $this->assertFalse($schema->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE));
+        $this->assertTrue($schema->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION));
     }
 
     /**

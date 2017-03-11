@@ -381,7 +381,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testValidateException() {
         try {
-            $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION);
+            $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
         } catch (\Exception $ex) {
             $msg = $ex->getMessage();
             throw $ex;
@@ -394,7 +394,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @expectedException \PHPUnit_Framework_Error_Notice
      */
     public function testValidateNotice() {
-        $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_NOTICE);
+        $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE);
     }
 
     /**

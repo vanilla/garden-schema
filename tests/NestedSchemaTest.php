@@ -185,7 +185,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * @expectedException \Garden\Schema\ValidationException
      */
     public function testValidateException() {
-        $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION);
+        $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
     }
 
     /**
@@ -194,7 +194,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * @expectedException \PHPUnit_Framework_Error_Notice
      */
     public function testValidateNotice() {
-        $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_NOTICE);
+        $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE);
     }
 
     /**

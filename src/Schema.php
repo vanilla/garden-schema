@@ -14,12 +14,12 @@ class Schema implements \JsonSerializable {
     /**
      * Trigger a notice when extraneous properties are encountered during validation.
      */
-    const FLAG_EXTRA_PROPERTIES_NOTICE = 0x1;
+    const VALIDATE_EXTRA_PROPERTY_NOTICE = 0x1;
 
     /**
      * Throw a ValidationException when extraneous properties are encountered during validation.
      */
-    const FLAG_EXTRA_PROPERTIES_EXCEPTION = 0x2;
+    const VALIDATE_EXTRA_PROPERTY_EXCEPTION = 0x2;
 
     /**
      * @var array All the known types.
@@ -721,12 +721,12 @@ class Schema implements \JsonSerializable {
 
         // Look for extraneous properties.
         if (!empty($keys)) {
-            if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_NOTICE)) {
+            if ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE)) {
                 $msg = sprintf("%s has unexpected field(s): %s.", $field->getName() ?: 'value', implode(', ', $keys));
                 trigger_error($msg, E_USER_NOTICE);
             }
 
-            if ($this->hasFlag(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION)) {
+            if ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)) {
                 $field->addError('invalid', [
                     'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
                     'extra' => array_values($keys),
