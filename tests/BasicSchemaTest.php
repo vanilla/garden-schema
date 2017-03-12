@@ -197,15 +197,14 @@ class BasicSchemaTest extends AbstractSchemaTest {
             "col:$shortType?"
         ]);
 
-        $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData);
-        $this->assertTrue($isValid);
-        $this->assertNull($nullData['col']);
-
         $missingData = [];
         $isValid = $schema->isValid($missingData);
         $this->assertTrue($isValid);
         $this->assertArrayNotHasKey('col', $missingData);
+
+        $nullData = ['col' => null];
+        $isValid = $schema->isValid($nullData);
+        $this->assertFalse($isValid);
     }
 
     /**

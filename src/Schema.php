@@ -606,7 +606,7 @@ class Schema implements \JsonSerializable {
      * @return bool|Invalid Returns the cleaned value or invalid if validation fails.
      */
     protected function validateBoolean($value, ValidationField $field) {
-        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if ($value === null) {
             $field->addTypeError('boolean');
             return Invalid::value();
@@ -734,12 +734,6 @@ class Schema implements \JsonSerializable {
                     $clean[$propertyName] = $propertyField->val('default');
                 } elseif ($isRequired) {
                     $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
-                }
-            } elseif ($data[$keys[$lName]] === null) {
-                if ($isRequired) {
-                    $propertyField->addError('missingField', ['messageCode' => '{field} cannot be null.']);
-                } else {
-                    $clean[$propertyName] = null;
                 }
             } else {
                 $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyField, $sparse);
