@@ -137,12 +137,12 @@ class StringValidationTest extends AbstractSchemaTest {
      * Test the enum constraint.
      *
      * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessage value must be one of: one, two, three.
+     * @expectedExceptionMessage value must be one of: one, two, three, null.
      * @expectedExceptionCode 422
      */
     public function testEnum() {
-        $enum = ['one', 'two', 'three'];
-        $schema = new Schema([':s' => ['enum' => $enum]]);
+        $enum = ['one', 'two', 'three', null];
+        $schema = new Schema([':s|n' => ['enum' => $enum]]);
 
         foreach ($enum as $str) {
             $this->assertTrue($schema->isValid($str));

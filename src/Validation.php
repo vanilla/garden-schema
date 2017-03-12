@@ -194,6 +194,22 @@ class Validation {
     }
 
     /**
+     * Get the error count, optionally for a particular field.
+     *
+     * @param string $field The name of a field or an empty string for all errors.
+     * @return int Returns the error count.
+     */
+    public function getErrorCount($field = '') {
+        if (empty($field)) {
+            return iterator_count($this->getRawErrors());
+        } elseif (empty($this->errors[$field])) {
+            return 0;
+        } else {
+            return count($this->errors[$field]);
+        }
+    }
+
+    /**
      * Get the error message for an error row.
      *
      * @param array $error The error row.
@@ -256,7 +272,13 @@ class Validation {
      * @return string Returns the translated string.
      */
     private function formatField($value, array $args = []) {
-        if (is_string($value)) {
+        if ($value === null) {
+            $r = $this->translate('null');
+        } elseif ($value === true) {
+            $r = $this->translate('true');
+        } elseif ($value === false) {
+            $r = $this->translate('false');
+        } elseif (is_string($value)) {
             $r = $this->translate($value);
         } elseif (is_numeric($value)) {
             $r = $value;

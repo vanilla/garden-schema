@@ -197,15 +197,14 @@ class BasicSchemaTest extends AbstractSchemaTest {
             "col:$shortType?"
         ]);
 
-        $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData);
-        $this->assertTrue($isValid);
-        $this->assertNull($nullData['col']);
-
         $missingData = [];
         $isValid = $schema->isValid($missingData);
         $this->assertTrue($isValid);
         $this->assertArrayNotHasKey('col', $missingData);
+
+        $nullData = ['col' => null];
+        $isValid = $schema->isValid($nullData);
+        $this->assertFalse($isValid);
     }
 
     /**
@@ -381,7 +380,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testValidateException() {
         try {
-            $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_EXCEPTION);
+            $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
         } catch (\Exception $ex) {
             $msg = $ex->getMessage();
             throw $ex;
@@ -394,7 +393,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @expectedException \PHPUnit_Framework_Error_Notice
      */
     public function testValidateNotice() {
-        $this->doValidationBehavior(Schema::FLAG_EXTRA_PROPERTIES_NOTICE);
+        $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE);
     }
 
     /**
@@ -431,5 +430,53 @@ class BasicSchemaTest extends AbstractSchemaTest {
         } catch (ValidationException $ex) {
             $this->assertSame('!!value is not a valid !integer.', $ex->getMessage());
         }
+    }
+
+    /**
+     * Test allow null.
+     *
+     * @param string $short The short type.
+     * @param string $long The long type.
+     * @param mixed $sample As sample value.
+     * @dataProvider provideTypes
+     */
+    public function testAllowNull($short, $long, $sample) {
+        $schema = new Schema([":$short|n"]);
+
+        $null = $schema->validate(null);
+        $this->assertNull($null);
+
+        $clean = $schema->validate($sample);
+        $this->assertSame($sample, $clean);
+    }
+
+    /**
+     * Test default values.
+     */
+    public function testDefault() {
+        $schema = new Schema([
+            'prop:s' => ['default' => 'foo']
+        ]);
+
+        $valid = $schema->validate([]);
+        $this->assertSame(['prop' => 'foo'], $valid);
+
+        $valid = $schema->validate([], true);
+        $this->assertSame([], $valid);
+    }
+
+    /**
+     * Default values for non-required fields.
+     */
+    public function testDefaultNotRequired() {
+        $schema = new Schema([
+            'prop:s?' => ['default' => 'foo']
+        ]);
+
+        $valid = $schema->validate([]);
+        $this->assertSame(['prop' => 'foo'], $valid);
+
+        $valid = $schema->validate([], true);
+        $this->assertSame([], $valid);
     }
 }
