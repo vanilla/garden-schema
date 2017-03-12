@@ -272,7 +272,13 @@ class Validation {
      * @return string Returns the translated string.
      */
     private function formatField($value, array $args = []) {
-        if (is_string($value)) {
+        if ($value === null) {
+            $r = $this->translate('null');
+        } elseif ($value === true) {
+            $r = $this->translate('true');
+        } elseif ($value === false) {
+            $r = $this->translate('false');
+        } elseif (is_string($value)) {
             $r = $this->translate($value);
         } elseif (is_numeric($value)) {
             $r = $value;

@@ -728,13 +728,12 @@ class Schema implements \JsonSerializable {
 
             // First check for required fields.
             if (!array_key_exists($lName, $keys)) {
-                // A sparse validation can leave required fields out.
-                if ($isRequired && !$sparse) {
-                    if ($propertyField->hasVal('default')) {
-                        $clean[$propertyName] = $propertyField->val('default');
-                    } else {
-                        $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
-                    }
+                if ($sparse) {
+                    // Sparse validation can leave required fields out.
+                } elseif ($propertyField->hasVal('default')) {
+                    $clean[$propertyName] = $propertyField->val('default');
+                } elseif ($isRequired) {
+                    $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
                 }
             } elseif ($data[$keys[$lName]] === null) {
                 if ($isRequired) {

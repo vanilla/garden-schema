@@ -465,4 +465,19 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $valid = $schema->validate([], true);
         $this->assertSame([], $valid);
     }
+
+    /**
+     * Default values for non-required fields.
+     */
+    public function testDefaultNotRequired() {
+        $schema = new Schema([
+            'prop:s?' => ['default' => 'foo']
+        ]);
+
+        $valid = $schema->validate([]);
+        $this->assertSame(['prop' => 'foo'], $valid);
+
+        $valid = $schema->validate([], true);
+        $this->assertSame([], $valid);
+    }
 }
