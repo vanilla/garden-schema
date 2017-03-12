@@ -34,7 +34,8 @@ class Schema implements \JsonSerializable {
         'number' => ['f', 'float'],
         'boolean' => ['b', 'bool'],
         'timestamp' => ['ts'],
-        'datetime' => ['dt']
+        'datetime' => ['dt'],
+        'null' => ['n']
     ];
 
     private $schema = [];
@@ -330,7 +331,22 @@ class Schema implements \JsonSerializable {
         // Check for a type.
         $parts = explode(':', $key);
         $name = $parts[0];
-        $type = !empty($parts[1]) ? $this->getType($parts[1]) : null;
+        $allowNull = false;
+        if (!empty($parts[1])) {
+            $types = explode('|', $parts[1]);
+            foreach ($types as $alias) {
+                $found = $this->getType($alias);
+                if ($found === null) {
+                    throw new \InvalidArgumentException("Unknown type '$alias'", 500);
+                } elseif ($found === 'null') {
+                    $allowNull = true;
+                } else {
+                    $type = $found;
+                }
+            }
+        } else {
+            $type = null;
+        }
 
         if ($value instanceof Schema) {
             if ($type === 'array') {
@@ -354,6 +370,9 @@ class Schema implements \JsonSerializable {
             if ($type === 'string' && !empty($name) && $required) {
                 $param['minLength'] = 1;
             }
+        }
+        if ($allowNull) {
+            $param['allowNull'] = true;
         }
 
         return [$name, $param, $required];
@@ -485,6 +504,8 @@ class Schema implements \JsonSerializable {
                 // The validation failed, so merge the validations together.
                 $field->getValidation()->merge($ex->getValidation(), $field->getName());
             }
+        } elseif ($value === null && $field->val('allowNull', false)) {
+            $result = $value;
         } else {
             // Validate the field's type.
             $type = $field->getType();
@@ -840,7 +861,7 @@ class Schema implements \JsonSerializable {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The field being validated.
-     * @return int|null Returns a valid timestamp or **null** if the value doesn't validate.
+     * @return int|Invalid Returns a valid timestamp or invalid if the value doesn't validate.
      */
     protected function validateTimestamp($value, ValidationField $field) {
         if (is_numeric($value) && $value > 0) {
@@ -849,9 +870,24 @@ class Schema implements \JsonSerializable {
             $result = $ts;
         } else {
             $field->addTypeError('timestamp');
-            $result = null;
+            $result = Invalid::value();
         }
         return $result;
+    }
+
+    /**
+     * Validate a null value.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The error collector for the field.
+     * @return null|Invalid Returns **null** or invalid.
+     */
+    protected function validateNull($value, ValidationField $field) {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $field->addError('invalid', ['messageCode' => '{field} should be null.', 'status' => 422]);
+        return Invalid::value();
     }
 
     /**

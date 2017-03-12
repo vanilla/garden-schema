@@ -432,4 +432,22 @@ class BasicSchemaTest extends AbstractSchemaTest {
             $this->assertSame('!!value is not a valid !integer.', $ex->getMessage());
         }
     }
+
+    /**
+     * Test allow null.
+     *
+     * @param string $short The short type.
+     * @param string $long The long type.
+     * @param mixed $sample As sample value.
+     * @dataProvider provideTypes
+     */
+    public function testAllowNull($short, $long, $sample) {
+        $schema = new Schema([":$short|n"]);
+
+        $null = $schema->validate(null);
+        $this->assertNull($null);
+
+        $clean = $schema->validate($sample);
+        $this->assertSame($sample, $clean);
+    }
 }
