@@ -367,7 +367,7 @@ class Schema implements \JsonSerializable {
             $param = ['type' => $type];
 
             // Parsed required strings have a minimum length of 1.
-            if ($type === 'string' && !empty($name) && $required) {
+            if ($type === 'string' && !empty($name) && $required && (!isset($value['default']) || $value['default'] !== '')) {
                 $param['minLength'] = 1;
             }
         }
@@ -459,12 +459,17 @@ class Schema implements \JsonSerializable {
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      */
     public function validate($data, $sparse = false) {
-        $validation = new ValidationField($this->createValidation(), $this->schema, '');
+        $field = new ValidationField($this->createValidation(), $this->schema, '');
 
-        $clean = $this->validateField($data, $validation, $sparse);
+        $clean = $this->validateField($data, $field, $sparse);
 
-        if (!$validation->getValidation()->isValid()) {
-            throw new ValidationException($validation->getValidation());
+        if (Invalid::isInvalid($clean) && $field->isValid()) {
+            // This really shouldn't happen, but we want to protect against seeing the invalid object.
+            $field->addError('invalid', ['messageCode' => '{field} is invalid.', 'status' => 422]);
+        }
+
+        if (!$field->getValidation()->isValid()) {
+            throw new ValidationException($field->getValidation());
         }
 
         return $clean;
@@ -725,7 +730,11 @@ class Schema implements \JsonSerializable {
             if (!array_key_exists($lName, $keys)) {
                 // A sparse validation can leave required fields out.
                 if ($isRequired && !$sparse) {
-                    $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
+                    if ($propertyField->hasVal('default')) {
+                        $clean[$propertyName] = $propertyField->val('default');
+                    } else {
+                        $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
+                    }
                 }
             } elseif ($data[$keys[$lName]] === null) {
                 if ($isRequired) {
@@ -756,7 +765,7 @@ class Schema implements \JsonSerializable {
             }
         }
 
-        return empty($clean) ? Invalid::value() : $clean;
+        return $clean;
     }
 
     /**
@@ -883,7 +892,7 @@ class Schema implements \JsonSerializable {
      * @return null|Invalid Returns **null** or invalid.
      */
     protected function validateNull($value, ValidationField $field) {
-        if ($value === null || $value === '') {
+        if ($value === null) {
             return null;
         }
         $field->addError('invalid', ['messageCode' => '{field} should be null.', 'status' => 422]);

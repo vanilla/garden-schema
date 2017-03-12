@@ -450,4 +450,19 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $clean = $schema->validate($sample);
         $this->assertSame($sample, $clean);
     }
+
+    /**
+     * Test default values.
+     */
+    public function testDefault() {
+        $schema = new Schema([
+            'prop:s' => ['default' => 'foo']
+        ]);
+
+        $valid = $schema->validate([]);
+        $this->assertSame(['prop' => 'foo'], $valid);
+
+        $valid = $schema->validate([], true);
+        $this->assertSame([], $valid);
+    }
 }

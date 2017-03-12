@@ -168,6 +168,16 @@ class ValidationField {
     }
 
     /**
+     * Whether or not the field has a value.
+     *
+     * @param string $key The key to look at.
+     * @return bool Returns **true** if the field has a key or **false** otherwise.
+     */
+    public function hasVal($key) {
+        return array_key_exists($key, $this->field);
+    }
+
+    /**
      * Get the error count for this field.
      */
     public function getErrorCount() {
