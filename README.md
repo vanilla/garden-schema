@@ -116,7 +116,7 @@ $schema = new Schema([
 ]);
 ```
 
-## Non-Object Schemas
+### Non-Object Schemas
 
 By default, schemas define an object because that is the most common use for a schema. If you want a schema to represent an array or even a basic type you define a single field with no name. The following example defines an array of objects (i.e. the output of a database query).
 
@@ -139,6 +139,26 @@ This schema would apply to something like the following data:
     ['id' => 32, 'name' => 'Franklin', 'birthday' => '1882-01-30']
 ]
 ```
+
+### Optional Properties and Allow Null
+
+When defining an object schema you can use a "?" to say tat the property is optional. This means that the property can be completely omitted during validation. This is not the same a providing a null value for the property which is considered invalid for optional properties.
+
+If you want a property to allow null values you can specify the **allowNull** attribute on the property. There are two ways to do this:
+
+```php
+[
+    // You can specify allowNull as a property attribute.
+    'opt1:s?' => ['allowNull' => true],
+    
+    // You can specify null as an optional type in the declaration.
+    'opt2:s|n?' => 'Another optional property.'
+] 
+```
+
+### Default Values
+
+You can specify a default value on object properties. If the property is omitted during validation then the default value will be used. Note that default values are not applied during sparse validation.
 
 ## Validating Data
 
