@@ -583,7 +583,7 @@ class Schema implements \JsonSerializable {
                 ''
             );
 
-            foreach ($value as $i => &$item) {
+            foreach ($value as $i => $item) {
                 $itemValidation->setName($field->getName()."[{$i}]");
                 $validItem = $this->validateField($item, $itemValidation, $sparse);
                 if (Invalid::isValid($validItem)) {
