@@ -43,7 +43,7 @@ To validate data you first create an instance of the **Schema** class and then c
 ```php
 namespace Garden\Schema;
 
-$schema = new Schema([...]);
+$schema = Schema::parse([...]);
 try {
     $valid = $schema->validate($data);
 } catch (ValidationException $ex) {
@@ -104,7 +104,7 @@ object    | o
 The array and object types are a bit special as they contain several elements rather than a single value. Because of this you can define the type of data that should be in those properties. Here are some examples:
 
 ```php
-$schema = new Schema([
+$schema = Schema::parse([
     'items:a', // array of any type
     'tags:a' => 's', // array of strings
     
@@ -121,7 +121,7 @@ $schema = new Schema([
 By default, schemas define an object because that is the most common use for a schema. If you want a schema to represent an array or even a basic type you define a single field with no name. The following example defines an array of objects (i.e. the output of a database query).
 
 ```php
-$schema = new Schema([
+$schema = Schema::parse([
     ':a' => [
         'id:i',
         'name:s',
@@ -169,7 +169,7 @@ Once you have a schema you validate data using the **validate()** or **isValid()
 You pass the data you want to validate to **Schema::validate()** and it it either returns a cleaned copy of your data or throws a **ValidationException**.
 
 ```php
-$schema = new Schema(['id:i', 'name:s']);
+$schema = Schema::parse(['id:i', 'name:s']);
 try {
     // $u1 will be ['id' => 123, 'name' => 'John']
     $u1 = $schema->validate(['id' => '123', 'name' => 'John']);
@@ -184,7 +184,7 @@ try {
 Calling **validate()** on user-submitted data allows you to check your data early and bail out if it isn't correct. If you just want to check your data without throwing an exception the **isValid()** method is a convenience method that returns true or false depending on whether or not the data is valid.
 
 ```php
-$schema = new Schema(['page:i', 'count:i?']);
+$schema = Schema::parse(['page:i', 'count:i?']);
 
 if ($schema->isValid(['page' => 5]) {
     // This will be hit.
@@ -224,7 +224,7 @@ class LocalizedValidation extends Validation {
 }
 
 // Install your class like so:
-$schema = new Schema([...]);
+$schema = Schema::parse([...]);
 $schema->setValidationClass(LocalizedValidation::class);
 ```
 
