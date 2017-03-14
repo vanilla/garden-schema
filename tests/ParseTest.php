@@ -156,62 +156,6 @@ class ParseTest extends AbstractSchemaTest {
     }
 
     /**
-     * Test merging basic schemas.
-     */
-    public function testBasicMerge() {
-        $schemaOne = Schema::parse(['foo:s?']);
-        $schemaTwo = Schema::parse(['bar:s']);
-
-        $schemaOne->merge($schemaTwo);
-
-        $expected = [
-            'type' => 'object',
-            'properties' => [
-                'foo' => ['type' => 'string'],
-                'bar' => ['type' => 'string', 'minLength' => 1]
-            ],
-            'required' => ['bar']
-        ];
-
-        $this->assertEquals($expected, $schemaOne->jsonSerialize());
-    }
-
-    /**
-     * Test merging nested schemas.
-     */
-    public function testNestedMerge() {
-        $schemaOne = $this->getArrayOfObjectsSchema();
-        $schemaTwo = Schema::parse([
-            'rows:a' => [
-                'email:s'
-            ]
-        ]);
-
-        $expected = [
-            'type' => 'object',
-            'properties' => [
-                'rows' => [
-                    'type' => 'array',
-                    'items' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'id' => ['type' => 'integer'],
-                            'name' => ['type' => 'string'],
-                            'email' => ['type' => 'string', 'minLength' => 1]
-                        ],
-                        'required' => ['id', 'email']
-                    ]
-                ]
-            ],
-            'required' => ['rows']
-        ];
-
-        $schemaOne->merge($schemaTwo);
-
-        $this->assertEquals($expected, $schemaOne->jsonSerialize());
-    }
-
-    /**
      * Test JSON schema format to type conversion (and back).
      *
      * @param array $arr The schema array.

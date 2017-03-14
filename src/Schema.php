@@ -147,31 +147,90 @@ class Schema implements \JsonSerializable {
      * Merge a schema with this one.
      *
      * @param Schema $schema A scheme instance. Its parameters will be merged into the current instance.
+     * @return $this
      */
     public function merge(Schema $schema) {
-        $fn = function (array &$target, array $source) use (&$fn) {
-            foreach ($source as $key => $val) {
-                if (is_array($val) && array_key_exists($key, $target) && is_array($target[$key])) {
-                    if (isset($val[0]) || isset($target[$key][0])) {
+        $this->mergeInternal($this->schema, $schema->getSchemaArray(), true, true);
+        return $this;
+    }
+
+    /**
+     * Add another schema to this one.
+     *
+     * Adding schemas together is analogous to array addition. When you add a schema it will only add missing information.
+     *
+     * @param Schema $schema The schema to add.
+     * @param bool $addProperties Whether to add properties that don't exist in this schema.
+     * @return $this
+     */
+    public function add(Schema $schema, $addProperties = false) {
+        $this->mergeInternal($this->schema, $schema->getSchemaArray(), false, $addProperties);
+        return $this;
+    }
+
+    /**
+     * The internal implementation of schema merging.
+     *
+     * @param array &$target The target of the merge.
+     * @param array $source The source of the merge.
+     * @param bool $overwrite Whether or not to replace values.
+     * @param bool $addProperties Whether or not to add object properties to the target.
+     * @return array
+     */
+    private function mergeInternal(array &$target, array $source, $overwrite = true, $addProperties = true) {
+        // We need to do a fix for required properties here.
+        if (isset($target['properties']) && !empty($source['required'])) {
+            $required = isset($target['required']) ? $target['required'] : [];
+
+            if (isset($source['required']) && $addProperties) {
+                $newProperties = array_diff(array_keys($source['properties']), array_keys($target['properties']));
+                $newRequired = array_intersect($source['required'], $newProperties);
+
+                $required = array_merge($required, $newRequired);
+            }
+        }
+
+
+        foreach ($source as $key => $val) {
+            if (is_array($val) && array_key_exists($key, $target) && is_array($target[$key])) {
+                if ($key === 'properties' && !$addProperties) {
+                    // We just want to merge the properties that exist in the destination.
+                    foreach ($val as $name => $prop) {
+                        if (isset($target[$key][$name])) {
+                            $this->mergeInternal($target[$key][$name], $prop, $overwrite, $addProperties);
+                        }
+                    }
+                } elseif (isset($val[0]) || isset($target[$key][0])) {
+                    if ($overwrite) {
                         // This is a numeric array, so just do a merge.
                         $merged = array_merge($target[$key], $val);
                         if (is_string($merged[0])) {
                             $merged = array_keys(array_flip($merged));
                         }
                         $target[$key] = $merged;
-                    } else {
-                        $target[$key] = $fn($target[$key], $val);
                     }
                 } else {
-                    $target[$key] = $val;
+                    $target[$key] = $this->mergeInternal($target[$key], $val, $overwrite, $addProperties);
                 }
+            } elseif (!$overwrite && array_key_exists($key, $target) && !is_array($val)) {
+                // Do nothing, we aren't replacing.
+            } else {
+                $target[$key] = $val;
             }
+        }
 
-            return $target;
-        };
+        if (isset($required)) {
+            if (empty($required)) {
+                unset($target['required']);
+            } else {
+                $target['required'] = $required;
+            }
+        }
 
-        $fn($this->schema, $schema->getSchemaArray());
+        return $target;
     }
+
+//    public function overlay(Schema $schema )
 
     /**
      * Returns the internal schema array.
@@ -286,6 +345,9 @@ class Schema implements \JsonSerializable {
             }
         }
 
+        if (is_array($node) && $node['type'] === null) {
+            unset($node['type']);
+        }
 
         return $node;
     }
