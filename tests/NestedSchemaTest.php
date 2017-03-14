@@ -189,6 +189,36 @@ class NestedSchemaTest extends AbstractSchemaTest {
     }
 
     /**
+     * Call validate on an instance of Schema where the data contains unexpected parameters.
+     *
+     * @param int $validationBehavior One of the **Schema::VALIDATE_*** constants.
+     */
+    protected function doValidationBehavior($validationBehavior) {
+        $schema = new Schema([
+            'groupID:i' => 'The ID of the group.',
+            'name:s' => 'The name of the group.',
+            'description:s' => 'A description of the group.',
+            'member:o' => [
+                'email:s' => 'The ID of the new member.'
+            ]
+        ]);
+        $schema->setFlags($validationBehavior);
+
+        $data = [
+            'groupID' => 123,
+            'name' => 'Group Foo',
+            'description' => 'A group for testing.',
+            'member' => [
+                'email' => 'user@example.com',
+                'role' => 'Leader',
+            ]
+        ];
+
+        $valid = $schema->validate($data);
+        $this->assertArrayNotHasKey('role', $valid['member']);
+    }
+
+    /**
      * Test triggering a notice when removing unexpected parameters from validated data.
      *
      * @expectedException \PHPUnit_Framework_Error_Notice
@@ -313,32 +343,35 @@ class NestedSchemaTest extends AbstractSchemaTest {
     }
 
     /**
-     * Call validate on an instance of Schema where the data contains unexpected parameters.
-     *
-     * @param int $validationBehavior One of the **Schema::VALIDATE_*** constants.
+     * Objects that implement array access should be able to be validated.
      */
-    protected function doValidationBehavior($validationBehavior) {
+    public function testArrayAccessValidation() {
         $schema = new Schema([
-            'groupID:i' => 'The ID of the group.',
-            'name:s' => 'The name of the group.',
-            'description:s' => 'A description of the group.',
-            'member:o' => [
-                'email:s' => 'The ID of the new member.'
+            'name:s',
+            'arr:a' => [
+                'id:i',
+                'foo:s'
             ]
         ]);
-        $schema->setFlags($validationBehavior);
 
-        $data = [
-            'groupID' => 123,
-            'name' => 'Group Foo',
-            'description' => 'A group for testing.',
-            'member' => [
-                'email' => 'user@example.com',
-                'role' => 'Leader',
+        $data = new \ArrayObject([
+            'name' => 'bur',
+            'arr' => new \ArrayObject([
+                new \ArrayObject(['id' => 1, 'foo' => 'bar']),
+                new \ArrayObject(['id' => 2, 'foo' => 'baz']),
+            ])
+        ]);
+
+        $valid = $schema->validate($data);
+
+        $expected = [
+            'name' => 'bur',
+            'arr' => [
+                ['id' => 1, 'foo' => 'bar'],
+                ['id' => 2, 'foo' => 'baz'],
             ]
         ];
 
-        $valid = $schema->validate($data);
-        $this->assertArrayNotHasKey('role', $valid['member']);
+        $this->assertEquals($expected, $valid);
     }
 }

@@ -568,10 +568,10 @@ class Schema implements \JsonSerializable {
      * @return array|Invalid Returns an array or invalid if validation fails.
      */
     protected function validateArray($value, ValidationField $field, $sparse = false) {
-        if (!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) {
+        if (!$this->isArray($value, true) || (count($value) > 0 && !array_key_exists(0, $value))) {
             $field->addTypeError('array');
             return Invalid::value();
-        } elseif (empty($value)) {
+        } elseif (count($value) === 0) {
             return [];
         } elseif ($field->val('items') !== null) {
             $result = [];
@@ -592,7 +592,7 @@ class Schema implements \JsonSerializable {
             }
         } else {
             // Cast the items into a proper numeric array.
-            $result = array_values($value);
+            $result = is_array($value) ? array_values($value) : iterator_to_array($value);
         }
 
         return empty($result) ? Invalid::value() : $result;
@@ -689,12 +689,14 @@ class Schema implements \JsonSerializable {
      * @return object|Invalid Returns a clean object or **null** if validation fails.
      */
     protected function validateObject($value, ValidationField $field, $sparse = false) {
-        if (!is_array($value) || isset($value[0])) {
+        if (!$this->isArray($value) || isset($value[0])) {
             $field->addTypeError('object');
             return Invalid::value();
         } elseif (is_array($field->val('properties'))) {
             // Validate the data against the internal schema.
             $value = $this->validateProperties($value, $field, $sparse);
+        } elseif (!is_array($value)) {
+            $value = $this->toArray($value);
         }
         return $value;
     }
@@ -702,16 +704,21 @@ class Schema implements \JsonSerializable {
     /**
      * Validate data against the schema and return the result.
      *
-     * @param array $data The data to validate.
+     * @param array|\ArrayAccess $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
      * or invalid if there are no valid properties.
      */
-    protected function validateProperties(array $data, ValidationField $field, $sparse = false) {
+    protected function validateProperties($data, ValidationField $field, $sparse = false) {
         $properties = $field->val('properties', []);
         $required = array_flip($field->val('required', []));
-        $keys = array_keys($data);
+
+        if (is_array($data)) {
+            $keys = array_keys($data);
+        } else {
+            $keys = array_keys(iterator_to_array($data));
+        }
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
         $propertyField = new ValidationField($field->getValidation(), [], null);
@@ -1047,5 +1054,30 @@ class Schema implements \JsonSerializable {
             $result = new $class;
         }
         return $result;
+    }
+
+    /**
+     * Check whether or not a value is an array or accessible like an array.
+     *
+     * @param mixed $value The value to check.
+     * @param bool $countable Whether the array has to be countable too.
+     * @return bool Returns **true** if the value can be used like an array or **false** otherwise.
+     */
+    private function isArray($value, $countable = false) {
+        return is_array($value) || ($value instanceof \ArrayAccess && $value instanceof \Traversable &&
+                (!$countable || $value instanceof \Countable));
+    }
+
+    /**
+     * Cast a value to an array.
+     *
+     * @param \Traversable $value The value to convert.
+     * @return array Returns an array.
+     */
+    private function toArray(\Traversable $value) {
+        if ($value instanceof \ArrayObject) {
+            return $value->getArrayCopy();
+        }
+        return iterator_to_array($value);
     }
 }
