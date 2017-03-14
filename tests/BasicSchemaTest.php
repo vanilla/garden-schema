@@ -20,7 +20,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * An empty schema should validate to anything.
      */
     public function testEmptySchema() {
-        $schema = new Schema([]);
+        $schema = Schema::parse([]);
 
         $val = [123];
         $r = $schema->validate($val);
@@ -35,7 +35,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * An object with no types should validate, but still require values.
      */
     public function testEmptyTypes() {
-        $schema = new Schema(['a', 'b' => 'Yup', 'c' => []]);
+        $schema = Schema::parse(['a', 'b' => 'Yup', 'c' => []]);
 
         $data = ['a' => [], 'b' => 1111, 'c' => 'hey!!!'];
         $valid = $schema->validate($data);
@@ -101,7 +101,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideBooleanData
      */
     public function testBooleanSchema($input, $expected) {
-        $schema = new Schema([':b']);
+        $schema = Schema::parse([':b']);
         $valid = $schema->validate($input);
         $this->assertSame($expected, $valid);
     }
@@ -114,7 +114,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideDateTimes
      */
     public function testDateTimeFormats($value, \DateTimeInterface $expected) {
-        $schema = new Schema([':dt']);
+        $schema = Schema::parse([':dt']);
 
         $valid = $schema->validate($value);
         $this->assertInstanceOf(\DateTimeInterface::class, $valid);
@@ -141,7 +141,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test an array type.
      */
     public function testArrayType() {
-        $schema = new Schema([':a']);
+        $schema = Schema::parse([':a']);
 
         $expectedSchema = [
             'type' => 'array'
@@ -157,19 +157,19 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         // Array with a description and not a type.
         $expectedSchema['description'] = 'Hello world!';
-        $schema = new Schema([':a' => 'Hello world!']);
+        $schema = Schema::parse([':a' => 'Hello world!']);
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
 
         // Array with an items type.
         unset($expectedSchema['description']);
         $expectedSchema['items']['type'] = 'integer';
 
-        $schema = new Schema([':a' => 'i']);
+        $schema = Schema::parse([':a' => 'i']);
         $this->assertEquals($expectedSchema, $schema->jsonSerialize());
 
         // Test the longer syntax.
         $expectedSchema['description'] = 'Hello world!';
-        $schema = new Schema([':a' => [
+        $schema = Schema::parse([':a' => [
             'description' => 'Hello world!',
             'items' => ['type' => 'integer']
         ]]);
@@ -193,7 +193,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideTypes
      */
     public function testNotRequired($shortType) {
-        $schema = new Schema([
+        $schema = Schema::parse([
             "col:$shortType?"
         ]);
 
@@ -219,7 +219,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
             return;
         }
 
-        $schema = new Schema([
+        $schema = Schema::parse([
             "col:$shortType"
         ]);
 
@@ -238,7 +238,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * In general, bools should be cast to false if they are passed, but falsey.
      */
     public function testRequiredEmptyBool() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'col:b'
         ]);
         /* @var Validation $validation */
@@ -307,7 +307,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideInvalidData
      */
     public function testInvalidValues($type, $value) {
-        $schema = new Schema([
+        $schema = Schema::parse([
             "col:$type?"
         ]);
         $strVal = print_r($value, true);
@@ -351,7 +351,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @param int $validationBehavior One of the **Schema::FLAG_*** constants.
      */
     protected function doValidationBehavior($validationBehavior) {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'userID:i' => 'The ID of the user.',
             'name:s' => 'The username of the user.',
             'email:s' => 'The email of the user.',
@@ -407,7 +407,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test a custom validation class.
      */
     public function testDifferentValidationClass() {
-        $schema = new Schema([':i']);
+        $schema = Schema::parse([':i']);
         $schema->setValidationClass(TestValidation::class);
 
         try {
@@ -441,7 +441,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideTypes
      */
     public function testAllowNull($short, $long, $sample) {
-        $schema = new Schema([":$short|n"]);
+        $schema = Schema::parse([":$short|n"]);
 
         $null = $schema->validate(null);
         $this->assertNull($null);
@@ -454,7 +454,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test default values.
      */
     public function testDefault() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'prop:s' => ['default' => 'foo']
         ]);
 
@@ -469,7 +469,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Default values for non-required fields.
      */
     public function testDefaultNotRequired() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'prop:s?' => ['default' => 'foo']
         ]);
 

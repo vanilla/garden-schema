@@ -64,7 +64,7 @@ class Schema implements \JsonSerializable {
      * @param array $schema The array schema to validate against.
      */
     public function __construct($schema = []) {
-        $this->schema = $this->parse($schema);
+        $this->schema = $schema;
     }
 
     /**
@@ -184,13 +184,25 @@ class Schema implements \JsonSerializable {
     }
 
     /**
+     * Parse a short schema and return the associated schema.
+     *
+     * @param array $arr The schema array.
+     * @return Schema Returns a new schema.
+     */
+    public static function parse(array $arr) {
+        $schema = new Schema();
+        $schema->schema = $schema->parseInternal($arr);
+        return $schema;
+    }
+
+    /**
      * Parse a schema in short form into a full schema array.
      *
      * @param array $arr The array to parse into a schema.
      * @return array The full schema array.
      * @throws \InvalidArgumentException Throws an exception when an item in the schema is invalid.
      */
-    protected function parse(array $arr) {
+    protected function parseInternal(array $arr) {
         if (empty($arr)) {
             // An empty schema validates to anything.
             return [];
@@ -239,7 +251,7 @@ class Schema implements \JsonSerializable {
                         // The value includes array schema information.
                         $node = array_replace($node, $value);
                     } else {
-                        $node['items'] = $this->parse($value);
+                        $node['items'] = $this->parseInternal($value);
                     }
                     break;
                 case 'object':
@@ -267,7 +279,7 @@ class Schema implements \JsonSerializable {
             // Parse child elements.
             if ($node['type'] === 'array' && isset($node['items'])) {
                 // The value includes array schema information.
-                $node['items'] = $this->parse($node['items']);
+                $node['items'] = $this->parseInternal($node['items']);
             } elseif ($node['type'] === 'object' && isset($node['properties'])) {
                 list($node['properties']) = $this->parseProperties($node['properties']);
 

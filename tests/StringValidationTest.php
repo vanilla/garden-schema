@@ -25,7 +25,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * @dataProvider provideMinLengthTests
      */
     public function testMinLength($str, $code, $minLength = 3) {
-        $schema = new Schema(['str:s' => ['minLength' => $minLength]]);
+        $schema = Schema::parse(['str:s' => ['minLength' => $minLength]]);
 
         try {
             $schema->validate(['str' => $str]);
@@ -66,7 +66,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * @dataProvider provideMaxLengthTests
      */
     public function testMaxLength($str, $code = '', $maxLength = 3) {
-        $schema = new Schema(['str:s?' => ['maxLength' => $maxLength]]);
+        $schema = Schema::parse(['str:s?' => ['maxLength' => $maxLength]]);
 
         try {
             $schema->validate(['str' => $str]);
@@ -104,7 +104,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * @dataProvider providePatternTests
      */
     public function testPattern($str, $code = '', $pattern = '^[a-z]o+$') {
-        $schema = new Schema(['str:s?' => ['pattern' => $pattern]]);
+        $schema = Schema::parse(['str:s?' => ['pattern' => $pattern]]);
 
         try {
             $schema->validate(['str' => $str]);
@@ -142,7 +142,7 @@ class StringValidationTest extends AbstractSchemaTest {
      */
     public function testEnum() {
         $enum = ['one', 'two', 'three', null];
-        $schema = new Schema([':s|n' => ['enum' => $enum]]);
+        $schema = Schema::parse([':s|n' => ['enum' => $enum]]);
 
         foreach ($enum as $str) {
             $this->assertTrue($schema->isValid($str));
@@ -155,7 +155,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * Test a required empty string with a min length of 0.
      */
     public function testRequiredEmptyString() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'col:s' => ['minLength' => 0]
         ]);
 
@@ -181,7 +181,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * @dataProvider provideDateTimeFormatTests
      */
     public function testDateTimeFormat($value, $expected) {
-        $schema = new Schema([':s' => ['format' => 'date-time']]);
+        $schema = Schema::parse([':s' => ['format' => 'date-time']]);
 
         $valid = $schema->validate($value);
         $this->assertEquals($expected, $valid);
@@ -216,7 +216,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * Test the email string format.
      */
     public function testEmailFormat() {
-        $schema = new Schema([':s' => ['format' => 'email']]);
+        $schema = Schema::parse([':s' => ['format' => 'email']]);
 
         $this->assertTrue($schema->isValid('todd@example.com'));
         $this->assertTrue($schema->isValid('todd+foo@example.com'));
@@ -227,7 +227,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * Test the IPv4 format.
      */
     public function testIPv4Format() {
-        $schema = new Schema([':s' => ['format' => 'ipv4']]);
+        $schema = Schema::parse([':s' => ['format' => 'ipv4']]);
 
         $this->assertTrue($schema->isValid('127.0.0.1'));
         $this->assertTrue($schema->isValid('192.168.5.5'));
@@ -238,7 +238,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * Test the IPv6 format.
      */
     public function testIPv6Format() {
-        $schema = new Schema([':s' => ['format' => 'ipv6']]);
+        $schema = Schema::parse([':s' => ['format' => 'ipv6']]);
 
         $this->assertTrue($schema->isValid('2001:0db8:0a0b:12f0:0000:0000:0000:0001'));
         $this->assertTrue($schema->isValid('2001:db8::1'));
@@ -249,7 +249,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * Test the IPv6 format.
      */
     public function testIPFormat() {
-        $schema = new Schema([':s' => ['format' => 'ip']]);
+        $schema = Schema::parse([':s' => ['format' => 'ip']]);
 
         $this->assertTrue($schema->isValid('2001:0db8:0a0b:12f0:0000:0000:0000:0001'));
         $this->assertTrue($schema->isValid('2001:db8::1'));
@@ -265,7 +265,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * @dataProvider provideUris
      */
     public function testUriFormat($uri, $valid = true) {
-        $schema = new Schema([':s' => ['format' => 'uri']]);
+        $schema = Schema::parse([':s' => ['format' => 'uri']]);
 
         if ($valid) {
             $this->assertTrue($schema->isValid($uri));

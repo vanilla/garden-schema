@@ -14,7 +14,7 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
      * Test basic property access.
      */
     public function testPropertyAccess() {
-        $schema = new Schema([]);
+        $schema = Schema::parse([]);
 
         $this->assertEmpty($schema->getDescription());
         $schema->setDescription('foo');
@@ -56,7 +56,7 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
      * @expectedException \InvalidArgumentException
      */
     public function testInvalidDescription() {
-        $schema = new Schema([]);
+        $schema = Schema::parse([]);
         $schema->setDescription(123);
     }
 
@@ -66,7 +66,7 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
      * @expectedException \InvalidArgumentException
      */
     public function testInvalidBehavior() {
-        $schema = new Schema([]);
+        $schema = Schema::parse([]);
         $schema->setFlags('foo');
     }
 }

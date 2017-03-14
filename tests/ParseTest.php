@@ -40,7 +40,7 @@ class ParseTest extends AbstractSchemaTest {
      * Test a basic nested object.
      */
     public function testBasicNested() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'obj:o' => [
                 'id:i',
                 'name:s?'
@@ -81,7 +81,7 @@ class ParseTest extends AbstractSchemaTest {
      * Test a double nested schema.
      */
     public function testDoubleNested() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'obj:o' => [
                 'obj:o?' => [
                     'id:i'
@@ -121,7 +121,7 @@ class ParseTest extends AbstractSchemaTest {
      * @dataProvider provideTypes
      */
     public function testRootSchemas($short, $type) {
-        $schema = new Schema([":$short" => 'desc']);
+        $schema = Schema::parse([":$short" => 'desc']);
 
         $expected = ['type' => $type, 'description' => 'desc'];
         $this->assertEquals($expected, $schema->getSchemaArray());
@@ -131,7 +131,7 @@ class ParseTest extends AbstractSchemaTest {
      * Test defining the root with a schema array.
      */
     public function testDefineRoot() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             ':a' => [
                 'userID:i',
                 'name:s',
@@ -159,8 +159,8 @@ class ParseTest extends AbstractSchemaTest {
      * Test merging basic schemas.
      */
     public function testBasicMerge() {
-        $schemaOne = new Schema(['foo:s?']);
-        $schemaTwo = new Schema(['bar:s']);
+        $schemaOne = Schema::parse(['foo:s?']);
+        $schemaTwo = Schema::parse(['bar:s']);
 
         $schemaOne->merge($schemaTwo);
 
@@ -181,7 +181,7 @@ class ParseTest extends AbstractSchemaTest {
      */
     public function testNestedMerge() {
         $schemaOne = $this->getArrayOfObjectsSchema();
-        $schemaTwo = new Schema([
+        $schemaTwo = Schema::parse([
             'rows:a' => [
                 'email:s'
             ]

@@ -76,7 +76,7 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
      * @return Schema Returns the schema of atomic types.
      */
     public function getAtomicSchema() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'id:i',
             'name:s' => 'The name of the object.',
             'description:s?',
@@ -95,7 +95,7 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
      * @return Schema Returns a new schema for testing.
      */
     public function getNestedSchema() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'id:i',
             'name:s',
             'addr:o' => [
@@ -114,7 +114,7 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
      * @return Schema Returns the schema.
      */
     public function getArrayOfObjectsSchema() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'rows:a' => [
                 'id:i',
                 'name:s?'

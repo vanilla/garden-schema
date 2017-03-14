@@ -62,7 +62,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * Test a variety of array item validation scenarios.
      */
     public function testArrayItemsType() {
-        $schema = new Schema(['arr:a' => 'i']);
+        $schema = Schema::parse(['arr:a' => 'i']);
 
         $validData = ['arr' => [1, '2', 3]];
         $this->assertTrue($schema->isValid($validData));
@@ -194,7 +194,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * @param int $validationBehavior One of the **Schema::VALIDATE_*** constants.
      */
     protected function doValidationBehavior($validationBehavior) {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'groupID:i' => 'The ID of the group.',
             'name:s' => 'The name of the group.',
             'description:s' => 'A description of the group.',
@@ -238,7 +238,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * The schema fields should be case-insensitive and fix the case of incorrect keys.
      */
     public function testCaseInsensitivity() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'obj:o' => [
                 'id:i',
                 'name:s?'
@@ -268,13 +268,13 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * Test passing a schema instance as details for a parameter.
      */
     public function testSchemaAsParameter() {
-        $userSchema = new Schema([
+        $userSchema = Schema::parse([
             'userID:i',
             'name:s',
             'email:s'
         ]);
 
-        $schema = new Schema([
+        $schema = Schema::parse([
             'name:s' => 'The title of the discussion.',
             'body:s' => 'The body of the discussion.',
             'insertUser' => $userSchema,
@@ -315,12 +315,12 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * Nested schemas should properly validate by calling the nested schema's validation.
      */
     public function testNestedSchemaValidation() {
-        $userSchema = new Schema([
+        $userSchema = Schema::parse([
             'name:s',
             'email:s?'
         ]);
 
-        $schema = new Schema([':a' => $userSchema]);
+        $schema = Schema::parse([':a' => $userSchema]);
 
         $clean = $schema->validate([
             ['name' => 'Todd', 'wut' => 'foo'],
@@ -331,7 +331,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
         try {
             $schema->validate([
                 ['email' => 'foo@bar.com'],
-                ['name' => new Schema([])]
+                ['name' => Schema::parse([])]
             ]);
             $this->fail("The data is not supposed to validate.");
         } catch (ValidationException $ex) {
@@ -346,7 +346,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * Objects that implement array access should be able to be validated.
      */
     public function testArrayAccessValidation() {
-        $schema = new Schema([
+        $schema = Schema::parse([
             'name:s',
             'arr:a' => [
                 'id:i',
