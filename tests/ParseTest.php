@@ -165,6 +165,16 @@ class ParseTest extends AbstractSchemaTest {
     }
 
     /**
+     * Test the ability to pass constructor arguments using the parse method.
+     */
+    public function testConstructorParameters() {
+        $subclass = ExtendedSchema::parse([], 'DiscussionController', 'index', 'out');
+        $this->assertEquals('DiscussionController', $subclass->controller);
+        $this->assertEquals('index', $subclass->method);
+        $this->assertEquals('out', $subclass->type);
+    }
+
+    /**
      * Test JSON schema format to type conversion (and back).
      *
      * @param array $arr The schema array.
