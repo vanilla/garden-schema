@@ -246,10 +246,10 @@ class Schema implements \JsonSerializable {
      * Parse a short schema and return the associated schema.
      *
      * @param array $arr The schema array.
-     * @return Schema Returns a new schema.
+     * @return static Returns a new schema.
      */
     public static function parse(array $arr) {
-        $schema = new Schema();
+        $schema = new static();
         $schema->schema = $schema->parseInternal($arr);
         return $schema;
     }
