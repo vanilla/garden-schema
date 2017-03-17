@@ -8,6 +8,7 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
+use Garden\Schema\Tests\Fixtures\ExtendedSchema;
 
 /**
  * Test schema parsing.
@@ -153,6 +154,14 @@ class ParseTest extends AbstractSchemaTest {
         ];
 
         $this->assertEquals($expected, $schema->jsonSerialize());
+    }
+
+    /**
+     * Verify the current class is returned from parse calls in Schema subclasses.
+     */
+    public function testSubclassing() {
+        $subclass = ExtendedSchema::parse([]);
+        $this->assertInstanceOf(ExtendedSchema::class, $subclass);
     }
 
     /**
