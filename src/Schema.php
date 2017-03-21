@@ -560,7 +560,7 @@ class Schema implements \JsonSerializable {
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      */
     public function validate($data, $sparse = false) {
-        $field = new ValidationField($this->createValidation(), $this->schema, '');
+        $field = new ValidationField($this->createValidation(), $this->schema, '', $sparse);
 
         $clean = $this->validateField($data, $field, $sparse);
 
@@ -679,7 +679,8 @@ class Schema implements \JsonSerializable {
             $itemValidation = new ValidationField(
                 $field->getValidation(),
                 $field->val('items'),
-                ''
+                '',
+                $sparse
             );
 
             $count = 0;
@@ -823,7 +824,7 @@ class Schema implements \JsonSerializable {
         }
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
-        $propertyField = new ValidationField($field->getValidation(), [], null);
+        $propertyField = new ValidationField($field->getValidation(), [], null, $sparse);
 
         // Loop through the schema fields and validate each one.
         $clean = [];
