@@ -94,6 +94,32 @@ class Schema implements \JsonSerializable {
     }
 
     /**
+     * Get the ID for the schema.
+     *
+     * @return string
+     */
+    public function getID() {
+        return isset($this->schema['id']) ? $this->schema['id'] : '';
+    }
+
+    /**
+     * Set the ID for the schema.
+     *
+     * @param string $ID The new ID.
+     * @throws \InvalidArgumentException Throws an exception when the provided ID is not a string.
+     * @return Schema
+     */
+    public function setID($ID) {
+        if (is_string($ID)) {
+            $this->schema['ID'] = $ID;
+        } else {
+            throw new \InvalidArgumentException("The ID is not a valid string.", 500);
+        }
+
+        return $this;
+    }
+
+    /**
      * Return the validation flags.
      *
      * @return int Returns a bitwise combination of flags.
