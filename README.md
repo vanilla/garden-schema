@@ -10,11 +10,11 @@ The Garden Schema is a simple data validation and cleaning library based on [JSO
 
 ## Features
 
-- Define the data structure of any depth of PHP array and validate it.
+- Define the data structures of PHP arrays of any depth, and validate them.
 
 - Validated data is cleaned and coerced into appropriate types.
 
-- The schema defines a whitelist of allowed data and strips out all extraneous data. This adds
+- The schema defines a whitelist of allowed data and strips out all extraneous data.
 
 - The **Schema** class understands data in [JSON Schema](http://json-schema.org/) format. We will add more support for the built-in JSON schema validation as time goes on.
 
@@ -51,24 +51,24 @@ try {
 }
 ```
 
-In the above example a **Schema** object is created with the schema definition passed to its constructor (more on that later). You then pass the data you want to validate to the **validate()** method. If the data is okay then a clean version is returned, otherwise a **ValidationException** is thrown.
+In the above example a **Schema** object is created with the schema definition passed to its constructor (more on that later). Data to be validated can then be passed to the **validate()** method. If the data is okay then a clean version is returned, otherwise a **ValidationException** is thrown.
 
 ## Defining Schemas
 
-The **Schema** class is instantiated with an array defining the schema. The array can be in [JSON Schema](http://json-schema.org/) format or it can be in custom short format which is much quicker to develop with. The short format will be described in this section.
+The **Schema** class is instantiated with an array defining the schema. The array can be in [JSON Schema](http://json-schema.org/) format or it can be in custom short format which is much quicker to write. The short format will be described in this section.
 
 By default the schema is an array where each element of the array defines an object property. By "object" we mean javascript object or PHP array with string keys. There are several ways a property can be defined:
  
 ```php
 [
-    '<property>', // basic property can be any type
+    '<property>', // basic property, can be any type
     '<property>?', // optional property
-    '<property>:<type>?', // property with given type
+    '<property>:<type>?', // optional property with specific type
 
-    '<property>:<type>?' => 'Description', // property with description
-    '<property>? => ['type' => '<type'>, 'description' => '...'], // longer format
+    '<property>:<type>?' => 'Description', // optional, typed property with description
+    '<property>?' => ['type' => '<type'>, 'description' => '...'], // longer format
     
-    '<property>:o => [ // object property with nested schema
+    '<property>:o' => [ // object property with nested schema
         '<property>:<type>' => '...',
         ...
     ],
@@ -86,7 +86,7 @@ We provide first-class support for descriptions because we believe in writing re
  
 ### Types and Short Types
 
-The **Schema** class supports the following types. Each type has a short-form and a long-form. Usually you use the short-form when defining a schema in code and it gets converted to the long-form.
+The **Schema** class supports the following types. Each type has a short-form and a long-form. Usually you use the short-form when defining a schema in code and it gets converted to the long-form internally, including when used in errors.
 
 Type      | Short-form
 --------- | ----------
@@ -142,7 +142,7 @@ This schema would apply to something like the following data:
 
 ### Optional Properties and Allow Null
 
-When defining an object schema you can use a "?" to say tat the property is optional. This means that the property can be completely omitted during validation. This is not the same a providing a null value for the property which is considered invalid for optional properties.
+When defining an object schema you can use a "?" to say that the property is optional. This means that the property can be completely omitted during validation. This is not the same a providing a null value for the property which is considered invalid for optional properties.
 
 If you want a property to allow null values you can specify the **allowNull** attribute on the property. There are two ways to do this:
 
