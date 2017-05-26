@@ -577,6 +577,7 @@ class Schema implements \JsonSerializable {
      */
     protected function validateField($value, ValidationField $field, $sparse = false) {
         $result = $value;
+
         if ($field->getField() instanceof Schema) {
             try {
                 $result = $field->getField()->validate($value, $sparse);
@@ -584,8 +585,8 @@ class Schema implements \JsonSerializable {
                 // The validation failed, so merge the validations together.
                 $field->getValidation()->merge($ex->getValidation(), $field->getName());
             }
-        } elseif ($value === null && $field->val('allowNull', false)) {
-            $result = $value;
+        } elseif (($value === null || ($value === '' && $field->getType() !== 'string')) && $field->val('allowNull', false)) {
+            $result = null;
         } else {
             // Validate the field's type.
             $type = $field->getType();
@@ -819,7 +820,15 @@ class Schema implements \JsonSerializable {
                     $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
                 }
             } else {
-                $clean[$propertyName] = $this->validateField($data[$keys[$lName]], $propertyField, $sparse);
+                $value = $data[$keys[$lName]];
+
+                if (in_array($value, [null, ''], true) && !$isRequired && !$propertyField->val('allowNull')) {
+                    if ($propertyField->getType() !== 'string' || $value === null) {
+                        continue;
+                    }
+                }
+
+                $clean[$propertyName] = $this->validateField($value, $propertyField, $sparse);
             }
 
             unset($keys[$lName]);

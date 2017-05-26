@@ -203,8 +203,8 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $this->assertArrayNotHasKey('col', $missingData);
 
         $nullData = ['col' => null];
-        $isValid = $schema->isValid($nullData);
-        $this->assertFalse($isValid);
+        $valid = $schema->validate($nullData);
+        $this->assertSame([], $valid);
     }
 
     /**
@@ -478,5 +478,12 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         $valid = $schema->validate([], true);
         $this->assertSame([], $valid);
+    }
+
+    public function testBoolFalse() {
+        $schema = Schema::parse(['bool:b']);
+
+        $valid = $schema->validate(['bool' => false]);
+        $this->assertFalse($valid['bool']);
     }
 }
