@@ -94,6 +94,88 @@ class Schema implements \JsonSerializable {
     }
 
     /**
+     * Get a schema field.
+     *
+     * @param string|array $path The JSON schema path of the field with parts separated by dots.
+     * @param mixed $default The value to return if the field isn't found.
+     * @return mixed Returns the field value or `$default`.
+     */
+    public function getField($path, $default = null) {
+        if (is_string($path)) {
+            $path = explode('.', $path);
+        }
+
+        $value = $this->schema;
+        foreach ($path as $i => $subKey) {
+            if (is_array($value) && isset($value[$subKey])) {
+                $value = $value[$subKey];
+            } elseif ($value instanceof Schema) {
+                return $value->getField(array_slice($path, $i), $default);
+            } else {
+                return $default;
+            }
+        }
+        return $value;
+    }
+
+    /**
+     * Set a schema field.
+     *
+     * @param string|array $path The JSON schema path of the field with parts separated by dots.
+     * @param mixed $value The new value.
+     * @return $this
+     */
+    public function setField($path, $value) {
+        if (is_string($path)) {
+            $path = explode('.', $path);
+        }
+
+        $selection = &$this->schema;
+        foreach ($path as $i => $subSelector) {
+            if (is_array($selection)) {
+                if (!isset($selection[$subSelector])) {
+                    $selection[$subSelector] = [];
+                }
+            } elseif ($selection instanceof Schema) {
+                $selection->setField(array_slice($path, $i), $value);
+                return $this;
+            } else {
+                $selection = [$subSelector => []];
+            }
+            $selection = &$selection[$subSelector];
+        }
+
+        $selection = $value;
+        return $this;
+    }
+
+    /**
+     * Get the ID for the schema.
+     *
+     * @return string
+     */
+    public function getID() {
+        return isset($this->schema['id']) ? $this->schema['id'] : '';
+    }
+
+    /**
+     * Set the ID for the schema.
+     *
+     * @param string $ID The new ID.
+     * @throws \InvalidArgumentException Throws an exception when the provided ID is not a string.
+     * @return Schema
+     */
+    public function setID($ID) {
+        if (is_string($ID)) {
+            $this->schema['ID'] = $ID;
+        } else {
+            throw new \InvalidArgumentException("The ID is not a valid string.", 500);
+        }
+
+        return $this;
+    }
+
+    /**
      * Return the validation flags.
      *
      * @return int Returns a bitwise combination of flags.
@@ -534,7 +616,7 @@ class Schema implements \JsonSerializable {
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      */
     public function validate($data, $sparse = false) {
-        $field = new ValidationField($this->createValidation(), $this->schema, '');
+        $field = new ValidationField($this->createValidation(), $this->schema, '', $sparse);
 
         $clean = $this->validateField($data, $field, $sparse);
 
@@ -654,7 +736,8 @@ class Schema implements \JsonSerializable {
             $itemValidation = new ValidationField(
                 $field->getValidation(),
                 $field->val('items'),
-                ''
+                '',
+                $sparse
             );
 
             $count = 0;
@@ -798,7 +881,7 @@ class Schema implements \JsonSerializable {
         }
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
-        $propertyField = new ValidationField($field->getValidation(), [], null);
+        $propertyField = new ValidationField($field->getValidation(), [], null, $sparse);
 
         // Loop through the schema fields and validate each one.
         $clean = [];
@@ -1162,5 +1245,53 @@ class Schema implements \JsonSerializable {
             return $value->getArrayCopy();
         }
         return iterator_to_array($value);
+    }
+
+    /**
+     * Return a sparse version of this schema.
+     *
+     * A sparse schema has no required properties.
+     *
+     * @return Schema Returns a new sparse schema.
+     */
+    public function withSparse() {
+        $sparseSchema = $this->withSparseInternal($this, new \SplObjectStorage());
+        return $sparseSchema;
+    }
+
+    /**
+     * The internal implementation of `Schema::withSparse()`.
+     *
+     * @param array|Schema $schema The schema to make sparse.
+     * @param \SplObjectStorage $schemas Collected sparse schemas that have already been made.
+     * @return mixed
+     */
+    private function withSparseInternal($schema, \SplObjectStorage $schemas) {
+        if ($schema instanceof Schema) {
+            if ($schemas->contains($schema)) {
+                return $schemas[$schema];
+            } else {
+                $schemas[$schema] = $sparseSchema = new Schema();
+                $sparseSchema->schema = $schema->withSparseInternal($schema->schema, $schemas);
+                if ($id = $sparseSchema->getID()) {
+                    $sparseSchema->setID($id.'Sparse');
+                }
+
+                return $sparseSchema;
+            }
+        }
+
+        unset($schema['required']);
+
+        if (isset($schema['items'])) {
+            $schema['items'] = $this->withSparseInternal($schema['items'], $schemas);
+        }
+        if (isset($schema['properties'])) {
+            foreach ($schema['properties'] as $name => &$property) {
+                $property = $this->withSparseInternal($property, $schemas);
+            }
+        }
+
+        return $schema;
     }
 }

@@ -374,4 +374,32 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
         $this->assertEquals($expected, $valid);
     }
+
+    /**
+     * Schemas should be able to recursively point to themselves.
+     */
+    public function testRecursive() {
+        $sch = Schema::parse([
+            'name:s',
+            'children:a?'
+        ]);
+
+        $sch->setField('properties.children.items', $sch);
+        $sch->validate(['name' => 'boo']);
+
+        $data = [
+            'name' => 'grand',
+            'children' => [
+                [
+                    'name' => 'parent',
+                    'children' => [
+                        ['name' => 'child']
+                    ]
+                ]
+            ]
+        ];
+
+        $valid2 = $sch->validate($data);
+        $this->assertEquals($data, $valid2);
+    }
 }

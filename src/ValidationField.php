@@ -27,16 +27,23 @@ class ValidationField {
     private $name;
 
     /**
+     * @var bool
+     */
+    private $sparse;
+
+    /**
      * Construct a new {@link ValidationField} object.
      *
      * @param Validation $validation The validation object that contains errors.
      * @param array|Schema $field The field definition.
      * @param string $name The path to the field.
+     * @param bool $sparse Whether this is a sparse validation or not.
      */
-    public function __construct(Validation $validation, $field, $name) {
+    public function __construct(Validation $validation, $field, $name, $sparse = false) {
         $this->field = $field;
         $this->validation = $validation;
         $this->name = $name;
+        $this->sparse = $sparse;
     }
 
     /**
@@ -182,5 +189,14 @@ class ValidationField {
      */
     public function getErrorCount() {
         return $this->getValidation()->getErrorCount($this->getName());
+    }
+
+    /**
+     * Whether or not this is a sparse validation..
+     *
+     * @return bool Returns **true** if this is a sparse validation or **false** otherwise.
+     */
+    public function isSparse() {
+        return $this->sparse;
     }
 }
