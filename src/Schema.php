@@ -94,6 +94,64 @@ class Schema implements \JsonSerializable {
     }
 
     /**
+     * Get a schema field.
+     *
+     * @param string|array $path The JSON schema path of the field with parts separated by dots.
+     * @param mixed $default The value to return if the field isn't found.
+     * @return mixed Returns the field value or `$default`.
+     */
+    public function getField($path, $default = null) {
+        if (is_string($path)) {
+            $path = explode('.', $path);
+        }
+
+        $value = $this->schema;
+        for ($i = 0; $i < count($path); ++$i) {
+            $subKey = $path[$i];
+
+            if (is_array($value) && isset($value[$subKey])) {
+                $value = $value[$subKey];
+            } elseif ($value instanceof Schema) {
+                return $value->getField(array_slice($path, $i), $default);
+            } else {
+                return $default;
+            }
+        }
+        return $value;
+    }
+
+    /**
+     * Set a schema field.
+     *
+     * @param string|array $path The JSON schema path of the field with parts separated by dots.
+     * @param mixed $value The new value.
+     * @return $this
+     */
+    public function setField($path, $value) {
+        if (is_string($path)) {
+            $path = explode('.', $path);
+        }
+
+        $selection = &$this->schema;
+        foreach ($path as $i => $subSelector) {
+            if (is_array($selection)) {
+                if (!isset($selection[$subSelector])) {
+                    $selection[$subSelector] = [];
+                }
+            } elseif ($selection instanceof Schema) {
+                $selection->setField(array_slice($path, $i), $value);
+                return $this;
+            } else {
+                $selection = [$subSelector => []];
+            }
+            $selection = &$selection[$subSelector];
+        }
+
+        $selection = $value;
+        return $this;
+    }
+
+    /**
      * Get the ID for the schema.
      *
      * @return string
