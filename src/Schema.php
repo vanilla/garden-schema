@@ -1239,4 +1239,52 @@ class Schema implements \JsonSerializable {
         }
         return iterator_to_array($value);
     }
+
+    /**
+     * Return a sparse version of this schema.
+     *
+     * A sparse schema has no required properties.
+     *
+     * @return Schema Returns a new sparse schema.
+     */
+    public function withSparse() {
+        $sparseSchema = $this->withSparseInternal($this, new \SplObjectStorage());
+        return $sparseSchema;
+    }
+
+    /**
+     * The internal implementation of `Schema::withSparse()`.
+     *
+     * @param array|Schema $schema The schema to make sparse.
+     * @param \SplObjectStorage $schemas Collected sparse schemas that have already been made.
+     * @return mixed
+     */
+    private function withSparseInternal($schema, \SplObjectStorage $schemas) {
+        if ($schema instanceof Schema) {
+            if ($schemas->contains($schema)) {
+                return $schemas[$schema];
+            } else {
+                $schemas[$schema] = $sparseSchema = new Schema();
+                $sparseSchema->schema = $schema->withSparseInternal($schema->schema, $schemas);
+                if ($id = $sparseSchema->getID()) {
+                    $sparseSchema->setID($id.'Sparse');
+                }
+
+                return $sparseSchema;
+            }
+        }
+
+        unset($schema['required']);
+
+        if (isset($schema['items'])) {
+            $schema['items'] = $this->withSparseInternal($schema['items'], $schemas);
+        }
+        if (isset($schema['properties'])) {
+            foreach ($schema['properties'] as $name => &$property) {
+                $property = $this->withSparseInternal($property, $schemas);
+            }
+        }
+
+        return $schema;
+    }
 }

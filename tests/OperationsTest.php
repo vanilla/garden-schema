@@ -150,4 +150,41 @@ class OperationsTest extends AbstractSchemaTest {
         $actual = $sch1->merge($sch2)->getSchemaArray();
         $this->assertEquals($expected, $actual);
     }
+
+    /**
+     * Test turning a schema into a sparse schema.
+     */
+    public function testWithSparse() {
+        $sch1 = Schema::parse([
+            'a:o' => ['b:s', 'c:i'],
+            'b:a' => ['b:s', 'c:i']
+        ]);
+
+        $sch2 = $sch1->withSparse();
+        $sch2->validate([]);
+        $sch2->validate(['a' => ['c' => 1], 'b' => [['b' => 'foo']]]);
+    }
+
+    /**
+     * Test making sparse schemas with duplicate schemas.
+     */
+    public function testWithSparseSchemaReuse() {
+        $sch1 = Schema::parse(['id:i', 'name:s']);
+        $sch2 = Schema::parse([
+            'u1' => $sch1,
+            'u2' => $sch1
+        ]);
+
+        $sch3 = $sch2->withSparse();
+
+        $this->assertSame($sch3->getField('properties.u1'), $sch3->getField('properties.u2'));
+
+        $data = [
+            'u1' => ['id' => 1],
+            'u2' => ['name' => 'Frank']
+        ];
+
+        $valid = $sch3->validate($data);
+        $this->assertEquals($data, $valid);
+    }
 }
