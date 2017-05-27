@@ -106,9 +106,7 @@ class Schema implements \JsonSerializable {
         }
 
         $value = $this->schema;
-        for ($i = 0; $i < count($path); ++$i) {
-            $subKey = $path[$i];
-
+        foreach ($path as $i => $subKey) {
             if (is_array($value) && isset($value[$subKey])) {
                 $value = $value[$subKey];
             } elseif ($value instanceof Schema) {
