@@ -310,7 +310,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $schema = Schema::parse([
             "col:$type?"
         ]);
-        $strVal = print_r($value, true);
+        $strVal = json_encode($value);
 
         $invalidData = ['col' => $value];
         try {

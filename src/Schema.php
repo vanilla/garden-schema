@@ -803,7 +803,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     protected function validateDatetime($value, ValidationField $field) {
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
-        } elseif (is_string($value) && $value !== '') {
+        } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
             try {
                 $dt = new \DateTimeImmutable($value);
                 if ($dt) {
