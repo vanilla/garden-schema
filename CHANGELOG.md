@@ -1,5 +1,20 @@
 # Change Log
 
+## [v1.6](https://github.com/vanilla/garden-schema/tree/v1.6) (2017-08-22)
+[Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.5.0...v1.6)
+
+**Implemented enhancements:**
+
+- Minor schema enhancements [\#17](https://github.com/vanilla/garden-schema/pull/17) ([tburry](https://github.com/tburry))
+
+**Closed issues:**
+
+- \[API v2\] Date time does not validate properly if the timezone is used [\#16](https://github.com/vanilla/garden-schema/issues/16)
+
+**Merged pull requests:**
+
+- Upgrade Travis dist to Trusty [\#14](https://github.com/vanilla/garden-schema/pull/14) ([initvector](https://github.com/initvector))
+
 ## [v1.5.0](https://github.com/vanilla/garden-schema/tree/v1.5.0) (2017-05-27)
 [Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.4.2...v1.5.0)
 
@@ -15,46 +30,46 @@
 ## [v1.4.2](https://github.com/vanilla/garden-schema/tree/v1.4.2) (2017-03-17)
 [Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.4.1...v1.4.2)
 
-**Merged pull requests:**
+**Implemented enhancements:**
 
 - Add ability to pass constructor arguments with Schema::parse [\#10](https://github.com/vanilla/garden-schema/pull/10) ([initvector](https://github.com/initvector))
 
 ## [v1.4.1](https://github.com/vanilla/garden-schema/tree/v1.4.1) (2017-03-17)
 [Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.4.0...v1.4.1)
 
-**Merged pull requests:**
+**Implemented enhancements:**
 
 - Allow Schema subclasses to be returned from parse method [\#9](https://github.com/vanilla/garden-schema/pull/9) ([initvector](https://github.com/initvector))
 
 ## [v1.4.0](https://github.com/vanilla/garden-schema/tree/v1.4.0) (2017-03-14)
 [Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.3.0...v1.4.0)
 
-**Merged pull requests:**
+**Implemented enhancements:**
 
 - Add the Schema::add\(\) method [\#6](https://github.com/vanilla/garden-schema/pull/6) ([tburry](https://github.com/tburry))
 
 ## [v1.3.0](https://github.com/vanilla/garden-schema/tree/v1.3.0) (2017-03-14)
 [Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.2.0...v1.3.0)
 
+**Implemented enhancements:**
+
+- Add support for validating objects that implement ArrayAccess [\#5](https://github.com/vanilla/garden-schema/pull/5) ([tburry](https://github.com/tburry))
+
 **Closed issues:**
 
 - Add an allowNull stop-gap [\#3](https://github.com/vanilla/garden-schema/issues/3)
 
-**Merged pull requests:**
-
-- Add support for validating objects that implement ArrayAccess [\#5](https://github.com/vanilla/garden-schema/pull/5) ([tburry](https://github.com/tburry))
-
 ## [v1.2.0](https://github.com/vanilla/garden-schema/tree/v1.2.0) (2017-03-12)
 [Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.1.0...v1.2.0)
 
-**Merged pull requests:**
+**Implemented enhancements:**
 
 - Add support for allowNull and default [\#4](https://github.com/vanilla/garden-schema/pull/4) ([tburry](https://github.com/tburry))
 
 ## [v1.1.0](https://github.com/vanilla/garden-schema/tree/v1.1.0) (2017-03-10)
 [Full Changelog](https://github.com/vanilla/garden-schema/compare/v1.0.0...v1.1.0)
 
-**Merged pull requests:**
+**Implemented enhancements:**
 
 - Add support for some string formats [\#1](https://github.com/vanilla/garden-schema/pull/1) ([tburry](https://github.com/tburry))
 
