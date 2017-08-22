@@ -213,4 +213,55 @@ class ParseTest extends AbstractSchemaTest {
 
         return $result;
     }
+
+    /**
+     * Test that field style.
+     *
+     * @param string $style The field style.
+     * @param string $delimiter The array delimiter.
+     * @dataProvider provideFieldStyles
+     */
+    public function testFieldStyle($style, $delimiter) {
+        $sch = Schema::parse(['' => [
+            'type' => 'array',
+            'style' => $style,
+            'items' => [
+                'type' => 'integer'
+            ]
+        ]]);
+
+        $arr = [1, 2, 3];
+
+        $valid = $sch->validate(implode($delimiter, $arr));
+        $this->assertEquals($arr, $valid);
+    }
+
+    /**
+     * Provide test data for {@link testFieldStyle()}.
+     *
+     * @return array Returns a data provider.
+     */
+    public function provideFieldStyles() {
+        $r = [
+            'form' => ['form', ','],
+            'spaceDelimited' => ['spaceDelimited', ' '],
+            'pipeDelimited' => ['pipeDelimited', '|']
+        ];
+
+        return $r;
+    }
+
+    /**
+     * Test validating a custom filter.
+     */
+    public function testCustomFilter() {
+        $sch = Schema::parse(['foo:s', 'bar:i']);
+        $sch->addFilter('foo', function ($v) {
+            return $v.'!';
+        });
+
+        $valid = $sch->validate(['foo' => 'bar', 'bar' => 2]);
+
+        $this->assertEquals(['foo' => 'bar!', 'bar' => 2], $valid);
+    }
 }

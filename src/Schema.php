@@ -10,7 +10,7 @@ namespace Garden\Schema;
 /**
  * A class for defining and validating data schemas.
  */
-class Schema implements \JsonSerializable {
+class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Trigger a notice when extraneous properties are encountered during validation.
      */
@@ -44,6 +44,11 @@ class Schema implements \JsonSerializable {
      * @var int A bitwise combination of the various **Schema::FLAG_*** constants.
      */
     private $flags = 0;
+
+    /**
+     * @var array An array of callbacks that will filter data in the schema.
+     */
+    private $filters = [];
 
     /**
      * @var array An array of callbacks that will custom validate the schema.
@@ -536,6 +541,20 @@ class Schema implements \JsonSerializable {
     }
 
     /**
+     * Add a custom filter to change data before validation.
+     *
+     * @param string $fieldname The name of the field to filter, if any.
+     *
+     * If you are adding a filter to a deeply nested field then separate the path with dots.
+     * @param callable $callback The callback to filter the field.
+     * @return $this
+     */
+    public function addFilter($fieldname, callable $callback) {
+        $this->filters[$fieldname][] = $callback;
+        return $this;
+    }
+
+    /**
      * Add a custom validator to to validate the schema.
      *
      * @param string $fieldname The name of the field to validate, if any.
@@ -658,7 +677,7 @@ class Schema implements \JsonSerializable {
      * is completely invalid.
      */
     protected function validateField($value, ValidationField $field, $sparse = false) {
-        $result = $value;
+        $result = $value = $this->filterField($value, $field);
 
         if ($field->getField() instanceof Schema) {
             try {
@@ -784,7 +803,7 @@ class Schema implements \JsonSerializable {
     protected function validateDatetime($value, ValidationField $field) {
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
-        } elseif (is_string($value) && $value !== '') {
+        } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
             try {
                 $dt = new \DateTimeImmutable($value);
                 if ($dt) {
@@ -1095,6 +1114,24 @@ class Schema implements \JsonSerializable {
     }
 
     /**
+     * Call all of the filters attached to a field.
+     *
+     * @param mixed $value The field value being filtered.
+     * @param ValidationField $field The validation object.
+     * @return mixed Returns the filtered value. If there are no filters for the field then the original value is returned.
+     */
+    protected function callFilters($value, ValidationField $field) {
+        // Strip array references in the name except for the last one.
+        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $field->getName());
+        if (!empty($this->filters[$key])) {
+            foreach ($this->filters[$key] as $filter) {
+                $value = call_user_func($filter, $value, $field);
+            }
+        }
+        return $value;
+    }
+
+    /**
      * Call all of the validators attached to a field.
      *
      * @param mixed $value The field value being validated.
@@ -1293,5 +1330,80 @@ class Schema implements \JsonSerializable {
         }
 
         return $schema;
+    }
+
+    /**
+     * Filter a field's value using built in and custom filters.
+     *
+     * @param mixed $value The original value of the field.
+     * @param ValidationField $field The field information for the field.
+     * @return mixed Returns the filtered field or the original field value if there are no filters.
+     */
+    private function filterField($value, ValidationField $field) {
+        // Check for limited support for Open API style.
+        switch ($field->val('style')) {
+            case 'form':
+                if (is_string($value)) {
+                    $value = explode(',', $value);
+                }
+                break;
+            case 'spaceDelimited':
+                if (is_string($value)) {
+                    $value = explode(' ', $value);
+                }
+                break;
+            case 'pipeDelimited':
+                if (is_string($value)) {
+                    $value = explode('|', $value);
+                }
+                break;
+        }
+
+        $value = $this->callFilters($value, $field);
+
+        return $value;
+    }
+
+    /**
+     * Whether a offset exists.
+     *
+     * @param mixed $offset An offset to check for.
+     * @return boolean true on success or false on failure.
+     * @link http://php.net/manual/en/arrayaccess.offsetexists.php
+     */
+    public function offsetExists($offset) {
+        return isset($this->schema[$offset]);
+    }
+
+    /**
+     * Offset to retrieve.
+     *
+     * @param mixed $offset The offset to retrieve.
+     * @return mixed Can return all value types.
+     * @link http://php.net/manual/en/arrayaccess.offsetget.php
+     */
+    public function offsetGet($offset) {
+        return isset($this->schema[$offset]) ? $this->schema[$offset] : null;
+    }
+
+    /**
+     * Offset to set.
+     *
+     * @param mixed $offset The offset to assign the value to.
+     * @param mixed $value The value to set.
+     * @link http://php.net/manual/en/arrayaccess.offsetset.php
+     */
+    public function offsetSet($offset, $value) {
+        $this->schema[$offset] = $value;
+    }
+
+    /**
+     * Offset to unset.
+     *
+     * @param mixed $offset The offset to unset.
+     * @link http://php.net/manual/en/arrayaccess.offsetunset.php
+     */
+    public function offsetUnset($offset) {
+        unset($this->schema[$offset]);
     }
 }
