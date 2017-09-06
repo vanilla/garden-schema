@@ -166,13 +166,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Set the ID for the schema.
      *
-     * @param string $ID The new ID.
+     * @param string $id The new ID.
      * @throws \InvalidArgumentException Throws an exception when the provided ID is not a string.
      * @return Schema
      */
-    public function setID($ID) {
-        if (is_string($ID)) {
-            $this->schema['ID'] = $ID;
+    public function setID($id) {
+        if (is_string($id)) {
+            $this->schema['id'] = $id;
         } else {
             throw new \InvalidArgumentException("The ID is not a valid string.", 500);
         }

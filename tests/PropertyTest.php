@@ -36,6 +36,17 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
     }
 
     /**
+     * Test **getID** and **setID**.
+     */
+    public function testGetSetID() {
+        $schema = new Schema();
+
+        $this->assertEmpty($schema->getID());
+        $schema->setID('test');
+        $this->assertEquals('test', $schema->getID());
+    }
+
+    /**
      * Test flag getters and setters.
      */
     public function testGetSetFlag() {
