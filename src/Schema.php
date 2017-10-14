@@ -759,13 +759,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     ]
                 );
             }
-            if (($maxItems = $field->val('maxItems', 0)) > 0 && mb_strlen($value) > $maxItems) {
+            if ((null !== $maxItems = $field->val('maxItems')) && count($value) > $maxItems) {
                 $field->addError(
                     'maxItems',
                     [
-                        'messageCode' => '{field} is {overflow} {overflow,plural,characters} too long.',
+                        'messageCode' => '{field} must contain no more than {maxItems} {maxItems,plural,item}.',
                         'maxItems' => $maxItems,
-                        'overflow' => mb_strlen($value) - $maxItems,
                         'status' => 422
                     ]
                 );
