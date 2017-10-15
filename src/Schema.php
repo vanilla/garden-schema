@@ -38,6 +38,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         'null' => ['n']
     ];
 
+    /**
+     * @var string The regular expression to strictly determine if a string is a date.
+     */
+    private static $DATE_REGEX = '`^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?`i';
+
     private $schema = [];
 
     /**
@@ -781,18 +786,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return bool|Invalid Returns the cleaned value or invalid if validation fails.
      */
     protected function validateBoolean($value, ValidationField $field) {
-        // Add some extra tests for multiple types.
-        if (is_array($field->getType())) {
-            $valueType = gettype($value);
-            if ($field->hasType('string') && $valueType === 'string') {
-                return Invalid::value();
-            } elseif (($field->hasType('integer') || $field->hasType('number')) && in_array($valueType, ['integer', 'double'])) {
-                return Invalid::value();
-            } elseif ($field->hasType('null') && $value === null) {
-                return Invalid::value();
-            }
-        }
-
         $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if ($value === null) {
             $field->addTypeError('boolean');
@@ -813,9 +806,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
         } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
-            if ($field->hasType('string') && $field->val('format') !== 'date-time' &&  !preg_match('`^\d{4}-\d{2}-\d{2}`', $value)) {
-                return Invalid::value();
-            }
             try {
                 $dt = new \DateTimeImmutable($value);
                 if ($dt) {
@@ -826,7 +816,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             } catch (\Exception $ex) {
                 $value = Invalid::value();
             }
-        } elseif (is_int($value) && $value > 0 && !$field->hasType('integer')) {
+        } elseif (is_int($value) && $value > 0) {
             $value = new \DateTimeImmutable('@'.(string)round($value));
         } else {
             $value = Invalid::value();
@@ -853,7 +843,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
         return $result;
     }
-
     /**
      * Validate and integer.
      *
@@ -1476,6 +1465,53 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return mixed Returns the valid value or `Invalid`.
      */
     private function validateMultipleTypes($value, array $types, ValidationField $field, $sparse) {
+        // First check for an exact type match.
+        switch (gettype($value)) {
+            case 'boolean':
+                if (in_array('boolean', $types)) {
+                    $singleType = 'boolean';
+                }
+                break;
+            case 'integer':
+                if (in_array('integer', $types)) {
+                    $singleType = 'integer';
+                } elseif (in_array('number', $types)) {
+                    $singleType = 'number';
+                }
+                break;
+            case 'double':
+                if (in_array('number', $types)) {
+                    $singleType = 'number';
+                } elseif (in_array('integer', $types)) {
+                    $singleType = 'integer';
+                }
+                break;
+            case 'string':
+                if (in_array('datetime', $types) && preg_match(self::$DATE_REGEX, $value)) {
+                    $singleType = 'datetime';
+                } elseif (in_array('string', $types)) {
+                    $singleType = 'string';
+                }
+                break;
+            case 'array':
+                if (in_array('array', $types) && in_array('object', $types)) {
+                    $singleType = isset($value[0]) || empty($value) ? 'array' : 'object';
+                } elseif (in_array('object', $types)) {
+                    $singleType = 'object';
+                } elseif (in_array('array', $types)) {
+                    $singleType = 'array';
+                }
+                break;
+            case 'NULL':
+                if (in_array('null', $types)) {
+                    $singleType = $this->validateSingleType($value, 'null', $field, $sparse);
+                }
+                break;
+        }
+        if (!empty($singleType)) {
+            return $this->validateSingleType($value, $singleType, $field, $sparse);
+        }
+
         // Clone the validation field to collect errors.
         $typeValidation = new ValidationField(new Validation(), $field->getField(), '', $sparse);
 
