@@ -748,32 +748,55 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ((!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) && !$value instanceof \Traversable) {
             $field->addTypeError('array');
             return Invalid::value();
-        } elseif ($field->val('items') !== null) {
-            $result = [];
-
-            // Validate each of the types.
-            $itemValidation = new ValidationField(
-                $field->getValidation(),
-                $field->val('items'),
-                '',
-                $sparse
-            );
-
-            $count = 0;
-            foreach ($value as $i => $item) {
-                $itemValidation->setName($field->getName()."[{$i}]");
-                $validItem = $this->validateField($item, $itemValidation, $sparse);
-                if (Invalid::isValid($validItem)) {
-                    $result[] = $validItem;
-                }
-                $count++;
+        } else {
+            if ((null !== $minItems = $field->val('minItems')) && count($value) < $minItems) {
+                $field->addError(
+                    'minItems',
+                    [
+                        'messageCode' => '{field} must contain at least {minItems} {minItems,plural,item}.',
+                        'minItems' => $minItems,
+                        'status' => 422
+                    ]
+                );
+            }
+            if ((null !== $maxItems = $field->val('maxItems')) && count($value) > $maxItems) {
+                $field->addError(
+                    'maxItems',
+                    [
+                        'messageCode' => '{field} must contain no more than {maxItems} {maxItems,plural,item}.',
+                        'maxItems' => $maxItems,
+                        'status' => 422
+                    ]
+                );
             }
 
-            return empty($result) && $count > 0 ? Invalid::value() : $result;
-        } else {
-            // Cast the items into a proper numeric array.
-            $result = is_array($value) ? array_values($value) : iterator_to_array($value);
-            return $result;
+            if ($field->val('items') !== null) {
+                $result = [];
+
+                // Validate each of the types.
+                $itemValidation = new ValidationField(
+                    $field->getValidation(),
+                    $field->val('items'),
+                    '',
+                    $sparse
+                );
+
+                $count = 0;
+                foreach ($value as $i => $item) {
+                    $itemValidation->setName($field->getName()."[{$i}]");
+                    $validItem = $this->validateField($item, $itemValidation, $sparse);
+                    if (Invalid::isValid($validItem)) {
+                        $result[] = $validItem;
+                    }
+                    $count++;
+                }
+
+                return empty($result) && $count > 0 ? Invalid::value() : $result;
+            } else {
+                // Cast the items into a proper numeric array.
+                $result = is_array($value) ? array_values($value) : iterator_to_array($value);
+                return $result;
+            }
         }
     }
 
