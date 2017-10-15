@@ -21,6 +21,12 @@ class MultipleTypesTest extends AbstractSchemaTest {
         $r = [
             ['integer array 1', 123],
             ['integer array 2', [1]],
+            ['boolean string 1', true],
+            ['boolean string 1', false],
+            ['boolean string 1', 'true'],
+            ['boolean string 1', ''],
+            ['boolean integer 1', 1],
+            ['datetime string 1', 'today']
         ];
 
         return array_column($r, null, 0);

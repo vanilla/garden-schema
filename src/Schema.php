@@ -781,11 +781,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return bool|Invalid Returns the cleaned value or invalid if validation fails.
      */
     protected function validateBoolean($value, ValidationField $field) {
+        // Add some extra tests for multiple types.
+        if (is_array($field->getType())) {
+            $valueType = gettype($value);
+            if ($field->hasType('string') && $valueType === 'string') {
+                return Invalid::value();
+            } elseif (($field->hasType('integer') || $field->hasType('number')) && in_array($valueType, ['integer', 'double'])) {
+                return Invalid::value();
+            } elseif ($field->hasType('null') && $value === null) {
+                return Invalid::value();
+            }
+        }
+
         $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if ($value === null) {
             $field->addTypeError('boolean');
             return Invalid::value();
         }
+
         return $value;
     }
 
@@ -800,6 +813,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
         } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
+            if ($field->hasType('string') && $field->val('format') !== 'date-time' &&  !preg_match('`^\d{4}-\d{2}-\d{2}`', $value)) {
+                return Invalid::value();
+            }
             try {
                 $dt = new \DateTimeImmutable($value);
                 if ($dt) {
@@ -810,7 +826,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             } catch (\Exception $ex) {
                 $value = Invalid::value();
             }
-        } elseif (is_int($value) && $value > 0) {
+        } elseif (is_int($value) && $value > 0 && !$field->hasType('integer')) {
             $value = new \DateTimeImmutable('@'.(string)round($value));
         } else {
             $value = Invalid::value();

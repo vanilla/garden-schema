@@ -190,7 +190,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test data that is not required, but provided as empty.
      *
      * @param string $shortType The short data type.
-     * @dataProvider provideTypes
+     * @dataProvider provideTypesAndData
      */
     public function testNotRequired($shortType) {
         $schema = Schema::parse([
@@ -211,7 +211,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test data that is not required, but provided as empty.
      *
      * @param string $shortType The short data type.
-     * @dataProvider provideTypes
+     * @dataProvider provideTypesAndData
      */
     public function testRequiredEmpty($shortType) {
         // Bools and strings are special cases.
@@ -438,7 +438,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @param string $short The short type.
      * @param string $long The long type.
      * @param mixed $sample As sample value.
-     * @dataProvider provideTypes
+     * @dataProvider provideTypesAndData
      */
     public function testAllowNull($short, $long, $sample) {
         $schema = Schema::parse([":$short|n"]);
