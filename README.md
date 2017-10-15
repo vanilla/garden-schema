@@ -156,6 +156,10 @@ If you want a property to allow null values you can specify the **allowNull** at
 ] 
 ```
 
+### Multiple Types
+
+The type property of the schema can accept an array of types. An array of types means that the data must be any one of the types. 
+
 ### Default Values
 
 You can specify a default value on object properties. If the property is omitted during validation then the default value will be used. Note that default values are not applied during sparse validation.
@@ -233,3 +237,22 @@ There are a few things to note in the above example:
 - When overriding **translate()** be sure to handle the case where a string starts with the '@' character. Such strings should not be translated and have the character removed.
 
 - You tell a **Schema** object to use your specific **Validation** subclass with the **setValidationClass()**. This method takes either a class name or an object instance. If you pass an object it will be cloned every time a validation object is needed. This is good when you want to use dependency injection and your class needs more sophisticated instantiation.
+
+## JSON Schema Support
+
+The **Schema** object is a wrapper for a [JSON Schema](http://json-schema.org/) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
+
+| Property | Type | Notes |
+| -------- | ---- | ----------- |
+| [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the length of a string. |
+| [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
+| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimeters. |
+| [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9) | array | Ony supports a single schema. |
+| [maxItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.11) | array | Limit the number of items in an array. |
+| [minItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.12) | array | Minimum number of items in an array. |
+| [required](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.17) | object | Names of required object properties. |
+| [properties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.18) | object | Specify schemas for object properties. |
+| [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23) | any | Specify an array of valid values. |
+| [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25) | any | Specify a type of an array of types to validate a value. |
+| [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3) | object | Applies to a schema that is in an object property. |
+| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri | 
