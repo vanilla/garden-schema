@@ -19,7 +19,7 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
      *
      * @return array Returns an array of types suitable to pass to a test method.
      */
-    public function provideTypes() {
+    public function provideTypesAndData() {
         $result = [
             'array' => ['a', 'array', [1, 2, 3]],
             'object' => ['o', 'object', ['foo' => 'bar']],

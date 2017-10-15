@@ -9,7 +9,13 @@ namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
 
+/**
+ * Tests specific to arrays.
+ */
 class ArrayValidationTest extends AbstractSchemaTest {
+    /**
+     * Test the maxItems property for arrays.
+     */
     public function testMinItems() {
         $sch = new Schema(['type' => 'array', 'minItems' => 1]);
 
@@ -18,6 +24,9 @@ class ArrayValidationTest extends AbstractSchemaTest {
         $this->assertFalse($sch->isValid([]));
     }
 
+    /**
+     * Test the minItems property for arrays.
+     */
     public function testMaxItems() {
         $sch = new Schema(['type' => 'array', 'maxItems' => 2]);
 

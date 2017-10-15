@@ -38,6 +38,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         'null' => ['n']
     ];
 
+    /**
+     * @var string The regular expression to strictly determine if a string is a date.
+     */
+    private static $DATE_REGEX = '`^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?`i';
+
     private $schema = [];
 
     /**
@@ -691,37 +696,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } else {
             // Validate the field's type.
             $type = $field->getType();
-            switch ($type) {
-                case 'boolean':
-                    $result = $this->validateBoolean($value, $field);
-                    break;
-                case 'integer':
-                    $result = $this->validateInteger($value, $field);
-                    break;
-                case 'number':
-                    $result = $this->validateNumber($value, $field);
-                    break;
-                case 'string':
-                    $result = $this->validateString($value, $field);
-                    break;
-                case 'timestamp':
-                    $result = $this->validateTimestamp($value, $field);
-                    break;
-                case 'datetime':
-                    $result = $this->validateDatetime($value, $field);
-                    break;
-                case 'array':
-                    $result = $this->validateArray($value, $field, $sparse);
-                    break;
-                case 'object':
-                    $result = $this->validateObject($value, $field, $sparse);
-                    break;
-                case null:
-                    // No type was specified so we are valid.
-                    $result = $value;
-                    break;
-                default:
-                    throw new \InvalidArgumentException("Unrecognized type $type.", 500);
+            if (is_array($type)) {
+                $result = $this->validateMultipleTypes($value, $type, $field, $sparse);
+            } else {
+                $result = $this->validateSingleType($value, $type, $field, $sparse);
             }
             if (Invalid::isValid($result)) {
                 $result = $this->validateEnum($result, $field);
@@ -813,6 +791,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addTypeError('boolean');
             return Invalid::value();
         }
+
         return $value;
     }
 
@@ -864,7 +843,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
         return $result;
     }
-
     /**
      * Validate and integer.
      *
@@ -1428,5 +1406,125 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function offsetUnset($offset) {
         unset($this->schema[$offset]);
+    }
+
+    /**
+     * Validate a field against a single type.
+     *
+     * @param mixed $value The value to validate.
+     * @param string $type The type to validate against.
+     * @param ValidationField $field Contains field and validation information.
+     * @param bool $sparse Whether or not this should be a sparse validation.
+     * @return mixed Returns the valid value or `Invalid`.
+     */
+    protected function validateSingleType($value, $type, ValidationField $field, $sparse) {
+        switch ($type) {
+            case 'boolean':
+                $result = $this->validateBoolean($value, $field);
+                break;
+            case 'integer':
+                $result = $this->validateInteger($value, $field);
+                break;
+            case 'number':
+                $result = $this->validateNumber($value, $field);
+                break;
+            case 'string':
+                $result = $this->validateString($value, $field);
+                break;
+            case 'timestamp':
+                $result = $this->validateTimestamp($value, $field);
+                break;
+            case 'datetime':
+                $result = $this->validateDatetime($value, $field);
+                break;
+            case 'array':
+                $result = $this->validateArray($value, $field, $sparse);
+                break;
+            case 'object':
+                $result = $this->validateObject($value, $field, $sparse);
+                break;
+            case null:
+                // No type was specified so we are valid.
+                $result = $value;
+                break;
+            default:
+                throw new \InvalidArgumentException("Unrecognized type $type.", 500);
+        }
+        return $result;
+    }
+
+    /**
+     * Validate a field against multiple basic types.
+     *
+     * The first validation that passes will be returned. If no type can be validated against then validation will fail.
+     *
+     * @param mixed $value The value to validate.
+     * @param string[] $types The types to validate against.
+     * @param ValidationField $field Contains field and validation information.
+     * @param bool $sparse Whether or not this should be a sparse validation.
+     * @return mixed Returns the valid value or `Invalid`.
+     */
+    private function validateMultipleTypes($value, array $types, ValidationField $field, $sparse) {
+        // First check for an exact type match.
+        switch (gettype($value)) {
+            case 'boolean':
+                if (in_array('boolean', $types)) {
+                    $singleType = 'boolean';
+                }
+                break;
+            case 'integer':
+                if (in_array('integer', $types)) {
+                    $singleType = 'integer';
+                } elseif (in_array('number', $types)) {
+                    $singleType = 'number';
+                }
+                break;
+            case 'double':
+                if (in_array('number', $types)) {
+                    $singleType = 'number';
+                } elseif (in_array('integer', $types)) {
+                    $singleType = 'integer';
+                }
+                break;
+            case 'string':
+                if (in_array('datetime', $types) && preg_match(self::$DATE_REGEX, $value)) {
+                    $singleType = 'datetime';
+                } elseif (in_array('string', $types)) {
+                    $singleType = 'string';
+                }
+                break;
+            case 'array':
+                if (in_array('array', $types) && in_array('object', $types)) {
+                    $singleType = isset($value[0]) || empty($value) ? 'array' : 'object';
+                } elseif (in_array('object', $types)) {
+                    $singleType = 'object';
+                } elseif (in_array('array', $types)) {
+                    $singleType = 'array';
+                }
+                break;
+            case 'NULL':
+                if (in_array('null', $types)) {
+                    $singleType = $this->validateSingleType($value, 'null', $field, $sparse);
+                }
+                break;
+        }
+        if (!empty($singleType)) {
+            return $this->validateSingleType($value, $singleType, $field, $sparse);
+        }
+
+        // Clone the validation field to collect errors.
+        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', $sparse);
+
+        // Try and validate against each type.
+        foreach ($types as $type) {
+            $result = $this->validateSingleType($value, $type, $typeValidation, $sparse);
+            if (Invalid::isValid($result)) {
+                return $result;
+            }
+        }
+
+        // Since we got here the value is invalid.
+        $field->merge($typeValidation->getValidation());
+        return Invalid::value();
     }
 }
