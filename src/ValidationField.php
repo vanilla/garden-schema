@@ -157,10 +157,20 @@ class ValidationField {
     /**
      * Get the field type.
      *
-     * @return string|null Returns a type string or null if there isn't one.
+     * @return string|string[]|null Returns a type string, array of type strings, or null if there isn't one.
      */
     public function getType() {
         return isset($this->field['type']) ? $this->field['type'] : null;
+    }
+
+    /**
+     * Whether or not the field has a given type.
+     *
+     * @param string $type The single type to test.
+     * @return bool Returns **true** if the field has the given type or **false** otherwise.
+     */
+    public function hasType($type) {
+        return in_array($type, (array)$this->getType());
     }
 
     /**
