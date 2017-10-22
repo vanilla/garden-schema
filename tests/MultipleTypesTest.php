@@ -99,4 +99,46 @@ class MultipleTypesTest extends AbstractSchemaTest {
         $arrayValid = $sch->validate($arrayValue);
         $this->assertSame($arrayValue, $arrayValid);
     }
+
+    /**
+     * Strings that are expanded with the **style** property should have some fidelity to an alternative type.
+     *
+     * This is to help supporting the "expand" parameter that Vanilla APIs can take where the value can be true or an array of field to expand.
+     *
+     * @param mixed $value The value to test.
+     * @param mixed $expected The expected valid data.
+     * @dataProvider provideExpandUserCaseTests
+     */
+    public function testExpandUseCase($value, $expected) {
+        $sch = new Schema([
+            'type' => [
+                'boolean',
+                'array'
+            ],
+            'style' => 'form',
+            'items' => [
+                'type', 'string'
+            ]
+        ]);
+
+        $valid = $sch->validate($value);
+        $this->assertSame($expected, $valid);
+    }
+
+    /**
+     * Provide tests for **testExpandUseCase()**.
+     *
+     * @return array Returns a data provider array.
+     */
+    public function provideExpandUserCaseTests() {
+        $r = [
+            ['true', true],
+            ['1', true],
+            ['false', false],
+            ['0', false],
+            ['a,b,c', ['a', 'b', 'c']]
+        ];
+
+        return array_column($r, null, 0);
+    }
 }
