@@ -1342,22 +1342,27 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     private function filterField($value, ValidationField $field) {
         // Check for limited support for Open API style.
-        switch ($field->val('style')) {
-            case 'form':
-                if (is_string($value)) {
-                    $value = explode(',', $value);
+        if (!empty($field->val('style')) && is_string($value)) {
+            $doFilter = true;
+            if ($field->hasType('boolean') && in_array($value, ['true', 'false', '0', '1'], true)) {
+                $doFilter = false;
+            } elseif ($field->hasType('integer') || $field->hasType('number') && is_numeric($value)) {
+                $doFilter = false;
+            }
+
+            if ($doFilter) {
+                switch ($field->val('style')) {
+                    case 'form':
+                        $value = explode(',', $value);
+                        break;
+                    case 'spaceDelimited':
+                        $value = explode(' ', $value);
+                        break;
+                    case 'pipeDelimited':
+                        $value = explode('|', $value);
+                        break;
                 }
-                break;
-            case 'spaceDelimited':
-                if (is_string($value)) {
-                    $value = explode(' ', $value);
-                }
-                break;
-            case 'pipeDelimited':
-                if (is_string($value)) {
-                    $value = explode('|', $value);
-                }
-                break;
+            }
         }
 
         $value = $this->callFilters($value, $field);
