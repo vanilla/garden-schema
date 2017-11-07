@@ -8,6 +8,8 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
+use Garden\Schema\Tests\Fixtures\CustomArray;
+use Garden\Schema\Tests\Fixtures\CustomArrayObject;
 use Garden\Schema\Tests\Fixtures\TestValidation;
 use Garden\Schema\Validation;
 use Garden\Schema\ValidationException;
@@ -485,5 +487,73 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         $valid = $schema->validate(['bool' => false]);
         $this->assertFalse($valid['bool']);
+    }
+
+    /**
+     * Objects that implement **ArrayAccess** should be returned as valid copies.
+     *
+     * @param string $class The name of the class to test.
+     * @dataProvider provideArrayObjectClasses
+     */
+    public function testArrayObjectResult($class) {
+        $schema = Schema::parse([':o']);
+
+        $fn = function () use ($class) {
+            $r = new $class();
+            $r['a'] = 1;
+            $r['b'] = 2;
+
+            return $r;
+        };
+
+        $expected = $fn();
+        $valid = $schema->validate($expected);
+
+        $this->assertInstanceOf($class, $valid);
+        /* @var \ArrayObject $valid */
+        $this->assertNotSame($expected, $valid);
+        $this->assertEquals($expected->getArrayCopy(), $valid->getArrayCopy());
+
+    }
+
+    /**
+     * Objects that implement **ArrayAccess** should be returned as valid copies.
+     *
+     * @param string $class The name of the class to test.
+     * @dataProvider provideArrayObjectClasses
+     */
+    public function testArrayObjectResultWithProperties($class) {
+        $schema = Schema::parse(['a:i', 'b:s']);
+
+        $fn = function () use ($class) {
+            $r = new $class();
+            $r['a'] = 1;
+            $r['b'] = 'foo';
+
+            return $r;
+        };
+
+        $expected = $fn();
+        $valid = $schema->validate($expected);
+
+        $this->assertInstanceOf($class, $valid);
+        /* @var \ArrayObject $valid */
+        $this->assertNotSame($expected, $valid);
+        $this->assertEquals($expected->getArrayCopy(), $valid->getArrayCopy());
+    }
+
+    /**
+     * Provide sample array access classes.
+     *
+     * @return array Returns a data provider array.
+     */
+    public function provideArrayObjectClasses() {
+        $r = [
+            [\ArrayObject::class],
+            [CustomArrayObject::class],
+            [CustomArray::class]
+        ];
+
+        return array_column($r, null, 0);
     }
 }

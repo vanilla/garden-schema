@@ -876,7 +876,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // Validate the data against the internal schema.
             $value = $this->validateProperties($value, $field, $sparse);
         } elseif (!is_array($value)) {
-            $value = $this->toArray($value);
+            $value = $this->toObjectArray($value);
         }
         return $value;
     }
@@ -896,15 +896,22 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (is_array($data)) {
             $keys = array_keys($data);
+            $clean = [];
         } else {
             $keys = array_keys(iterator_to_array($data));
+            $class = get_class($data);
+            $clean = new $class;
+
+            if ($clean instanceof \ArrayObject) {
+                $clean->setFlags($data->getFlags());
+                $clean->setIteratorClass($data->getIteratorClass());
+            }
         }
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
         $propertyField = new ValidationField($field->getValidation(), [], null, $sparse);
 
         // Loop through the schema fields and validate each one.
-        $clean = [];
         foreach ($properties as $propertyName => $property) {
             $propertyField
                 ->setField($property)
@@ -1278,9 +1285,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param \Traversable $value The value to convert.
      * @return array Returns an array.
      */
-    private function toArray(\Traversable $value) {
+    private function toObjectArray(\Traversable $value) {
+        $class = get_class($value);
         if ($value instanceof \ArrayObject) {
-            return $value->getArrayCopy();
+            return new $class($value->getArrayCopy(), $value->getFlags(), $value->getIteratorClass());
+        } elseif ($value instanceof \ArrayAccess) {
+            $r = new $class;
+            foreach ($value as $k => $v) {
+                $r[$k] = $v;
+            }
+            return $r;
         }
         return iterator_to_array($value);
     }

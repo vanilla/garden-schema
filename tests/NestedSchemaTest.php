@@ -364,13 +364,13 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
         $valid = $schema->validate($data);
 
-        $expected = [
+        $expected = new \ArrayObject([
             'name' => 'bur',
             'arr' => [
-                ['id' => 1, 'foo' => 'bar'],
-                ['id' => 2, 'foo' => 'baz'],
+                new \ArrayObject(['id' => 1, 'foo' => 'bar']),
+                new \ArrayObject(['id' => 2, 'foo' => 'baz']),
             ]
-        ];
+        ]);
 
         $this->assertEquals($expected, $valid);
     }
