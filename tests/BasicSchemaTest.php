@@ -556,4 +556,20 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         return array_column($r, null, 0);
     }
+
+    /**
+     * Old style **allowNull** fields should be converted into a union type including null.
+     */
+    public function testAllowNullBC() {
+        $sch = Schema::parse([
+            'photo:s' => [
+                'allowNull' => true,
+                'minLength' => 0,
+                'description' => 'Raw photo field value from the user record.'
+            ]
+        ]);
+
+        $this->assertArrayNotHasKey('allowNull', $sch->getField('properties.photo'));
+        $this->assertEquals(['string', 'null'], $sch->getField('properties.photo.type'));
+    }
 }

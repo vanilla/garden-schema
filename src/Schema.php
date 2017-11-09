@@ -438,8 +438,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
         }
 
-        if (is_array($node) && $node['type'] === null) {
-            unset($node['type']);
+        if (is_array($node)) {
+            if (!empty($node['allowNull'])) {
+                $node['type'] = array_merge((array)$node['type'], ['null']);
+            }
+            unset($node['allowNull']);
+
+            if ($node['type'] === null || $node['type'] === []) {
+                unset($node['type']);
+            }
         }
 
         return $node;
@@ -498,48 +505,49 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Check for a type.
         $parts = explode(':', $key);
         $name = $parts[0];
-        $allowNull = false;
+        $types = [];
+
         if (!empty($parts[1])) {
-            $types = explode('|', $parts[1]);
-            foreach ($types as $alias) {
+            $shortTypes = explode('|', $parts[1]);
+            foreach ($shortTypes as $alias) {
                 $found = $this->getType($alias);
                 if ($found === null) {
                     throw new \InvalidArgumentException("Unknown type '$alias'", 500);
-                } elseif ($found === 'null') {
-                    $allowNull = true;
                 } else {
-                    $type = $found;
+                    $types[] = $found;
                 }
             }
-        } else {
-            $type = null;
         }
 
         if ($value instanceof Schema) {
-            if ($type === 'array') {
-                $param = ['type' => $type, 'items' => $value];
+            if (count($types) === 1 && $types[0] === 'array') {
+                $param = ['type' => $types[0], 'items' => $value];
             } else {
                 $param = $value;
             }
         } elseif (isset($value['type'])) {
             $param = $value;
 
-            if (!empty($type) && $type !== $param['type']) {
-                throw new \InvalidArgumentException("Type mismatch between $type and {$param['type']} for field $name.", 500);
+            if (!empty($types) && $types !== (array)$param['type']) {
+                $typesStr = implode('|', $types);
+                $paramTypesStr = implode('|', (array)$param['type']);
+
+                throw new \InvalidArgumentException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
             }
         } else {
-            if (empty($type) && !empty($parts[1])) {
+            if (empty($types) && !empty($parts[1])) {
                 throw new \InvalidArgumentException("Invalid type {$parts[1]} for field $name.", 500);
             }
-            $param = ['type' => $type];
+            if (empty($types)) {
+                $param = ['type' => null];
+            } else {
+                $param = ['type' => count($types) === 1 ? $types[0] : $types];
+            }
 
             // Parsed required strings have a minimum length of 1.
-            if ($type === 'string' && !empty($name) && $required && (!isset($value['default']) || $value['default'] !== '')) {
+            if (in_array('string', $types) && !empty($name) && $required && (!isset($value['default']) || $value['default'] !== '')) {
                 $param['minLength'] = 1;
             }
-        }
-        if ($allowNull) {
-            $param['allowNull'] = true;
         }
 
         return [$name, $param, $required];
@@ -691,7 +699,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 // The validation failed, so merge the validations together.
                 $field->getValidation()->merge($ex->getValidation(), $field->getName());
             }
-        } elseif (($value === null || ($value === '' && $field->getType() !== 'string')) && $field->val('allowNull', false)) {
+        } elseif (($value === null || ($value === '' && $field->getType() !== 'string')) && $field->hasType('null')) {
             $result = null;
         } else {
             // Validate the field's type.
@@ -932,7 +940,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             } else {
                 $value = $data[$keys[$lName]];
 
-                if (in_array($value, [null, ''], true) && !$isRequired && !$propertyField->val('allowNull')) {
+                if (in_array($value, [null, ''], true) && !$isRequired && !$propertyField->hasType('null')) {
                     if ($propertyField->getType() !== 'string' || $value === null) {
                         continue;
                     }
@@ -1461,6 +1469,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 break;
             case 'object':
                 $result = $this->validateObject($value, $field, $sparse);
+                break;
+            case 'null':
+                $result = $this->validateNull($value, $field);
                 break;
             case null:
                 // No type was specified so we are valid.
