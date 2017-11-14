@@ -195,6 +195,10 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideTypesAndData
      */
     public function testNotRequired($shortType) {
+        if ($shortType === 'n') {
+            return;
+        }
+
         $schema = Schema::parse([
             "col:$shortType?"
         ]);
@@ -217,7 +221,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testRequiredEmpty($shortType) {
         // Bools and strings are special cases.
-        if (in_array($shortType, ['b'])) {
+        if (in_array($shortType, ['b', 'n'])) {
             return;
         }
 
@@ -592,5 +596,33 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
         $this->assertArrayNotHasKey('allowNull', $sch->getField('properties.photo'));
         $this->assertEquals(['string', 'null'], $sch->getField('properties.photo.type'));
+    }
+
+    /**
+     * Test some null validation.
+     */
+    public function testNull() {
+        $sch = Schema::parse(['a:n', 'b:n?']);
+
+        $expected = ['a' => null, 'b' => null];
+        $r = $sch->validate(['a' => null, 'b' => null]);
+        $this->assertEquals($expected, $r);
+
+        $this->assertFalse($sch->isValid(['a' => 1]));
+    }
+
+    /**
+     * Test validation on mixed empty string null types.
+     */
+    public function testStringOrNull() {
+        $sch = new Schema([
+            'type' => ['string', 'null']
+        ]);
+
+        $r = $sch->validate('');
+        $this->assertSame('', $r);
+
+        $r = $sch->validate(null);
+        $this->assertSame(null, $r);
     }
 }

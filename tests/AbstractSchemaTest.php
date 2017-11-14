@@ -21,14 +21,15 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
      */
     public function provideTypesAndData() {
         $result = [
-            'array' => ['a', 'array', [1, 2, 3]],
-            'object' => ['o', 'object', ['foo' => 'bar']],
-            'integer' => ['i', 'integer', 123],
-            'string' => ['s', 'string', 'hello'],
-            'number' => ['f', 'number', 12.3],
-            'boolean' => ['b', 'boolean', true],
-            'timestamp' => ['ts', 'timestamp', time()],
-            'datetime' => ['dt', 'datetime', new \DateTimeImmutable()]
+//            'array' => ['a', 'array', [1, 2, 3]],
+//            'object' => ['o', 'object', ['foo' => 'bar']],
+//            'integer' => ['i', 'integer', 123],
+//            'string' => ['s', 'string', 'hello'],
+//            'number' => ['f', 'number', 12.3],
+//            'boolean' => ['b', 'boolean', true],
+//            'timestamp' => ['ts', 'timestamp', time()],
+//            'datetime' => ['dt', 'datetime', new \DateTimeImmutable()],
+            'null' => ['n', 'null', null],
         ];
         return $result;
     }
