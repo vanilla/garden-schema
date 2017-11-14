@@ -302,6 +302,27 @@ class BasicSchemaTest extends AbstractSchemaTest {
     }
 
     /**
+     * Require one of on an empty array should fail.
+     *
+     * @expectedException \Garden\Schema\ValidationException
+     */
+    public function testRequireOneOfEmpty() {
+        $schema = Schema::parse(['a:i?', 'b:i?', 'c:i?'])->requireOneOf(['a', 'b', 'c'], '', 2);
+
+        $r = $schema->validate([]);
+    }
+
+    /**
+     * Require one of should not fire during sparse validation.
+     */
+    public function testRequireOneOfSparse() {
+        $schema = Schema::parse(['a:i?', 'b:i?', 'c:i?'])->requireOneOf(['a', 'b', 'c'], '', 2);
+
+        $r = $schema->validate([], true);
+        $r2 = $schema->validate(['a' => 1], true);
+    }
+
+    /**
      * Test a variety of invalid values.
      *
      * @param string $type The type short code.

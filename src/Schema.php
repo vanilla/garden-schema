@@ -593,6 +593,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $result = $this->addValidator(
             $fieldname,
             function ($data, ValidationField $field) use ($required, $count) {
+                // This validator does not apply to sparse validation.
+                if ($field->isSparse()) {
+                    return true;
+                }
+
                 $hasCount = 0;
                 $flattened = [];
 
@@ -603,7 +608,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                         // This is an array of required names. They all must match.
                         $hasCountInner = 0;
                         foreach ($name as $nameInner) {
-                            if (isset($data[$nameInner]) && $data[$nameInner]) {
+                            if (array_key_exists($nameInner, $data)) {
                                 $hasCountInner++;
                             } else {
                                 break;
@@ -612,7 +617,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                         if ($hasCountInner >= count($name)) {
                             $hasCount++;
                         }
-                    } elseif (isset($data[$name]) && $data[$name]) {
+                    } elseif (array_key_exists($name, $data)) {
                         $hasCount++;
                     }
 
