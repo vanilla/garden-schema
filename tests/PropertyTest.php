@@ -23,6 +23,7 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
         $schema->setDescription('foo');
         $this->assertSame('foo', $schema->getDescription());
         $this->assertSame('foo', $schema->jsonSerialize()['description']);
+        $this->assertSame('foo', $schema['description']);
 
         $this->assertSame(0, $schema->getFlags());
         $behaviors = [
@@ -101,6 +102,16 @@ class PropertyTest extends \PHPUnit_Framework_TestCase {
 
         $schema->setField('items.type', 'integer');
         $this->assertSame('integer', $schema->getField('items.type'));
+    }
+
+    public function testArrayAccess() {
+        $schema = Schema::parse([':a' => 's']);
+
+        $schema['id'] = 'foo';
+        $this->assertEquals('foo', $schema['id']);
+
+        unset($schema['id']);
+        $this->assertFalse(isset($schema['id']));
     }
 
     /**

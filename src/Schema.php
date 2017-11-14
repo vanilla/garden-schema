@@ -704,7 +704,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 // The validation failed, so merge the validations together.
                 $field->getValidation()->merge($ex->getValidation(), $field->getName());
             }
-        } elseif (($value === null || ($value === '' && $field->getType() !== 'string')) && $field->hasType('null')) {
+        } elseif (($value === null || ($value === '' && !$field->hasType('string'))) && $field->hasType('null')) {
             $result = null;
         } else {
             // Validate the field's type.
