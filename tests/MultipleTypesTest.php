@@ -117,7 +117,7 @@ class MultipleTypesTest extends AbstractSchemaTest {
             ],
             'style' => 'form',
             'items' => [
-                'type', 'string'
+                'type' => 'string'
             ]
         ]);
 
