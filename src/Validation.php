@@ -226,7 +226,7 @@ class Validation {
 
         // Massage the field name for better formatting.
         if (!$this->getTranslateFieldNames()) {
-            $field = (!empty($error['path']) ? ($error['path'][0] !== '[' ?: 'item').$error['path'].'.' : '').$error['field'];
+            $field = (!empty($error['path']) ? ($error['path'][0] !== '[' ? '' : 'item').$error['path'].'.' : '').$error['field'];
             $field = $field ?: (isset($error['index']) ? 'item' : 'value');
             if (isset($error['index'])) {
                 $field .= '['.$error['index'].']';
