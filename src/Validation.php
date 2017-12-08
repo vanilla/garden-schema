@@ -335,7 +335,11 @@ class Validation {
         foreach ($paths as $path => $errors) {
             foreach ($errors as $error) {
                 if (!empty($name)) {
-                    $fullPath = "{$name}.{$path}";
+                    if (!empty($path)) {
+                        $fullPath = "{$name}.{$path}";
+                    } else {
+                        $fullPath = $name;
+                    }
                     $this->addError($fullPath, $error['code'], $error);
                 }
             }
