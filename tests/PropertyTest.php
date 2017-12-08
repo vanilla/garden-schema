@@ -7,12 +7,13 @@
 
 namespace Garden\Schema\Tests;
 
+use PHPUnit\Framework\TestCase;
 use Garden\Schema\Schema;
 
 /**
  * Test property access of the schema object itself.
  */
-class PropertyTest extends \PHPUnit_Framework_TestCase {
+class PropertyTest extends TestCase {
     /**
      * Test basic property access.
      */

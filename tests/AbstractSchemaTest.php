@@ -7,13 +7,14 @@
 
 namespace Garden\Schema\Tests;
 
+use PHPUnit\Framework\TestCase;
 use Garden\Schema\Schema;
 use Garden\Schema\Validation;
 
 /**
  * Base class for schema tests.
  */
-abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
+abstract class AbstractSchemaTest extends TestCase {
     /**
      * Provides all of the schema types.
      *
@@ -143,6 +144,7 @@ abstract class AbstractSchemaTest extends \PHPUnit_Framework_TestCase {
         $codes = [];
         foreach ($validation->getFieldErrors($field) as $error) {
             if ($code === $error['code']) {
+                $this->assertEquals($code, $error['code']); // Need at least one assertion.
                 return;
             }
             $codes[] = $error['code'];

@@ -7,13 +7,14 @@
 
 namespace Garden\Schema\Tests;
 
+use PHPUnit\Framework\TestCase;
 use Garden\Schema\Validation;
 use Garden\Schema\Tests\Fixtures\TestValidation;
 
 /**
  * Test the {@link Validation}.
  */
-class ValidationClassTest extends \PHPUnit_Framework_TestCase {
+class ValidationClassTest extends TestCase {
     /**
      * Adding an error to the validation object should make the object not valid.
      */
