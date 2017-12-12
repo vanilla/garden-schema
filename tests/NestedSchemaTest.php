@@ -10,6 +10,7 @@ namespace Garden\Schema\Tests;
 use Garden\Schema\Schema;
 use Garden\Schema\ValidationException;
 use Garden\Schema\ValidationField;
+use Garden\Schema\Tests\Fixtures\SchemaValidationFail;
 
 /**
  * Tests for nested object schemas.
@@ -420,5 +421,17 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
         $valid2 = $sch->validate($data);
         $this->assertEquals($data, $valid2);
+    }
+
+    /**
+     * Test that a schema that throws an exception in Schema::validate() will have a proper error message.
+     */
+    public function testNestedSchemaValidationFailureException() {
+        $schema = Schema::parse([
+            'sub-schema-fail' => new SchemaValidationFail()
+        ]);
+
+        $this->expectExceptionMessage('sub-schema-fail is always invalid.');
+        $schema->validate(['sub-schema-fail' => null]);
     }
 }
