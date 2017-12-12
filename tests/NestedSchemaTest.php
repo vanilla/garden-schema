@@ -59,6 +59,25 @@ class NestedSchemaTest extends AbstractSchemaTest {
     }
 
     /**
+     * Verify field names in nested schema error messages appear as expected.
+     *
+     * @expectedException Garden\Schema\ValidationException
+     * @expectedExceptionMessage addr.zip is not a valid integer.
+     */
+    public function testNestedInvalidMessage() {
+        $sch = $this->getNestedSchema();
+        $result = $sch->validate([
+            'id' => 1,
+            'name' => 'Vanilla',
+            'addr' => [
+                'stree' => '123 Fake St.',
+                'city' => 'Nowhere',
+                'zip' => false
+            ]
+        ]);
+    }
+
+    /**
      * Test a variety of array item validation scenarios.
      */
     public function testArrayItemsType() {
