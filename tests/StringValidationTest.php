@@ -32,6 +32,8 @@ class StringValidationTest extends AbstractSchemaTest {
 
             if (!empty($code)) {
                 $this->fail("'$str' shouldn't validate against a min length of $minLength.");
+            } else {
+                $this->assertGreaterThanOrEqual($minLength, strlen($str));
             }
         } catch (ValidationException $ex) {
             $this->assertFieldHasError($ex->getValidation(), 'str', $code);
@@ -73,6 +75,8 @@ class StringValidationTest extends AbstractSchemaTest {
 
             if (!empty($code)) {
                 $this->fail("'$str' shouldn't validate against a max length of $maxLength.");
+            } else {
+                $this->assertLessThanOrEqual($maxLength, strlen($str));
             }
         } catch (ValidationException $ex) {
             $this->assertFieldHasError($ex->getValidation(), 'str', $code);
@@ -111,6 +115,8 @@ class StringValidationTest extends AbstractSchemaTest {
 
             if (!empty($code)) {
                 $this->fail("'$str' shouldn't validate against a pattern of $pattern.");
+            } else {
+                $this->assertRegExp("/{$pattern}/", $str);
             }
         } catch (ValidationException $ex) {
             $this->assertFieldHasError($ex->getValidation(), 'str', $code);

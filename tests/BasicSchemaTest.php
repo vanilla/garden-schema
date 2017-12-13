@@ -196,7 +196,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testNotRequired($shortType) {
         if ($shortType === 'n') {
-            return;
+            $this->markTestSkipped();
         }
 
         $schema = Schema::parse([
@@ -222,7 +222,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
     public function testRequiredEmpty($shortType) {
         // Bools and strings are special cases.
         if (in_array($shortType, ['b', 'n'])) {
-            return;
+            $this->markTestSkipped();
         }
 
         $schema = Schema::parse([
@@ -322,8 +322,13 @@ class BasicSchemaTest extends AbstractSchemaTest {
     public function testRequireOneOfSparse() {
         $schema = Schema::parse(['a:i?', 'b:i?', 'c:i?'])->requireOneOf(['a', 'b', 'c'], '', 2);
 
-        $r = $schema->validate([], true);
-        $r2 = $schema->validate(['a' => 1], true);
+        $data = [];
+        $result = $schema->validate($data, true);
+        $this->assertSame($data, $result);
+
+        $data2 = ['a' => 1];
+        $result2 = $schema->validate($data2, true);
+        $this->assertSame($data2, $result2);
     }
 
     /**

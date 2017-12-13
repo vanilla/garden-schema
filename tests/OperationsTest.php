@@ -159,10 +159,15 @@ class OperationsTest extends AbstractSchemaTest {
             'a:o' => ['b:s', 'c:i'],
             'b:a' => ['b:s', 'c:i']
         ]);
-
         $sch2 = $sch1->withSparse();
-        $sch2->validate([]);
-        $sch2->validate(['a' => ['c' => 1], 'b' => [['b' => 'foo']]]);
+
+        $data = [];
+        $result = $sch2->validate($data);
+        $this->assertSame($data, $result);
+
+        $data2 = ['a' => ['c' => 1], 'b' => [['b' => 'foo']]];
+        $result2 = $sch2->validate($data2);
+        $this->assertSame($data2, $result2);
     }
 
     /**
