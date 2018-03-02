@@ -34,4 +34,19 @@ class ArrayValidationTest extends AbstractSchemaTest {
         $this->assertTrue($sch->isValid([1, 2]));
         $this->assertFalse($sch->isValid([1, 2, 3]));
     }
+
+    /**
+     * Test the enum with arrays.
+     */
+    public function testEnumItems() {
+        $sch = new Schema([
+            'type' => 'array',
+            'items' => 'string',
+            'enum' => ['a', 'b', 'c'],
+        ]);
+
+        $this->assertTrue($sch->isValid(['a']));
+        $this->assertTrue($sch->isValid(['a', 'c']));
+        $this->assertFalse($sch->isValid(['a', 'd']));
+    }
 }

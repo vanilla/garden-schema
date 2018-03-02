@@ -1120,16 +1120,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return $value;
         }
 
-        if (!in_array($value, $enum, true)) {
-            $field->addError(
-                'invalid',
-                [
-                    'messageCode' => '{field} must be one of: {enum}.',
-                    'enum' => $enum,
-                    'status' => 422
-                ]
-            );
-            return Invalid::value();
+        if (!is_array($value)) {
+            $values = [$value];
+        } else {
+            $values = $value;
+        }
+
+        foreach ($values as $value) {
+            if (!in_array($value, $enum, true)) {
+                $field->addError(
+                    'invalid',
+                    [
+                        'messageCode' => '{field} must be one of: {enum}.',
+                        'enum' => $enum,
+                        'status' => 422
+                    ]
+                );
+                return Invalid::value();
+            }
         }
         return $value;
     }
