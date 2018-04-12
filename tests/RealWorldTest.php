@@ -63,4 +63,57 @@ class RealWorldTest extends TestCase {
         $valid = $sch->validate(['a' => '']);
         $this->assertSame(['a' => ''], $valid);
     }
+
+    /**
+     * Test schema extending!
+     */
+    public function testNestedMergedFilteredAdd() {
+        $data = [
+            'property1' => true,
+            'property2' => false,
+            'sub-schema' => [
+                'sub-property1' => true,
+                'sub-property2' => false,
+            ]
+        ];
+        $expectedData = [
+            'property1' => true,
+            'sub-schema' => [
+                'sub-property2' => false,
+            ]
+        ];
+
+        $subSchema1Definition = [
+            'sub-property1:b' => 'Sub property 1',
+        ];
+        $subSchema2Definition = [
+            'sub-property2:b' => 'Sub property 2',
+        ];
+        $mergedSubSchema = Schema::parse($subSchema1Definition)->merge(
+            Schema::parse($subSchema2Definition)
+        );
+
+        $schema1Definition = [
+            'property1:b' => 'Property 1',
+            'sub-schema' => Schema::parse($subSchema1Definition),
+        ];
+        $schema2Definition = [
+            'property2:b' => 'Property 2',
+            'sub-schema' => Schema::parse($subSchema2Definition),
+        ];
+        $mergedSchema = Schema::parse($schema1Definition)->merge(
+            Schema::parse($schema2Definition)
+        );
+
+        // Buil a schema by extending other schemas!
+        $filteredSchema = Schema::parse([
+            'property1' => null,
+            'sub-schema' => Schema::parse([
+                'sub-property2' => null,
+            ])->add($mergedSubSchema),
+        ])->add($mergedSchema);
+
+        $validatedData = $filteredSchema->validate($data);
+        $this->assertEquals($expectedData, $validatedData);
+    }
 }
