@@ -289,7 +289,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     // We just want to merge the properties that exist in the destination.
                     foreach ($val as $name => $prop) {
                         if (isset($target[$key][$name])) {
-                            $this->mergeInternal($target[$key][$name], $prop, $overwrite, $addProperties);
+                            $targetProp = &$target[$key][$name];
+
+                            if (is_array($targetProp) && is_array($prop)) {
+                                $this->mergeInternal($targetProp, $prop, $overwrite, $addProperties);
+                            } elseif (is_array($targetProp) && $prop instanceof Schema) {
+                                $this->mergeInternal($targetProp, $prop->getSchemaArray(), $overwrite, $addProperties);
+                            } elseif ($overwrite) {
+                                $targetProp = $prop;
+                            }
                         }
                     }
                 } elseif (isset($val[0]) || isset($target[$key][0])) {

@@ -114,6 +114,6 @@ class RealWorldTest extends TestCase {
         ])->add($mergedSchema);
 
         $validatedData = $filteredSchema->validate($data);
-        $this->assert($expectedData, $validatedData);
+        $this->assertEquals($expectedData, $validatedData);
     }
 }
