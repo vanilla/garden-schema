@@ -67,16 +67,6 @@ class PropertyTest extends TestCase {
     }
 
     /**
-     * Description must be a string.
-     *
-     * @expectedException \InvalidArgumentException
-     */
-    public function testInvalidDescription() {
-        $schema = Schema::parse([]);
-        $schema->setDescription(123);
-    }
-
-    /**
      * The validation behavior should be an appropriate constant.
      *
      * @expectedException \InvalidArgumentException
