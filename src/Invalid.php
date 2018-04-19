@@ -19,6 +19,8 @@ class Invalid {
 
     /**
      * Private constructor to enforce singleton.
+     *
+     * @noinspection PhpUnusedPrivateMethodInspection
      */
     private function __constructor() {
         // no-op

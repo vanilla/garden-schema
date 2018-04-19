@@ -90,16 +90,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Set the description for the schema.
      *
      * @param string $description The new description.
-     * @throws \InvalidArgumentException Throws an exception when the provided description is not a string.
-     * @return Schema
+     * @return $this
      */
-    public function setDescription($description) {
-        if (is_string($description)) {
-            $this->schema['description'] = $description;
-        } else {
-            throw new \InvalidArgumentException("The description is not a valid string.", 500);
-        }
-
+    public function setDescription(string $description) {
+        $this->schema['description'] = $description;
         return $this;
     }
 
@@ -164,7 +158,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return string
      */
-    public function getID() {
+    public function getID(): string {
         return isset($this->schema['id']) ? $this->schema['id'] : '';
     }
 
@@ -346,7 +340,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Parse a short schema and return the associated schema.
      *
      * @param array $arr The schema array.
-     * @param mixed ...$args Constructor arguments for the schema instance.
+     * @param mixed[] $args Constructor arguments for the schema instance.
      * @return static Returns a new schema.
      */
     public static function parse(array $arr, ...$args) {
@@ -834,11 +828,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } else {
                     $value = null;
                 }
-            } catch (\Exception $ex) {
+            } catch (\Throwable $ex) {
                 $value = Invalid::value();
             }
         } elseif (is_int($value) && $value > 0) {
-            $value = new \DateTimeImmutable('@'.(string)round($value));
+            try {
+                $value = new \DateTimeImmutable('@'.(string)round($value));
+            } catch (\Throwable $ex) {
+                $value = Invalid::value();
+            }
         } else {
             $value = Invalid::value();
         }
@@ -905,7 +903,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Validate data against the schema and return the result.
      *
-     * @param array|\ArrayAccess $data The data to validate.
+     * @param array|\Traversable&\ArrayAccess $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
@@ -923,7 +921,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $class = get_class($data);
             $clean = new $class;
 
-            if ($clean instanceof \ArrayObject) {
+            if ($clean instanceof \ArrayObject && $data instanceof \ArrayObject) {
                 $clean->setFlags($data->getFlags());
                 $clean->setIteratorClass($data->getIteratorClass());
             }
@@ -999,7 +997,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return Invalid::value();
         }
 
-        $errorCount = $field->getErrorCount();
         if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
             if (!empty($field->getName()) && $minLength === 1) {
                 $field->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
