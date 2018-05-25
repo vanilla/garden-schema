@@ -1,7 +1,7 @@
 <?php
 /**
  * @author Todd Burry <todd@vanillaforums.com>
- * @copyright 2009-2017 Vanilla Forums Inc.
+ * @copyright 2009-2018 Vanilla Forums Inc.
  * @license MIT
  */
 
@@ -1203,14 +1203,20 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
 
             if (!empty($schema['type'])) {
-                // Swap datetime and timestamp to other types with formats.
-                if ($schema['type'] === 'datetime') {
-                    $schema['type'] = 'string';
-                    $schema['format'] = 'date-time';
-                } elseif ($schema['type'] === 'timestamp') {
-                    $schema['type'] = 'integer';
-                    $schema['format'] = 'timestamp';
+                $types = (array)$schema['type'];
+
+                foreach ($types as $i => &$type) {
+                    // Swap datetime and timestamp to other types with formats.
+                    if ($type === 'datetime') {
+                        $type = 'string';
+                        $schema['format'] = 'date-time';
+                    } elseif ($schema['type'] === 'timestamp') {
+                        $type = 'integer';
+                        $schema['format'] = 'timestamp';
+                    }
                 }
+                $types = array_unique($types);
+                $schema['type'] = count($types) === 1 ? reset($types) : $types;
             }
 
             if (!empty($schema['items'])) {

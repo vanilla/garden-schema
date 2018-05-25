@@ -1,7 +1,7 @@
 <?php
 /**
  * @author Todd Burry <todd@vanillaforums.com>
- * @copyright 2009-2017 Vanilla Forums Inc.
+ * @copyright 2009-2018 Vanilla Forums Inc.
  * @license MIT
  */
 
@@ -200,7 +200,11 @@ class ParseTest extends AbstractSchemaTest {
             'timestamp' => [
                 ['type' => 'timestamp'],
                 ['type' => 'integer', 'format' => 'timestamp'],
-            ]
+            ],
+            'datetime|null' => [
+                ['type' => ['datetime', 'null']],
+                ['type' => ['string', 'null'], 'format' => 'date-time'],
+            ],
         ];
 
         $result = $r;
