@@ -414,7 +414,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         try {
             $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
         } catch (ValidationException $ex) {
-            $ex->getValidation()->setConcatMainMessage(true);
+            $ex->getValidation()->setConcatFieldMessages(true);
             throw new ValidationException($ex->getValidation());
         }
     }

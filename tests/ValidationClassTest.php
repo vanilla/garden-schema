@@ -61,7 +61,7 @@ class ValidationClassTest extends TestCase {
     public function testCalcMessage() {
         $vld = new Validation();
 
-        $vld->setConcatMainMessage(true)
+        $vld->setConcatFieldMessages(true)
             ->addError('foo', 'baz')
             ->addError('foo', 'bar');
 
@@ -85,7 +85,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testMessageReplacements() {
         $vld = new Validation();
-        $vld->setConcatMainMessage(true)
+        $vld->setConcatFieldMessages(true)
             ->addError('foo', 'The {field}!');
 
         $this->assertSame('The foo!', $vld->getMessage());
@@ -145,7 +145,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testMessageTranslation() {
         $vld = new TestValidation();
-        $vld->setConcatMainMessage(true)
+        $vld->setConcatFieldMessages(true)
             ->setTranslateFieldNames(true);
 
         $vld->addError('it', 'Keeping {field} {status}', 100);
@@ -158,7 +158,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testPlural() {
         $vld = new TestValidation();
-        $vld->setConcatMainMessage(true)
+        $vld->setConcatFieldMessages(true)
             ->addError('it', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
         $this->assertSame('!apple berries pears.', $vld->getMessage());
     }
@@ -169,5 +169,16 @@ class ValidationClassTest extends TestCase {
     public function testNoTranslate() {
         $vld = new Validation();
         $this->assertSame('foo', $vld->translate('@foo'));
+    }
+
+    /**
+     * Errors with an empty field should contribute to the default main message.
+     */
+    public function testConcatEmptyFieldMessage() {
+        $vld = new Validation();
+        $vld->addError('', 'foo.')
+            ->addError('', 'bar.');
+
+        $this->assertEquals('foo. bar.', $vld->getMessage());
     }
 }

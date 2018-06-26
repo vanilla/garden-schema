@@ -68,7 +68,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * @var bool Whether or not to concatenate field errors to generate the main error message.
      */
-    private $concatMainMessage = false;
+    private $concatFieldMessages = false;
 
     /// Methods ///
 
@@ -1302,7 +1302,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } else {
             $result = new $class;
         }
-        $result->setConcatMainMessage($this->concatMainMessage());
+        $result->setConcatFieldMessages($this->concatFieldMessages());
         return $result;
     }
 
@@ -1590,20 +1590,20 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Whether or not to concatenate field errors to generate the main error message.
      *
-     * @return bool Returns the concatMainMessage.
+     * @return bool Returns the concatFieldMessages.
      */
-    public function concatMainMessage(): bool {
-        return $this->concatMainMessage;
+    public function concatFieldMessages(): bool {
+        return $this->concatFieldMessages;
     }
 
     /**
      * Set whether or not to concatenate field errors to generate the main error message.
      *
-     * @param bool $concatMainMessage
+     * @param bool $concatFieldMessages
      * @return $this
      */
-    public function setConcatMainMessage(bool $concatMainMessage) {
-        $this->concatMainMessage = $concatMainMessage;
+    public function setConcatFieldMessages(bool $concatFieldMessages) {
+        $this->concatFieldMessages = $concatFieldMessages;
         return $this;
     }
 }

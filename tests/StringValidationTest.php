@@ -149,7 +149,7 @@ class StringValidationTest extends AbstractSchemaTest {
     public function testEnum() {
         $enum = ['one', 'two', 'three', null];
         $schema = Schema::parse([':s|n' => ['enum' => $enum]]);
-        $schema->setConcatMainMessage(true);
+        $schema->setConcatFieldMessages(true);
 
         foreach ($enum as $str) {
             $this->assertTrue($schema->isValid($str));
