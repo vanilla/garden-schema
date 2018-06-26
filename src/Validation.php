@@ -111,18 +111,7 @@ class Validation {
             return $message;
         }
 
-        $sentence = $this->translate('%s.');
-
-        // Generate the message by concatenating all of the errors together.
-        $messages = [];
-        foreach ($this->getRawErrors() as $error) {
-            $message = $this->getErrorMessage($error);
-            if (preg_match('`\PP$`u', $message)) {
-                $message = sprintf($sentence, $message);
-            }
-            $messages[] = $message;
-        }
-        return implode(' ', $messages);
+        return $this->getConcatMessage();
     }
 
     /**
@@ -418,10 +407,35 @@ class Validation {
     private function formatError($error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1]
-        );
+            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1, 'status' => 1]
+        ) + ['status' => 400];
 
         $row['message'] = $this->getErrorMessage($error);
         return $row;
+    }
+
+    /**
+     * Generate a global error string by concatenating field errors.
+     *
+     * @param string|null $field The name of a field to concatenate errors for.
+     * @return string Returns an error message.
+     */
+    public function getConcatMessage($field = null): string {
+        $sentence = $this->translate('%s.');
+
+        // Generate the message by concatenating all of the errors together.
+        $messages = [];
+        foreach ($this->getRawErrors() as $error) {
+            if ($field !== null && $field !== $error['field']) {
+                continue;
+            }
+
+            $message = $this->getErrorMessage($error);
+            if (preg_match('`\PP$`u', $message)) {
+                $message = sprintf($sentence, $message);
+            }
+            $messages[] = $message;
+        }
+        return implode(' ', $messages);
     }
 }
