@@ -83,6 +83,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      */
     public function testArrayItemsType() {
         $schema = Schema::parse(['arr:a' => 'i']);
+        $schema->setConcatFieldMessages(true);
 
         $validData = ['arr' => [1, '2', 3]];
         $this->assertTrue($schema->isValid($validData));
@@ -430,6 +431,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
         $schema = Schema::parse([
             'sub-schema-fail' => new SchemaValidationFail()
         ]);
+        $schema->setConcatFieldMessages(true);
 
         $this->expectExceptionMessage('sub-schema-fail is always invalid.');
         $schema->validate(['sub-schema-fail' => null]);

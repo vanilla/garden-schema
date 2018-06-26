@@ -106,6 +106,7 @@ abstract class AbstractSchemaTest extends TestCase {
                 'zip:i?'
             ]
         ]);
+        $schema->setConcatFieldMessages(true);
 
         return $schema;
     }

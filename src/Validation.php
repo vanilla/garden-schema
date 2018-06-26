@@ -32,6 +32,11 @@ class Validation {
     private $translateFieldNames = false;
 
     /**
+     * @var bool Whether or not to concatenate field errors to generate the main error message.
+     */
+    private $concatFieldMessages = false;
+
+    /**
      * Add an error.
      *
      * @param string $field The name and path of the field to add or an empty string if this is a global error.
@@ -109,20 +114,13 @@ class Validation {
     public function getMessage() {
         if ($message = $this->getMainMessage()) {
             return $message;
+        } elseif (!$this->concatFieldMessages()) {
+            $globalMessage = $this->getConcatMessage('');
+
+            return $globalMessage ?: $this->translate('Validation Failed');
         }
 
-        $sentence = $this->translate('%s.');
-
-        // Generate the message by concatenating all of the errors together.
-        $messages = [];
-        foreach ($this->getRawErrors() as $error) {
-            $message = $this->getErrorMessage($error);
-            if (preg_match('`\PP$`u', $message)) {
-                $message = sprintf($sentence, $message);
-            }
-            $messages[] = $message;
-        }
-        return implode(' ', $messages);
+        return $this->getConcatMessage();
     }
 
     /**
@@ -418,10 +416,55 @@ class Validation {
     private function formatError($error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1]
-        );
+            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1, 'status' => 1]
+        ) + ['status' => 400];
 
         $row['message'] = $this->getErrorMessage($error);
         return $row;
+    }
+
+    /**
+     * Whether or not to concatenate field errors to generate the main error message.
+     *
+     * @return bool Returns the concatFieldMessages.
+     */
+    public function concatFieldMessages(): bool {
+        return $this->concatFieldMessages;
+    }
+
+    /**
+     * Set whether or not to concatenate field errors to generate the main error message.
+     *
+     * @param bool $concatFieldMessages
+     * @return $this
+     */
+    public function setConcatFieldMessages(bool $concatFieldMessages) {
+        $this->concatFieldMessages = $concatFieldMessages;
+        return $this;
+    }
+
+    /**
+     * Generate a global error string by concatenating field errors.
+     *
+     * @param string|null $field The name of a field to concatenate errors for.
+     * @return string Returns an error message.
+     */
+    public function getConcatMessage($field = null): string {
+        $sentence = $this->translate('%s.');
+
+        // Generate the message by concatenating all of the errors together.
+        $messages = [];
+        foreach ($this->getRawErrors() as $error) {
+            if ($field !== null && $field !== $error['field']) {
+                continue;
+            }
+
+            $message = $this->getErrorMessage($error);
+            if (preg_match('`\PP$`u', $message)) {
+                $message = sprintf($sentence, $message);
+            }
+            $messages[] = $message;
+        }
+        return implode(' ', $messages);
     }
 }

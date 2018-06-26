@@ -65,6 +65,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     private $validationClass = Validation::class;
 
+    /**
+     * @var bool Whether or not to concatenate field errors to generate the main error message.
+     */
+    private $concatFieldMessages = false;
 
     /// Methods ///
 
@@ -919,7 +923,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $keys = array_keys($data);
             $clean = [];
         } else {
-            $keys = array_keys(iterator_to_array($data));
+            if ($data instanceof \Traversable) {
+                $keys = array_keys(iterator_to_array($data));
+            } else {
+                $keys = array_keys($properties);
+            }
+
             $class = get_class($data);
             $clean = new $class;
 
@@ -1293,6 +1302,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } else {
             $result = new $class;
         }
+        $result->setConcatFieldMessages($this->concatFieldMessages());
         return $result;
     }
 
@@ -1575,5 +1585,25 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Since we got here the value is invalid.
         $field->merge($typeValidation->getValidation());
         return Invalid::value();
+    }
+
+    /**
+     * Whether or not to concatenate field errors to generate the main error message.
+     *
+     * @return bool Returns the concatFieldMessages.
+     */
+    public function concatFieldMessages(): bool {
+        return $this->concatFieldMessages;
+    }
+
+    /**
+     * Set whether or not to concatenate field errors to generate the main error message.
+     *
+     * @param bool $concatFieldMessages
+     * @return $this
+     */
+    public function setConcatFieldMessages(bool $concatFieldMessages) {
+        $this->concatFieldMessages = $concatFieldMessages;
+        return $this;
     }
 }
