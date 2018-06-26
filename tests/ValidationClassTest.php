@@ -35,7 +35,7 @@ class ValidationClassTest extends TestCase {
         $error = $vld->getErrors()[0];
 
         $this->assertArraySubset(
-            ['field' => 'bar', 'path' => 'foo', 'code' => 'error'],
+            ['field' => 'bar', 'path' => 'foo', 'code' => 'error', 'status' => 400],
             $error
         );
     }
@@ -61,7 +61,8 @@ class ValidationClassTest extends TestCase {
     public function testCalcMessage() {
         $vld = new Validation();
 
-        $vld->addError('foo', 'baz')
+        $vld->setConcatMainMessage(true)
+            ->addError('foo', 'baz')
             ->addError('foo', 'bar');
 
         $msg = $vld->getMessage();
@@ -84,7 +85,8 @@ class ValidationClassTest extends TestCase {
      */
     public function testMessageReplacements() {
         $vld = new Validation();
-        $vld->addError('foo', 'The {field}!');
+        $vld->setConcatMainMessage(true)
+            ->addError('foo', 'The {field}!');
 
         $this->assertSame('The foo!', $vld->getMessage());
     }
@@ -99,6 +101,12 @@ class ValidationClassTest extends TestCase {
             ->addError('bar', 'err', 301);
 
         $this->assertSame(302, $vld->getStatus());
+
+        $errors = array_column($vld->getErrors(), null, 'field');
+
+        $this->assertSame(302, $errors['foo']['status']);
+        $this->assertSame(301, $errors['bar']['status']);
+
     }
 
     /**
@@ -137,7 +145,8 @@ class ValidationClassTest extends TestCase {
      */
     public function testMessageTranslation() {
         $vld = new TestValidation();
-        $vld->setTranslateFieldNames(true);
+        $vld->setConcatMainMessage(true)
+            ->setTranslateFieldNames(true);
 
         $vld->addError('it', 'Keeping {field} {status}', 100);
 
@@ -149,7 +158,8 @@ class ValidationClassTest extends TestCase {
      */
     public function testPlural() {
         $vld = new TestValidation();
-        $vld->addError('it', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
+        $vld->setConcatMainMessage(true)
+            ->addError('it', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
         $this->assertSame('!apple berries pears.', $vld->getMessage());
     }
 
