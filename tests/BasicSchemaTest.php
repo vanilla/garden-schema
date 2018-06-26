@@ -413,9 +413,9 @@ class BasicSchemaTest extends AbstractSchemaTest {
     public function testValidateException() {
         try {
             $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
-        } catch (\Exception $ex) {
-            $msg = $ex->getMessage();
-            throw $ex;
+        } catch (ValidationException $ex) {
+            $ex->getValidation()->setConcatMainMessage(true);
+            throw new ValidationException($ex->getValidation());
         }
     }
 
@@ -445,7 +445,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
+            $this->assertSame('!value is not a valid !integer.', $ex->getValidation()->getConcatMessage());
         }
 
         $validation = new TestValidation();
@@ -453,14 +453,14 @@ class BasicSchemaTest extends AbstractSchemaTest {
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
+            $this->assertSame('!value is not a valid !integer.', $ex->getValidation()->getConcatMessage());
         }
 
         $validation->setTranslateFieldNames(true);
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!!value is not a valid !integer.', $ex->getMessage());
+            $this->assertSame('!!value is not a valid !integer.', $ex->getValidation()->getConcatMessage());
         }
     }
 
