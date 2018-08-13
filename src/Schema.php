@@ -654,7 +654,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return mixed Returns a cleaned version of the data.
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      */
-    public function validate($data, bool $sparse = false) {
+    public function validate($data, $sparse = false) {
         $field = new ValidationField($this->createValidation(), $this->schema, '', $sparse);
 
         $clean = $this->validateField($data, $field, $sparse);
