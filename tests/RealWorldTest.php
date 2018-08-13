@@ -1,8 +1,8 @@
 <?php
 /**
  * @author Todd Burry <todd@vanillaforums.com>
- * @copyright 2009-2017 Vanilla Forums Inc.
- * @license Proprietary
+ * @copyright 2009-2018 Vanilla Forums Inc.
+ * @license MIT
  */
 
 namespace Garden\Schema\Tests;
