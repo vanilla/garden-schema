@@ -69,7 +69,7 @@ class PropertyTest extends TestCase {
     /**
      * The validation behavior should be an appropriate constant.
      *
-     * @expectedException \InvalidArgumentException
+     * @expectedException \TypeError
      */
     public function testInvalidBehavior() {
         $schema = Schema::parse([]);
