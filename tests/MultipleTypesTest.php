@@ -78,8 +78,8 @@ class MultipleTypesTest extends AbstractSchemaTest {
     public function testTypeAndArrayOfType($short, $type, $value) {
         if ($type === 'array') {
             // Just return because this isn't really a valid test to skip.
+            $this->assertTrue(true); // dummy assertion to avoid warning.
             return;
-//            $this->markTestSkipped('An array is invalid for this test.');
         }
 
         $sch = new Schema([

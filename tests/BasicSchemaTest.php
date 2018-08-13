@@ -195,10 +195,6 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @dataProvider provideTypesAndData
      */
     public function testNotRequired($shortType) {
-        if ($shortType === 'n') {
-            $this->markTestSkipped();
-        }
-
         $schema = Schema::parse([
             "col:$shortType?"
         ]);
@@ -208,21 +204,23 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $this->assertTrue($isValid);
         $this->assertArrayNotHasKey('col', $missingData);
 
-        $nullData = ['col' => null];
-        $valid = $schema->validate($nullData);
-        $this->assertSame([], $valid);
+        if ($shortType !== 'n') {
+            $nullData = ['col' => null];
+            $valid = $schema->validate($nullData);
+            $this->assertSame([], $valid);
+        }
     }
 
     /**
      * Test data that is not required, but provided as empty.
      *
      * @param string $shortType The short data type.
-     * @dataProvider provideTypesAndData
+     * @dataProvider provideTypesAndDataNotNull
      */
     public function testRequiredEmpty($shortType) {
-        // Bools and strings are special cases.
-        if (in_array($shortType, ['b', 'n'])) {
-            $this->markTestSkipped();
+        if ($shortType === 'b') {
+            $this->doTestRequiredEmptyBool();
+            return;
         }
 
         $schema = Schema::parse([
@@ -243,7 +241,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      *
      * In general, bools should be cast to false if they are passed, but falsey.
      */
-    public function testRequiredEmptyBool() {
+    protected function doTestRequiredEmptyBool() {
         $schema = Schema::parse([
             'col:b'
         ]);

@@ -73,7 +73,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array $schema The array schema to validate against.
      */
-    public function __construct($schema = []) {
+    public function __construct(array $schema = []) {
         $this->schema = $schema;
     }
 
@@ -82,7 +82,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return string
      */
-    public function getDescription() {
+    public function getDescription(): string {
         return isset($this->schema['description']) ? $this->schema['description'] : '';
     }
 
@@ -90,16 +90,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Set the description for the schema.
      *
      * @param string $description The new description.
-     * @throws \InvalidArgumentException Throws an exception when the provided description is not a string.
-     * @return Schema
+     * @return $this
      */
-    public function setDescription($description) {
-        if (is_string($description)) {
-            $this->schema['description'] = $description;
-        } else {
-            throw new \InvalidArgumentException("The description is not a valid string.", 500);
-        }
-
+    public function setDescription(string $description) {
+        $this->schema['description'] = $description;
         return $this;
     }
 
@@ -164,7 +158,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return string
      */
-    public function getID() {
+    public function getID(): string {
         return isset($this->schema['id']) ? $this->schema['id'] : '';
     }
 
@@ -175,7 +169,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws \InvalidArgumentException Throws an exception when the provided ID is not a string.
      * @return Schema
      */
-    public function setID($id) {
+    public function setID(string $id) {
         if (is_string($id)) {
             $this->schema['id'] = $id;
         } else {
@@ -190,7 +184,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return int Returns a bitwise combination of flags.
      */
-    public function getFlags() {
+    public function getFlags(): int {
         return $this->flags;
     }
 
@@ -200,7 +194,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param int $flags One or more of the **Schema::FLAG_*** constants.
      * @return Schema Returns the current instance for fluent calls.
      */
-    public function setFlags($flags) {
+    public function setFlags(int $flags) {
         if (!is_int($flags)) {
             throw new \InvalidArgumentException('Invalid flags.', 500);
         }
@@ -215,7 +209,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
      * @return bool Returns **true** if all of the flags are set or **false** otherwise.
      */
-    public function hasFlag($flag) {
+    public function hasFlag(int $flag): bool {
         return ($this->flags & $flag) === $flag;
     }
 
@@ -226,7 +220,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $value Either true or false.
      * @return $this
      */
-    public function setFlag($flag, $value) {
+    public function setFlag(int $flag, bool $value) {
         if ($value) {
             $this->flags = $this->flags | $flag;
         } else {
@@ -338,7 +332,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array
      * @see Schema::jsonSerialize()
      */
-    public function getSchemaArray() {
+    public function getSchemaArray(): array {
         return $this->schema;
     }
 
@@ -346,7 +340,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Parse a short schema and return the associated schema.
      *
      * @param array $arr The schema array.
-     * @param mixed ...$args Constructor arguments for the schema instance.
+     * @param mixed[] $args Constructor arguments for the schema instance.
      * @return static Returns a new schema.
      */
     public static function parse(array $arr, ...$args) {
@@ -362,7 +356,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array The full schema array.
      * @throws \InvalidArgumentException Throws an exception when an item in the schema is invalid.
      */
-    protected function parseInternal(array $arr) {
+    protected function parseInternal(array $arr): array {
         if (empty($arr)) {
             // An empty schema validates to anything.
             return [];
@@ -400,7 +394,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array $node The node to parse.
      * @param mixed $value Additional information from the node.
-     * @return array Returns a JSON schema compatible node.
+     * @return array|\ArrayAccess Returns a JSON schema compatible node.
      */
     private function parseNode($node, $value = null) {
         if (is_array($value)) {
@@ -466,7 +460,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param array $arr An object property schema.
      * @return array Returns a schema array suitable to be placed in the **properties** key of a schema.
      */
-    private function parseProperties(array $arr) {
+    private function parseProperties(array $arr): array {
         $properties = [];
         $requiredProperties = [];
         foreach ($arr as $key => $value) {
@@ -490,7 +484,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $requiredProperties[] = $name;
             }
         }
-        return array($properties, $requiredProperties);
+        return [$properties, $requiredProperties];
     }
 
     /**
@@ -501,7 +495,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array Returns an array in the form `[string name, array param, bool required]`.
      * @throws \InvalidArgumentException Throws an exception if the short param is not in the correct format.
      */
-    public function parseShortParam($key, $value = []) {
+    public function parseShortParam(string $key, $value = []): array {
         // Is the parameter optional?
         if (substr($key, -1) === '?') {
             $required = false;
@@ -570,7 +564,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param callable $callback The callback to filter the field.
      * @return $this
      */
-    public function addFilter($fieldname, callable $callback) {
+    public function addFilter(string $fieldname, callable $callback) {
         $this->filters[$fieldname][] = $callback;
         return $this;
     }
@@ -584,7 +578,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param callable $callback The callback to validate with.
      * @return Schema Returns `$this` for fluent calls.
      */
-    public function addValidator($fieldname, callable $callback) {
+    public function addValidator(string $fieldname, callable $callback) {
         $this->validators[$fieldname][] = $callback;
         return $this;
     }
@@ -597,7 +591,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param int $count The count of required items.
      * @return Schema Returns `$this` for fluent calls.
      */
-    public function requireOneOf(array $required, $fieldname = '', $count = 1) {
+    public function requireOneOf(array $required, string $fieldname = '', int $count = 1) {
         $result = $this->addValidator(
             $fieldname,
             function ($data, ValidationField $field) use ($required, $count) {
@@ -834,11 +828,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } else {
                     $value = null;
                 }
-            } catch (\Exception $ex) {
+            } catch (\Throwable $ex) {
                 $value = Invalid::value();
             }
         } elseif (is_int($value) && $value > 0) {
-            $value = new \DateTimeImmutable('@'.(string)round($value));
+            try {
+                $value = new \DateTimeImmutable('@'.(string)round($value));
+            } catch (\Throwable $ex) {
+                $value = Invalid::value();
+            }
         } else {
             $value = Invalid::value();
         }
@@ -905,7 +903,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Validate data against the schema and return the result.
      *
-     * @param array|\ArrayAccess $data The data to validate.
+     * @param array|\Traversable&\ArrayAccess $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
      * @param bool $sparse Whether or not this is a sparse validation.
      * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
@@ -923,7 +921,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $class = get_class($data);
             $clean = new $class;
 
-            if ($clean instanceof \ArrayObject) {
+            if ($clean instanceof \ArrayObject && $data instanceof \ArrayObject) {
                 $clean->setFlags($data->getFlags());
                 $clean->setIteratorClass($data->getIteratorClass());
             }
@@ -999,7 +997,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return Invalid::value();
         }
 
-        $errorCount = $field->getErrorCount();
         if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
             if (!empty($field->getName()) && $minLength === 1) {
                 $field->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);

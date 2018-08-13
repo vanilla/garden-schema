@@ -42,6 +42,8 @@ class Validation {
     public function addError($field, $error, $options = []) {
         if (empty($error)) {
             throw new \InvalidArgumentException('The error code cannot be empty.', 500);
+        } elseif (!in_array(gettype($options), ['integer', 'array'], true)) {
+            throw new \InvalidArgumentException('$options must be an integer or array.', 500);
         }
 
         $fieldKey = $field;
@@ -63,10 +65,10 @@ class Validation {
             return $v !== null;
         });
 
-        if (is_array($options)) {
-            $row += $options;
-        } elseif (is_int($options)) {
+        if (is_int($options)) {
             $row['status'] = $options;
+        } else {
+            $row += $options;
         }
 
         $this->errors[$fieldKey][] = $row;
@@ -401,10 +403,12 @@ class Validation {
     }
 
     /**
-     * @param $error
-     * @return array
+     * Format a raw error row for consumption.
+     *
+     * @param array $error The error to format.
+     * @return array Returns the error stripped of default values.
      */
-    private function formatError($error) {
+    private function formatError(array $error) {
         $row = array_intersect_key(
             $error,
             ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1, 'status' => 1]

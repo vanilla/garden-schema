@@ -4,4 +4,4 @@ if (!class_exists('PHPUnit_Framework_Error_Notice') && class_exists('PHPUnit\\Fr
     class_alias('PHPUnit\\Framework\\Error\\Notice', 'PHPUnit_Framework_Error_Notice');
 }
 
-require('vendor/autoload.php');
+require(__DIR__.'/../vendor/autoload.php');
