@@ -398,6 +398,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     private function parseNode($node, $value = null) {
         if (is_array($value)) {
+            if (is_array($node['type'])) {
+                trigger_error('Schemas with multiple types is deprecated.', E_USER_DEPRECATED);
+            }
+
             // The value describes a bit more about the schema.
             switch ($node['type']) {
                 case 'array':
@@ -442,7 +446,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (is_array($node)) {
             if (!empty($node['allowNull'])) {
-                $node['type'] = array_merge((array)$node['type'], ['null']);
+                $node['nullable'] = true;
             }
             unset($node['allowNull']);
 
@@ -515,6 +519,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $found = $this->getType($alias);
                 if ($found === null) {
                     throw new \InvalidArgumentException("Unknown type '$alias'", 500);
+                } elseif ($found === 'null') {
+                    $nullable = true;
                 } else {
                     $types[] = $found;
                 }
@@ -550,6 +556,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             if (in_array('string', $types) && !empty($name) && $required && (!isset($value['default']) || $value['default'] !== '')) {
                 $param['minLength'] = 1;
             }
+        }
+
+        if (!empty($nullable)) {
+            $param['nullable'] = true;
+        }
+
+        if (is_array($param['type'])) {
+            trigger_error('Schemas with multiple types is deprecated.', E_USER_DEPRECATED);
         }
 
         return [$name, $param, $required];
@@ -706,7 +720,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 // The validation failed, so merge the validations together.
                 $field->getValidation()->merge($ex->getValidation(), $field->getName());
             }
-        } elseif (($value === null || ($value === '' && !$field->hasType('string'))) && $field->hasType('null')) {
+        } elseif (($value === null || ($value === '' && !$field->hasType('string'))) && ($field->val('nullable') || $field->hasType('null'))) {
             $result = null;
         } else {
             // Validate the field's type.
@@ -951,7 +965,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             } else {
                 $value = $data[$keys[$lName]];
 
-                if (in_array($value, [null, ''], true) && !$isRequired && !$propertyField->hasType('null')) {
+                if (in_array($value, [null, ''], true) && !$isRequired && !($propertyField->val('nullable') || $propertyField->hasType('null'))) {
                     if ($propertyField->getType() !== 'string' || $value === null) {
                         continue;
                     }

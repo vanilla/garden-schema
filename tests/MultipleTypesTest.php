@@ -7,6 +7,7 @@
 
 namespace Garden\Schema\Tests;
 use Garden\Schema\Schema;
+use PHPUnit\Framework\Error\Notice;
 
 /**
  * Tests for schemas where the type property is multiple types.
@@ -123,6 +124,15 @@ class MultipleTypesTest extends AbstractSchemaTest {
 
         $valid = $sch->validate($value);
         $this->assertSame($expected, $valid);
+    }
+
+    /**
+     * Multiple types should have a deprecation notice.
+     *
+     * @expectedException PHPUnit\Framework\Error\Notice
+     */
+    public function testDeprecationNotice() {
+        $sch = Schema::parse(['a:i|s']);
     }
 
     /**

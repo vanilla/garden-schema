@@ -119,7 +119,7 @@ class ParseTest extends AbstractSchemaTest {
      *
      * @param string $short The short type to test.
      * @param string $type The type to test.
-     * @dataProvider provideTypesAndData
+     * @dataProvider provideNonNullTypesAndData
      */
     public function testRootSchemas($short, $type) {
         $schema = Schema::parse([":$short" => 'desc']);

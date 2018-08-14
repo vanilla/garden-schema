@@ -7,14 +7,88 @@
 
 namespace Garden\Schema\Tests;
 
+use PHPUnit\Framework\Error\Error;
+use PHPUnit\Framework\Error\Notice;
 use PHPUnit\Framework\TestCase;
 use Garden\Schema\Schema;
 use Garden\Schema\Validation;
+use PHPUnit\Framework\Warning;
 
 /**
  * Base class for schema tests.
  */
 abstract class AbstractSchemaTest extends TestCase {
+    private $expectedErrors;
+
+    /**
+     * Clear out the errors array.
+     */
+    protected function setUp() {
+        $this->expectedErrors = [];
+        set_error_handler([$this, "errorHandler"]);
+    }
+
+    /**
+     * Track errors that occur during testing.
+     *
+     * The handler allows test methods to explicitly expect errors without failing. If an error is not expected then
+     * it will be thrown as usual.
+     *
+     * @param int $number The number of the error.
+     * @param string $message The error message.
+     * @param string $file The file the error occurred in.
+     * @param int $line The line the error occurred on.
+     * @throws \Throwable Throws an exception when the error was not expected.
+     */
+    public function errorHandler($number, $message, $file, $line) {
+        // Look for an expected error.
+        foreach ($this->expectedErrors as $i => $row) {
+            list($no, $str) = $row;
+
+            if (($number === $no || $no === null) && ($message === $str || $str === null)) {
+                unset($this->expectedErrors[$i]);
+                return;
+            }
+        }
+
+        switch ($number) {
+            case E_NOTICE:
+            case E_USER_NOTICE:
+            case E_DEPRECATED:
+            case E_USER_DEPRECATED:
+                throw new Notice($message, $number, $file, $line);
+            case E_WARNING:
+            case E_USER_WARNING:
+                throw new Warning($message, $number);
+            case E_ERROR:
+            case E_USER_ERROR:
+                throw new Error($message, $number, $file, $line);
+            default:
+                // No error was found so throw an exception.
+                throw new \ErrorException($message, $number, $number, $file, $line);
+        }
+    }
+
+    /**
+     * Assert than an error has occurred.
+     *
+     * @param string $errstr The desired error string.
+     * @param int $errno The desired error number.
+     */
+    public function expectError($errstr, $errno) {
+        $this->expectedErrors[] = [$errno, $errstr];
+    }
+
+    /**
+     * Assert than an error has occurred.
+     *
+     * @param int $errno The desired error number.
+     */
+    public function expectErrorNumber($errno) {
+        $this->expectError(null, $errno);
+    }
+
+
     /**
      * Provides all of the schema types.
      *
@@ -33,6 +107,17 @@ abstract class AbstractSchemaTest extends TestCase {
             'null' => ['n', 'null', null],
         ];
         return $result;
+    }
+
+    /**
+     * Provide just the non-null types and data.
+     *
+     * @return array Returns a data provider array.
+     */
+    public function provideNonNullTypesAndData() {
+        $r = $this->provideTypesAndData();
+        unset($r['null']);
+        return $r;
     }
 
     /**
