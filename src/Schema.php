@@ -671,7 +671,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     public function validate($data, $sparse = false) {
         $field = new ValidationField($this->createValidation(), $this->schema, '', $sparse);
 
-        $clean = $this->validateField($data, $field, $sparse);
+        $clean = $this->validateField($data, $field);
 
         if (Invalid::isInvalid($clean) && $field->isValid()) {
             // This really shouldn't happen, but we want to protect against seeing the invalid object.
@@ -706,16 +706,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field A validation object to add errors to.
-     * @param bool $sparse Whether or not this is a sparse validation.
      * @return mixed|Invalid Returns a clean version of the value with all extra fields stripped out or invalid if the value
      * is completely invalid.
      */
-    protected function validateField($value, ValidationField $field, $sparse = false) {
+    protected function validateField($value, ValidationField $field) {
         $result = $value = $this->filterField($value, $field);
 
         if ($field->getField() instanceof Schema) {
             try {
-                $result = $field->getField()->validate($value, $sparse);
+                $result = $field->getField()->validate($value, $field->isSparse());
             } catch (ValidationException $ex) {
                 // The validation failed, so merge the validations together.
                 $field->getValidation()->merge($ex->getValidation(), $field->getName());
@@ -726,9 +725,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // Validate the field's type.
             $type = $field->getType();
             if (is_array($type)) {
-                $result = $this->validateMultipleTypes($value, $type, $field, $sparse);
+                $result = $this->validateMultipleTypes($value, $type, $field);
             } else {
-                $result = $this->validateSingleType($value, $type, $field, $sparse);
+                $result = $this->validateSingleType($value, $type, $field);
             }
             if (Invalid::isValid($result)) {
                 $result = $this->validateEnum($result, $field);
@@ -748,10 +747,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
-     * @param bool $sparse Whether or not this is a sparse validation.
      * @return array|Invalid Returns an array or invalid if validation fails.
      */
-    protected function validateArray($value, ValidationField $field, $sparse = false) {
+    protected function validateArray($value, ValidationField $field) {
         if ((!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) && !$value instanceof \Traversable) {
             $field->addTypeError('array');
             return Invalid::value();
@@ -785,13 +783,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     $field->getValidation(),
                     $field->val('items'),
                     '',
-                    $sparse
+                    $field->isSparse()
                 );
 
                 $count = 0;
                 foreach ($value as $i => $item) {
                     $itemValidation->setName($field->getName()."[{$i}]");
-                    $validItem = $this->validateField($item, $itemValidation, $sparse);
+                    $validItem = $this->validateField($item, $itemValidation);
                     if (Invalid::isValid($validItem)) {
                         $result[] = $validItem;
                     }
@@ -898,16 +896,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
-     * @param bool $sparse Whether or not this is a sparse validation.
      * @return object|Invalid Returns a clean object or **null** if validation fails.
      */
-    protected function validateObject($value, ValidationField $field, $sparse = false) {
+    protected function validateObject($value, ValidationField $field) {
         if (!$this->isArray($value) || isset($value[0])) {
             $field->addTypeError('object');
             return Invalid::value();
         } elseif (is_array($field->val('properties'))) {
             // Validate the data against the internal schema.
-            $value = $this->validateProperties($value, $field, $sparse);
+            $value = $this->validateProperties($value, $field);
         } elseif (!is_array($value)) {
             $value = $this->toObjectArray($value);
         }
@@ -919,11 +916,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array|\Traversable&\ArrayAccess $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
-     * @param bool $sparse Whether or not this is a sparse validation.
      * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
      * or invalid if there are no valid properties.
      */
-    protected function validateProperties($data, ValidationField $field, $sparse = false) {
+    protected function validateProperties($data, ValidationField $field) {
         $properties = $field->val('properties', []);
         $required = array_flip($field->val('required', []));
 
@@ -942,7 +938,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
-        $propertyField = new ValidationField($field->getValidation(), [], null, $sparse);
+        $propertyField = new ValidationField($field->getValidation(), [], null, $field->isSparse());
 
         // Loop through the schema fields and validate each one.
         foreach ($properties as $propertyName => $property) {
@@ -955,7 +951,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             // First check for required fields.
             if (!array_key_exists($lName, $keys)) {
-                if ($sparse) {
+                if ($field->isSparse()) {
                     // Sparse validation can leave required fields out.
                 } elseif ($propertyField->hasVal('default')) {
                     $clean[$propertyName] = $propertyField->val('default');
@@ -971,7 +967,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     }
                 }
 
-                $clean[$propertyName] = $this->validateField($value, $propertyField, $sparse);
+                $clean[$propertyName] = $this->validateField($value, $propertyField);
             }
 
             unset($keys[$lName]);
@@ -1471,10 +1467,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to validate.
      * @param string $type The type to validate against.
      * @param ValidationField $field Contains field and validation information.
-     * @param bool $sparse Whether or not this should be a sparse validation.
      * @return mixed Returns the valid value or `Invalid`.
      */
-    protected function validateSingleType($value, $type, ValidationField $field, $sparse) {
+    protected function validateSingleType($value, $type, ValidationField $field) {
         switch ($type) {
             case 'boolean':
                 $result = $this->validateBoolean($value, $field);
@@ -1495,10 +1490,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $result = $this->validateDatetime($value, $field);
                 break;
             case 'array':
-                $result = $this->validateArray($value, $field, $sparse);
+                $result = $this->validateArray($value, $field);
                 break;
             case 'object':
-                $result = $this->validateObject($value, $field, $sparse);
+                $result = $this->validateObject($value, $field);
                 break;
             case 'null':
                 $result = $this->validateNull($value, $field);
@@ -1521,10 +1516,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to validate.
      * @param string[] $types The types to validate against.
      * @param ValidationField $field Contains field and validation information.
-     * @param bool $sparse Whether or not this should be a sparse validation.
      * @return mixed Returns the valid value or `Invalid`.
      */
-    private function validateMultipleTypes($value, array $types, ValidationField $field, $sparse) {
+    private function validateMultipleTypes($value, array $types, ValidationField $field) {
         // First check for an exact type match.
         switch (gettype($value)) {
             case 'boolean':
@@ -1564,20 +1558,20 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 break;
             case 'NULL':
                 if (in_array('null', $types)) {
-                    $singleType = $this->validateSingleType($value, 'null', $field, $sparse);
+                    $singleType = $this->validateSingleType($value, 'null', $field);
                 }
                 break;
         }
         if (!empty($singleType)) {
-            return $this->validateSingleType($value, $singleType, $field, $sparse);
+            return $this->validateSingleType($value, $singleType, $field);
         }
 
         // Clone the validation field to collect errors.
-        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', $sparse);
+        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', $field->isSparse());
 
         // Try and validate against each type.
         foreach ($types as $type) {
-            $result = $this->validateSingleType($value, $type, $typeValidation, $sparse);
+            $result = $this->validateSingleType($value, $type, $typeValidation);
             if (Invalid::isValid($result)) {
                 return $result;
             }
