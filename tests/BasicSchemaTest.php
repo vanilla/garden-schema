@@ -192,7 +192,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test data that is not required, but provided as empty.
      *
      * @param string $shortType The short data type.
-     * @dataProvider provideTypesAndData
+     * @dataProvider provideNonNullTypesAndData
      */
     public function testNotRequired($shortType) {
         $schema = Schema::parse([
@@ -203,12 +203,6 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $isValid = $schema->isValid($missingData);
         $this->assertTrue($isValid);
         $this->assertArrayNotHasKey('col', $missingData);
-
-        if ($shortType !== 'n') {
-            $nullData = ['col' => null];
-            $valid = $schema->validate($nullData);
-            $this->assertSame([], $valid);
-        }
     }
 
     /**
@@ -468,7 +462,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * @param string $short The short type.
      * @param string $long The long type.
      * @param mixed $sample As sample value.
-     * @dataProvider provideTypesAndData
+     * @dataProvider provideNonNullTypesAndData
      */
     public function testAllowNull($short, $long, $sample) {
         $schema = Schema::parse([":$short|n"]);
@@ -598,20 +592,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         ]);
 
         $this->assertArrayNotHasKey('allowNull', $sch->getField('properties.photo'));
-        $this->assertEquals(['string', 'null'], $sch->getField('properties.photo.type'));
-    }
-
-    /**
-     * Test some null validation.
-     */
-    public function testNull() {
-        $sch = Schema::parse(['a:n', 'b:n?']);
-
-        $expected = ['a' => null, 'b' => null];
-        $r = $sch->validate(['a' => null, 'b' => null]);
-        $this->assertEquals($expected, $r);
-
-        $this->assertFalse($sch->isValid(['a' => 1]));
+        $this->assertEquals(true, $sch->getField('properties.photo.nullable'));
     }
 
     /**
