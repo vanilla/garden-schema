@@ -1080,7 +1080,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     break;
                 case 'uri':
                     $type = 'URI';
-                    $result = filter_var($result, FILTER_VALIDATE_URL, FILTER_FLAG_HOST_REQUIRED | FILTER_FLAG_SCHEME_REQUIRED);
+                    $result = filter_var($result, FILTER_VALIDATE_URL);
                     break;
                 default:
                     trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
