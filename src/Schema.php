@@ -664,12 +664,21 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Validate data against the schema.
      *
      * @param mixed $data The data to validate.
-     * @param bool $sparse Whether or not this is a sparse validation.
+     * @param array $options Validation options.
+     *
+     * - **sparse**: Whether or not this is a sparse validation.
      * @return mixed Returns a cleaned version of the data.
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      */
-    public function validate($data, $sparse = false) {
-        $field = new ValidationField($this->createValidation(), $this->schema, '', $sparse);
+    public function validate($data, $options = []) {
+        if (is_bool($options)) {
+            trigger_error("The $options parameter is deprecated. Use ['sparse' => true] instead.'", E_USER_DEPRECATED);
+            $options = ['sparse' => true];
+        }
+        $options += ['sparse' => false];
+
+
+        $field = new ValidationField($this->createValidation(), $this->schema, '', $options);
 
         $clean = $this->validateField($data, $field);
 
@@ -689,12 +698,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Validate data against the schema and return the result.
      *
      * @param mixed $data The data to validate.
-     * @param bool $sparse Whether or not to do a sparse validation.
+     * @param array $options Validation options. See `Schema::validate()`.
      * @return bool Returns true if the data is valid. False otherwise.
      */
-    public function isValid($data, $sparse = false) {
+    public function isValid($data, $options = []) {
         try {
-            $this->validate($data, $sparse);
+            $this->validate($data, $options);
             return true;
         } catch (ValidationException $ex) {
             return false;
@@ -714,7 +723,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if ($field->getField() instanceof Schema) {
             try {
-                $result = $field->getField()->validate($value, $field->isSparse());
+                $result = $field->getField()->validate($value, $field->getOptions());
             } catch (ValidationException $ex) {
                 // The validation failed, so merge the validations together.
                 $field->getValidation()->merge($ex->getValidation(), $field->getName());
@@ -783,7 +792,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     $field->getValidation(),
                     $field->val('items'),
                     '',
-                    $field->isSparse()
+                    $field->getOptions()
                 );
 
                 $count = 0;
@@ -938,7 +947,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
-        $propertyField = new ValidationField($field->getValidation(), [], null, $field->isSparse());
+        $propertyField = new ValidationField($field->getValidation(), [], null, $field->getOptions());
 
         // Loop through the schema fields and validate each one.
         foreach ($properties as $propertyName => $property) {
@@ -1071,7 +1080,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     break;
                 case 'uri':
                     $type = 'URI';
-                    $result = filter_var($result, FILTER_VALIDATE_URL, FILTER_FLAG_HOST_REQUIRED | FILTER_FLAG_SCHEME_REQUIRED);
+                    $result = filter_var($result, FILTER_VALIDATE_URL);
                     break;
                 default:
                     trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
@@ -1567,7 +1576,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         // Clone the validation field to collect errors.
-        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', $field->isSparse());
+        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', $field->getOptions());
 
         // Try and validate against each type.
         foreach ($types as $type) {
