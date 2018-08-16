@@ -85,7 +85,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string
      */
     public function getDescription(): string {
-        return isset($this->schema['description']) ? $this->schema['description'] : '';
+        return $this->schema['description'] ?? '';
     }
 
     /**
@@ -97,6 +97,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     public function setDescription(string $description) {
         $this->schema['description'] = $description;
         return $this;
+    }
+
+    /**
+     * Get the schema's title.
+     *
+     * @return string Returns the title.
+     */
+    public function getTitle(): string {
+        return $this->schema['title'] ?? '';
+    }
+
+    /**
+     * Set the schema's title.
+     *
+     * @param string $title The new title.
+     */
+    public function setTitle(string $title) {
+        $this->schema['title'] = $title;
     }
 
     /**
