@@ -601,7 +601,8 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testStringOrNull() {
         $sch = new Schema([
-            'type' => ['string', 'null']
+            'type' => 'string',
+            'nullable' => true,
         ]);
 
         $r = $sch->validate('');

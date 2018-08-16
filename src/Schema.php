@@ -1528,6 +1528,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return mixed Returns the valid value or `Invalid`.
      */
     private function validateMultipleTypes($value, array $types, ValidationField $field) {
+        trigger_error('Multiple schema types are deprecated.', E_USER_DEPRECATED);
+
         // First check for an exact type match.
         switch (gettype($value)) {
             case 'boolean':
