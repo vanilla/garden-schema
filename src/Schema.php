@@ -33,9 +33,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         'string' => ['s', 'str'],
         'number' => ['f', 'float'],
         'boolean' => ['b', 'bool'],
-        'timestamp' => ['ts'],
-        'datetime' => ['dt'],
-        'null' => ['n']
+
+        // Psuedo-types
+        'timestamp' => ['ts'], // type: integer, format: timestamp
+        'datetime' => ['dt'], // type: string, format: date-time
+        'null' => ['n'], // Adds nullable: true
     ];
 
     /**
@@ -512,6 +514,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $parts = explode(':', $key);
         $name = $parts[0];
         $types = [];
+        $param = [];
 
         if (!empty($parts[1])) {
             $shortTypes = explode('|', $parts[1]);
@@ -519,6 +522,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $found = $this->getType($alias);
                 if ($found === null) {
                     throw new \InvalidArgumentException("Unknown type '$alias'", 500);
+                } elseif ($found === 'datetime') {
+                    $param['format'] = 'date-time';
+                    $types[] = 'string';
+                } elseif ($found === 'timestamp') {
+                    $param['format'] = 'timestamp';
+                    $types[] = 'integer';
                 } elseif ($found === 'null') {
                     $nullable = true;
                 } else {
@@ -529,12 +538,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if ($value instanceof Schema) {
             if (count($types) === 1 && $types[0] === 'array') {
-                $param = ['type' => $types[0], 'items' => $value];
+                $param += ['type' => $types[0], 'items' => $value];
             } else {
                 $param = $value;
             }
         } elseif (isset($value['type'])) {
-            $param = $value;
+            $param = $value + $param;
 
             if (!empty($types) && $types !== (array)$param['type']) {
                 $typesStr = implode('|', $types);
@@ -547,9 +556,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 throw new \InvalidArgumentException("Invalid type {$parts[1]} for field $name.", 500);
             }
             if (empty($types)) {
-                $param = ['type' => null];
+                $param += ['type' => null];
             } else {
-                $param = ['type' => count($types) === 1 ? $types[0] : $types];
+                $param += ['type' => count($types) === 1 ? $types[0] : $types];
             }
 
             // Parsed required strings have a minimum length of 1.
@@ -891,6 +900,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return int|Invalid Returns the cleaned value or **null** if validation fails.
      */
     protected function validateInteger($value, ValidationField $field) {
+        if ($field->val('format') === 'timestamp') {
+            return $this->validateTimestamp($value, $field);
+        }
+
         $result = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($result === false) {
@@ -1009,6 +1022,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string|Invalid Returns the valid string or **null** if validation fails.
      */
     protected function validateString($value, ValidationField $field) {
+        if ($field->val('format') === 'date-time') {
+            $result = $this->validateDatetime($value, $field);
+            return $result;
+        }
+
         if (is_string($value) || is_numeric($value)) {
             $value = $result = (string)$value;
         } else {
@@ -1057,10 +1075,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ($format = $field->val('format')) {
             $type = $format;
             switch ($format) {
-                case 'date-time':
+                case 'date':
                     $result = $this->validateDatetime($result, $field);
                     if ($result instanceof \DateTimeInterface) {
-                        $result = $result->format(\DateTime::RFC3339);
+                        $result = $result->format("Y-m-d\T00:00:00P");
                     }
                     break;
                 case 'email':
@@ -1493,9 +1511,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $result = $this->validateString($value, $field);
                 break;
             case 'timestamp':
+                trigger_error('The timestamp type is deprecated. Use an integer with a format of timestamp instead.', E_USER_DEPRECATED);
                 $result = $this->validateTimestamp($value, $field);
                 break;
             case 'datetime':
+                trigger_error('The datetime type is deprecated. Use a string with a format of date-time instead.', E_USER_DEPRECATED);
                 $result = $this->validateDatetime($value, $field);
                 break;
             case 'array':

@@ -43,10 +43,12 @@ abstract class AbstractSchemaTest extends TestCase {
     public function errorHandler($number, $message, $file, $line) {
         // Look for an expected error.
         foreach ($this->expectedErrors as $i => $row) {
-            list($no, $str) = $row;
+            list($no, $str, $unset) = $row;
 
-            if (($number === $no || $no === null) && ($message === $str || $str === null)) {
-                unset($this->expectedErrors[$i]);
+            if (($number === $no || $no === null) && ($message === $str || empty($str))) {
+                if ($unset) {
+                    unset($this->expectedErrors[$i]);
+                }
                 return;
             }
         }
@@ -74,18 +76,20 @@ abstract class AbstractSchemaTest extends TestCase {
      *
      * @param string $errstr The desired error string.
      * @param int $errno The desired error number.
+     * @param bool $unset Whether or not to unset the error when it is encountered.
      */
-    public function expectError($errstr, $errno) {
-        $this->expectedErrors[] = [$errno, $errstr];
+    public function expectError(string $errstr, int $errno, bool $unset = true) {
+        $this->expectedErrors[] = [$errno, $errstr, $unset];
     }
 
     /**
      * Assert than an error has occurred.
      *
      * @param int $errno The desired error number.
+     * @param bool $unset Whether or not to unset the error when it is encountered.
      */
-    public function expectErrorNumber($errno) {
-        $this->expectError(null, $errno);
+    public function expectErrorNumber(int $errno, bool $unset = true) {
+        $this->expectError('', $errno, $unset);
     }
 
 
@@ -180,7 +184,7 @@ abstract class AbstractSchemaTest extends TestCase {
             'name:s' => 'The name of the object.',
             'description:s?',
             'timestamp:ts?',
-            'date:dt?',
+            'date?' => ['type' => 'string', 'format' => 'date-time'],
             'amount:f?',
             'enabled:b?',
         ]);

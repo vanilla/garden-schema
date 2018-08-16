@@ -6,7 +6,7 @@
 ![MIT License](https://img.shields.io/packagist/l/vanilla/garden-schema.svg?style=flat)
 [![CLA](https://cla-assistant.io/readme/badge/vanilla/garden-schema)](https://cla-assistant.io/vanilla/garden-schema)
 
-The Garden Schema is a simple data validation and cleaning library based on [JSON Schema](http://json-schema.org/).
+The Garden Schema is a simple data validation and cleaning library based on [OpenAPI 3.0 Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject).
 
 ## Features
 
@@ -16,7 +16,7 @@ The Garden Schema is a simple data validation and cleaning library based on [JSO
 
 - The schema defines a whitelist of allowed data and strips out all extraneous data.
 
-- The **Schema** class understands data in [JSON Schema](http://json-schema.org/) format. We will add more support for the built-in JSON schema validation as time goes on.
+- The **Schema** class understands a subset of data in [OpenAPI Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) format. We will add more support for the built-in JSON schema validation as time goes on.
 
 - Developers can use a shorter schema format in order to define schemas in code rapidly. We built this class to be as easy to use as possible. Avoid developer groans as they lock down their data.
 
@@ -55,7 +55,7 @@ In the above example a **Schema** object is created with the schema definition p
 
 ## Defining Schemas
 
-The **Schema** class is instantiated with an array defining the schema. The array can be in [JSON Schema](http://json-schema.org/) format or it can be in custom short format which is much quicker to write. The short format will be described in this section.
+The **Schema** class is instantiated with an array defining the schema. The array can be in [OpenAPI 3.0 Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) format or it can be in custom short format which is much quicker to write. The short format will be described in this section.
 
 By default the schema is an array where each element of the array defines an object property. By "object" we mean javascript object or PHP array with string keys. There are several ways a property can be defined:
  
@@ -240,7 +240,7 @@ There are a few things to note in the above example:
 
 ## JSON Schema Support
 
-The **Schema** object is a wrapper for a [JSON Schema](http://json-schema.org/) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
+The **Schema** object is a wrapper for an [Open API Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
 
 | Property | Type | Notes |
 | -------- | ---- | ----------- |
