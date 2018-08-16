@@ -244,6 +244,11 @@ The **Schema** object is a wrapper for an [Open API Schema](https://github.com/O
 
 | Property | Type | Notes |
 | -------- | ---- | ----------- |
+| [multipleOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.1) | integer/number | A numeric instance is only valid if division by this keyword's value results in an integer. |
+| [maximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.2) | integer/number |  If the instance is a number, then this keyword validates only if the instance is less than or exactly equal to "maximum". |
+| [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum". |
+| [minimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.4) | integer/number |  If the instance is a number, then this keyword validates only if the instance is greater than or exactly equal to "minimum". |
+| [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
 | [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the length of a string. |
 | [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
 | [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimeters. |

@@ -908,6 +908,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addTypeError('number');
             return Invalid::value();
         }
+
+        $result = $this->validateNumberProperties($result, $field);
+
         return $result;
     }
     /**
@@ -928,6 +931,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addTypeError('integer');
             return Invalid::value();
         }
+
+        $result = $this->validateNumberProperties($result, $field);
+
         return $result;
     }
 
@@ -1629,5 +1635,52 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Since we got here the value is invalid.
         $field->merge($typeValidation->getValidation());
         return Invalid::value();
+    }
+
+    /**
+     * Validate specific numeric validation properties.
+     *
+     * @param int|float $value The value to test.
+     * @param ValidationField $field Field information.
+     * @return int|float|Invalid Returns the number of invalid.
+     */
+    private function validateNumberProperties($value, ValidationField $field) {
+        $count = $field->getErrorCount();
+
+        if ($multipleOf = $field->val('multipleOf')) {
+            $divided = $value / $multipleOf;
+
+            if ($divided != round($divided)) {
+                $field->addError('multipleOf', ['messageCode' => '{field} is not a multiple of {multipleOf}.', 'status' => 422, 'multipleOf' => $multipleOf]);
+            }
+        }
+
+        if ($maximum = $field->val('maximum')) {
+            $exclusive = $field->val('exclusiveMaximum');
+
+            if ($value > $maximum || ($exclusive && $value == $maximum)) {
+                if ($exclusive) {
+                    $field->addError('maximum', ['messageCode' => '{field} is greater than or equal to {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                } else {
+                    $field->addError('maximum', ['messageCode' => '{field} is greater than {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                }
+
+            }
+        }
+
+        if ($minimum = $field->val('minimum')) {
+            $exclusive = $field->val('exclusiveMinimum');
+
+            if ($value < $minimum || ($exclusive && $value == $minimum)) {
+                if ($exclusive) {
+                    $field->addError('minimum', ['messageCode' => '{field} is greater than or equal to {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                } else {
+                    $field->addError('minimum', ['messageCode' => '{field} is greater than {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                }
+
+            }
+        }
+
+        return $field->getErrorCount() === $count ? $value : Invalid::value();
     }
 }
