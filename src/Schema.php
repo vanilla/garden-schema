@@ -33,9 +33,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         'string' => ['s', 'str'],
         'number' => ['f', 'float'],
         'boolean' => ['b', 'bool'],
-        'timestamp' => ['ts'],
-        'datetime' => ['dt'],
-        'null' => ['n']
+
+        // Psuedo-types
+        'timestamp' => ['ts'], // type: integer, format: timestamp
+        'datetime' => ['dt'], // type: string, format: date-time
+        'null' => ['n'], // Adds nullable: true
     ];
 
     /**
@@ -523,6 +525,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($found === 'datetime') {
                     $param['format'] = 'date-time';
                     $types[] = 'string';
+                } elseif ($found === 'timestamp') {
+                    $param['format'] = 'timestamp';
+                    $types[] = 'integer';
                 } elseif ($found === 'null') {
                     $nullable = true;
                 } else {
@@ -895,6 +900,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return int|Invalid Returns the cleaned value or **null** if validation fails.
      */
     protected function validateInteger($value, ValidationField $field) {
+        if ($field->val('format') === 'timestamp') {
+            return $this->validateTimestamp($value, $field);
+        }
+
         $result = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($result === false) {
@@ -1502,6 +1511,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $result = $this->validateString($value, $field);
                 break;
             case 'timestamp':
+                trigger_error('The timestamp type is deprecated. Use an integer with a format of timestamp instead.', E_USER_DEPRECATED);
                 $result = $this->validateTimestamp($value, $field);
                 break;
             case 'datetime':

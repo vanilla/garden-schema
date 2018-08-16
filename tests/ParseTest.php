@@ -26,7 +26,7 @@ class ParseTest extends AbstractSchemaTest {
                 'id' => ['type' => 'integer'],
                 'name' => ['type' => 'string', 'minLength' => 1, 'description' => 'The name of the object.'],
                 'description' => ['type' => 'string'],
-                'timestamp' => ['type' => 'timestamp'],
+                'timestamp' => ['type' => 'integer', 'format' => 'timestamp'],
                 'date' => ['type' => 'string', 'format' => 'date-time'],
                 'amount' => ['type' => 'number'],
                 'enabled' => ['type' => 'boolean'],
@@ -128,6 +128,9 @@ class ParseTest extends AbstractSchemaTest {
         if ($type === 'datetime') {
             $expected['type'] = 'string';
             $expected['format'] = 'date-time';
+        } elseif ($type === 'timestamp') {
+            $expected['type'] = 'integer';
+            $expected['format'] = 'timestamp';
         }
 
         $this->assertEquals($expected, $schema->getSchemaArray());

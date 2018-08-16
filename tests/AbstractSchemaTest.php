@@ -184,7 +184,7 @@ abstract class AbstractSchemaTest extends TestCase {
             'name:s' => 'The name of the object.',
             'description:s?',
             'timestamp:ts?',
-            'date:dt?',
+            'date?' => ['type' => 'string', 'format' => 'date-time'],
             'amount:f?',
             'enabled:b?',
         ]);
