@@ -9,6 +9,8 @@ namespace Garden\Schema;
 
 /**
  * A parameters class for field validation.
+ *
+ * This is an internal class and may change in the future.
  */
 class ValidationField {
     /**
@@ -27,9 +29,9 @@ class ValidationField {
     private $name;
 
     /**
-     * @var bool
+     * @var array
      */
-    private $sparse;
+    private $options;
 
     /**
      * Construct a new {@link ValidationField} object.
@@ -37,13 +39,15 @@ class ValidationField {
      * @param Validation $validation The validation object that contains errors.
      * @param array|Schema $field The field definition.
      * @param string $name The path to the field.
-     * @param bool $sparse Whether this is a sparse validation or not.
+     * @param array $options Validation options.
+     *
+     * - **sparse**: Whether or not this is a sparse validation.
      */
-    public function __construct(Validation $validation, $field, $name, $sparse = false) {
+    public function __construct(Validation $validation, $field, $name, array $options = []) {
         $this->field = $field;
         $this->validation = $validation;
         $this->name = $name;
-        $this->sparse = $sparse;
+        $this->options = $options + ['sparse' => false];
     }
 
     /**
@@ -207,6 +211,26 @@ class ValidationField {
      * @return bool Returns **true** if this is a sparse validation or **false** otherwise.
      */
     public function isSparse() {
-        return $this->sparse;
+        return $this->getOption('sparse', false);
+    }
+
+    /**
+     * Gets the options array.
+     *
+     * @return array Returns an options array.
+     */
+    public function getOptions(): array {
+        return $this->options;
+    }
+
+    /**
+     * Get an indivitual option.
+     *
+     * @param string $option The name of the option.
+     * @param mixed $default The default value to return if the option doesn't exist.
+     * @return mixed Returns the option or the default value.
+     */
+    public function getOption(string $option, $default = null) {
+        return $this->options[$option] ?? $default;
     }
 }

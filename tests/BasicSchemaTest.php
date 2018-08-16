@@ -315,11 +315,12 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $schema = Schema::parse(['a:i?', 'b:i?', 'c:i?'])->requireOneOf(['a', 'b', 'c'], '', 2);
 
         $data = [];
+        $this->expectErrorNumber(E_USER_DEPRECATED);
         $result = $schema->validate($data, true);
         $this->assertSame($data, $result);
 
         $data2 = ['a' => 1];
-        $result2 = $schema->validate($data2, true);
+        $result2 = $schema->validate($data2, ['sparse' => true]);
         $this->assertSame($data2, $result2);
     }
 
@@ -485,7 +486,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $valid = $schema->validate([]);
         $this->assertSame(['prop' => 'foo'], $valid);
 
-        $valid = $schema->validate([], true);
+        $valid = $schema->validate([], ['sparse' => true]);
         $this->assertSame([], $valid);
     }
 
@@ -500,7 +501,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $valid = $schema->validate([]);
         $this->assertSame(['prop' => 'foo'], $valid);
 
-        $valid = $schema->validate([], true);
+        $valid = $schema->validate([], ['sparse' => true]);
         $this->assertSame([], $valid);
     }
 
