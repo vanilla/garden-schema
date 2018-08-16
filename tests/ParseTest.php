@@ -27,7 +27,7 @@ class ParseTest extends AbstractSchemaTest {
                 'name' => ['type' => 'string', 'minLength' => 1, 'description' => 'The name of the object.'],
                 'description' => ['type' => 'string'],
                 'timestamp' => ['type' => 'timestamp'],
-                'date' => ['type' => 'datetime'],
+                'date' => ['type' => 'string', 'format' => 'date-time'],
                 'amount' => ['type' => 'number'],
                 'enabled' => ['type' => 'boolean'],
             ],
@@ -125,6 +125,11 @@ class ParseTest extends AbstractSchemaTest {
         $schema = Schema::parse([":$short" => 'desc']);
 
         $expected = ['type' => $type, 'description' => 'desc'];
+        if ($type === 'datetime') {
+            $expected['type'] = 'string';
+            $expected['format'] = 'date-time';
+        }
+
         $this->assertEquals($expected, $schema->getSchemaArray());
     }
 

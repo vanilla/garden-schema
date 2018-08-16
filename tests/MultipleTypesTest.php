@@ -60,7 +60,7 @@ class MultipleTypesTest extends AbstractSchemaTest {
 
         $expected = $expected === null ? $value : $expected;
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumber(E_USER_DEPRECATED, false);
         $valid = $sch->validate($value);
         if (is_array($expected) || $expected instanceof \DateTimeInterface) {
             $this->assertEquals($expected, $valid);
@@ -94,12 +94,11 @@ class MultipleTypesTest extends AbstractSchemaTest {
             ]
         ]);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumber(E_USER_DEPRECATED, false);
         $valid = $sch->validate($value);
         $this->assertSame($value, $valid);
 
         $arrayValue = [$value, $value, $value];
-        $this->expectErrorNumber(E_USER_DEPRECATED);
         $arrayValid = $sch->validate($arrayValue);
         $this->assertSame($arrayValue, $arrayValid);
     }

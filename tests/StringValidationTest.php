@@ -199,8 +199,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * @return array Returns a data provider array.
      */
     public function provideDateTimeFormatTests() {
-        $dt = new \DateTimeImmutable();
-        $dtStr = $dt->format(DateTime::RFC3339);
+        $dt = new \DateTimeImmutable('1:23pm');
 
         $r = [
             $dt->format(DateTime::ATOM),
@@ -211,8 +210,8 @@ class StringValidationTest extends AbstractSchemaTest {
             $dt->format(DateTime::W3C),
         ];
 
-        $r = array_map(function ($v) use ($dtStr) {
-            return [$v, $dtStr];
+        $r = array_map(function ($v) use ($dt) {
+            return [$v, $dt];
         }, $r);
         $r = array_column($r, null, 0);
         return $r;
