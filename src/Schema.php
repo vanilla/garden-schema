@@ -811,6 +811,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 );
             }
 
+            if ($field->val('uniqueItems') && count($value) > count(array_unique($value))) {
+                $field->addError(
+                    'uniqueItems',
+                    [
+                        'messageCode' => '{field} must contain unique items.',
+                        'status' => 422,
+                    ]
+                );
+            }
+
             if ($field->val('items') !== null) {
                 $result = [];
 
@@ -954,6 +964,29 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif (!is_array($value)) {
             $value = $this->toObjectArray($value);
         }
+
+        if (($maxProperties = $field->val('maxProperties')) && count($value) > $maxProperties) {
+            $field->addError(
+                'maxItems',
+                [
+                    'messageCode' => '{field} must contain no more than {maxProperties} {maxProperties,plural,item}.',
+                    'maxItems' => $maxProperties,
+                    'status' => 422
+                ]
+            );
+        }
+
+        if (($minProperties = $field->val('minProperties')) && count($value) < $minProperties) {
+            $field->addError(
+                'minItems',
+                [
+                    'messageCode' => '{field} must contain at least {minProperties} {minProperties,plural,item}.',
+                    'minItems' => $minProperties,
+                    'status' => 422
+                ]
+            );
+        }
+
         return $value;
     }
 
