@@ -164,7 +164,7 @@ class ValidationField {
      * @return string|string[]|null Returns a type string, array of type strings, or null if there isn't one.
      */
     public function getType() {
-        return isset($this->field['type']) ? $this->field['type'] : null;
+        return $this->field['type'] ?? null;
     }
 
     /**
@@ -185,7 +185,7 @@ class ValidationField {
      * @return mixed Returns a value or the default.
      */
     public function val($key, $default = null) {
-        return isset($this->field[$key]) ? $this->field[$key] : $default;
+        return $this->field[$key] ?? $default;
     }
 
     /**

@@ -85,7 +85,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string
      */
     public function getDescription(): string {
-        return isset($this->schema['description']) ? $this->schema['description'] : '';
+        return $this->schema['description'] ?? '';
     }
 
     /**
@@ -97,6 +97,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     public function setDescription(string $description) {
         $this->schema['description'] = $description;
         return $this;
+    }
+
+    /**
+     * Get the schema's title.
+     *
+     * @return string Returns the title.
+     */
+    public function getTitle(): string {
+        return $this->schema['title'] ?? '';
+    }
+
+    /**
+     * Set the schema's title.
+     *
+     * @param string $title The new title.
+     */
+    public function setTitle(string $title) {
+        $this->schema['title'] = $title;
     }
 
     /**
@@ -793,6 +811,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 );
             }
 
+            if ($field->val('uniqueItems') && count($value) > count(array_unique($value))) {
+                $field->addError(
+                    'uniqueItems',
+                    [
+                        'messageCode' => '{field} must contain unique items.',
+                        'status' => 422,
+                    ]
+                );
+            }
+
             if ($field->val('items') !== null) {
                 $result = [];
 
@@ -890,6 +918,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addTypeError('number');
             return Invalid::value();
         }
+
+        $result = $this->validateNumberProperties($result, $field);
+
         return $result;
     }
     /**
@@ -910,6 +941,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addTypeError('integer');
             return Invalid::value();
         }
+
+        $result = $this->validateNumberProperties($result, $field);
+
         return $result;
     }
 
@@ -924,12 +958,35 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if (!$this->isArray($value) || isset($value[0])) {
             $field->addTypeError('object');
             return Invalid::value();
-        } elseif (is_array($field->val('properties'))) {
+        } elseif (is_array($field->val('properties')) || null !== $field->val('additionalProperties')) {
             // Validate the data against the internal schema.
             $value = $this->validateProperties($value, $field);
         } elseif (!is_array($value)) {
             $value = $this->toObjectArray($value);
         }
+
+        if (($maxProperties = $field->val('maxProperties')) && count($value) > $maxProperties) {
+            $field->addError(
+                'maxItems',
+                [
+                    'messageCode' => '{field} must contain no more than {maxProperties} {maxProperties,plural,item}.',
+                    'maxItems' => $maxProperties,
+                    'status' => 422
+                ]
+            );
+        }
+
+        if (($minProperties = $field->val('minProperties')) && count($value) < $minProperties) {
+            $field->addError(
+                'minItems',
+                [
+                    'messageCode' => '{field} must contain at least {minProperties} {minProperties,plural,item}.',
+                    'minItems' => $minProperties,
+                    'status' => 422
+                ]
+            );
+        }
+
         return $value;
     }
 
@@ -943,6 +1000,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     protected function validateProperties($data, ValidationField $field) {
         $properties = $field->val('properties', []);
+        $additionalProperties = $field->val('additionalProperties');
         $required = array_flip($field->val('required', []));
 
         if (is_array($data)) {
@@ -997,12 +1055,22 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Look for extraneous properties.
         if (!empty($keys)) {
-            if ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE)) {
+            if ($additionalProperties) {
+                $propertyField = new ValidationField($field->getValidation(), $additionalProperties, null, $field->getOptions());
+
+                foreach ($keys as $key) {
+                    $propertyField
+                        ->setName(ltrim($field->getName().".$key", '.'));
+
+                    $valid = $this->validateField($data[$key], $propertyField);
+                    if (Invalid::isValid($valid)) {
+                        $clean[$key] = $valid;
+                    }
+                }
+            } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE)) {
                 $msg = sprintf("%s has unexpected field(s): %s.", $field->getName() ?: 'value', implode(', ', $keys));
                 trigger_error($msg, E_USER_NOTICE);
-            }
-
-            if ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)) {
+            } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)) {
                 $field->addError('invalid', [
                     'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
                     'extra' => array_values($keys),
@@ -1611,5 +1679,52 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Since we got here the value is invalid.
         $field->merge($typeValidation->getValidation());
         return Invalid::value();
+    }
+
+    /**
+     * Validate specific numeric validation properties.
+     *
+     * @param int|float $value The value to test.
+     * @param ValidationField $field Field information.
+     * @return int|float|Invalid Returns the number of invalid.
+     */
+    private function validateNumberProperties($value, ValidationField $field) {
+        $count = $field->getErrorCount();
+
+        if ($multipleOf = $field->val('multipleOf')) {
+            $divided = $value / $multipleOf;
+
+            if ($divided != round($divided)) {
+                $field->addError('multipleOf', ['messageCode' => '{field} is not a multiple of {multipleOf}.', 'status' => 422, 'multipleOf' => $multipleOf]);
+            }
+        }
+
+        if ($maximum = $field->val('maximum')) {
+            $exclusive = $field->val('exclusiveMaximum');
+
+            if ($value > $maximum || ($exclusive && $value == $maximum)) {
+                if ($exclusive) {
+                    $field->addError('maximum', ['messageCode' => '{field} is greater than or equal to {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                } else {
+                    $field->addError('maximum', ['messageCode' => '{field} is greater than {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                }
+
+            }
+        }
+
+        if ($minimum = $field->val('minimum')) {
+            $exclusive = $field->val('exclusiveMinimum');
+
+            if ($value < $minimum || ($exclusive && $value == $minimum)) {
+                if ($exclusive) {
+                    $field->addError('minimum', ['messageCode' => '{field} is greater than or equal to {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                } else {
+                    $field->addError('minimum', ['messageCode' => '{field} is greater than {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                }
+
+            }
+        }
+
+        return $field->getErrorCount() === $count ? $value : Invalid::value();
     }
 }
