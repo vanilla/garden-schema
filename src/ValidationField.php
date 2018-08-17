@@ -206,6 +206,24 @@ class ValidationField {
     }
 
     /**
+     * Whether or not we are validating a request.
+     *
+     * @return bool Returns **true** of we are validating a request or **false** otherwise.
+     */
+    public function isRequest(): bool {
+        return $this->options['request'] ?? false;
+    }
+
+    /**
+     * Whether or not we are validating a response.
+     *
+     * @return bool Returns **true** of we are validating a response or **false** otherwise.
+     */
+    public function isResponse(): bool {
+        return $this->options['response'] ?? false;
+    }
+
+    /**
      * Whether or not this is a sparse validation..
      *
      * @return bool Returns **true** if this is a sparse validation or **false** otherwise.
