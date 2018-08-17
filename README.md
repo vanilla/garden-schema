@@ -258,6 +258,7 @@ The **Schema** object is a wrapper for an [Open API Schema](https://github.com/O
 | [uniqueItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.4.5) | array | All items must be unique. |
 | [maxProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.1) | object | Limit the number of properties on an object. |
 | [minProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.2) | object | Minimum number of properties on an object.  |
+| [additionalProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.6) | object | Validate additional properties against a schema. Can also be **true** to always validate. |
 | [required](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.17) | object | Names of required object properties. |
 | [properties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.18) | object | Specify schemas for object properties. |
 | [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23) | any | Specify an array of valid values. |

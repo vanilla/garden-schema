@@ -958,7 +958,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if (!$this->isArray($value) || isset($value[0])) {
             $field->addTypeError('object');
             return Invalid::value();
-        } elseif (is_array($field->val('properties'))) {
+        } elseif (is_array($field->val('properties')) || null !== $field->val('additionalProperties')) {
             // Validate the data against the internal schema.
             $value = $this->validateProperties($value, $field);
         } elseif (!is_array($value)) {
@@ -1000,6 +1000,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     protected function validateProperties($data, ValidationField $field) {
         $properties = $field->val('properties', []);
+        $additionalProperties = $field->val('additionalProperties');
         $required = array_flip($field->val('required', []));
 
         if (is_array($data)) {
@@ -1054,12 +1055,22 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Look for extraneous properties.
         if (!empty($keys)) {
-            if ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE)) {
+            if ($additionalProperties) {
+                $propertyField = new ValidationField($field->getValidation(), $additionalProperties, null, $field->getOptions());
+
+                foreach ($keys as $key) {
+                    $propertyField
+                        ->setName(ltrim($field->getName().".$key", '.'));
+
+                    $valid = $this->validateField($data[$key], $propertyField);
+                    if (Invalid::isValid($valid)) {
+                        $clean[$key] = $valid;
+                    }
+                }
+            } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE)) {
                 $msg = sprintf("%s has unexpected field(s): %s.", $field->getName() ?: 'value', implode(', ', $keys));
                 trigger_error($msg, E_USER_NOTICE);
-            }
-
-            if ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)) {
+            } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)) {
                 $field->addError('invalid', [
                     'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
                     'extra' => array_values($keys),

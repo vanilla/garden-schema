@@ -35,4 +35,57 @@ class ObjectValidationTest extends AbstractSchemaTest {
         $this->assertTrue($sch->isValid(['a' => 1, 'b' => 2]));
         $this->assertFalse($sch->isValid(['a' => 1]));
     }
+
+    /**
+     * Test the additionalProperties validator without a properties validator.
+     */
+    public function testAdditionalProperties() {
+        $sch = new Schema([
+            'type' => 'object',
+            'additionalProperties' => [
+                'type' => 'boolean',
+            ],
+        ]);
+
+        $valid = $sch->validate(['a' => 'false', 'B' => 'true']);
+        $this->assertEquals(['a' => false, 'B' => true], $valid);
+    }
+
+    /**
+     * Test properties and additionalProperties together.
+     */
+    public function testPropertiesWithAdditionalProperties() {
+        $sch = new Schema([
+            'type' => 'object',
+            'properties' => [
+                'b' => [
+                    'type' => 'string',
+                ],
+            ],
+            'additionalProperties' => [
+                'type' => 'boolean',
+            ],
+        ]);
+
+        $valid = $sch->validate(['A' => 'false', 'b' => 'true']);
+        $this->assertEquals(['A' => false, 'b' => 'true'], $valid);
+    }
+
+    /**
+     * Additional Properties of **true** should always validate.
+     */
+    public function testTrueAdditionalProperties() {
+        $sch = new Schema([
+            'type' => 'object',
+            'properties' => [
+                'b' => [
+                    'type' => 'string',
+                ],
+            ],
+            'additionalProperties' => true,
+        ]);
+
+        $valid = $sch->validate(['A' => 'false', 'b' => 'true']);
+        $this->assertEquals(['A' => 'false', 'b' => 'true'], $valid);
+    }
 }
