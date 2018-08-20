@@ -45,6 +45,7 @@ class InputOutputTest extends AbstractSchemaTest {
                 ]
             ],
             'additionalProperties' => true,
+            'required' => ['r', 'w'],
         ]);
 
         $this->data = [
@@ -64,11 +65,29 @@ class InputOutputTest extends AbstractSchemaTest {
     }
 
     /**
+     * Required readOnly properties are not required when making a request.
+     */
+    public function testReadOnlyRequest() {
+        $valid = $this->schema->validate(['w' => 'w'], ['request' => true]);
+
+        $this->assertEquals(['w' => 'w'], $valid);
+    }
+
+    /**
      * Responses should strip writeOnly properties.
      */
     public function testWriteOnlyResponseStrip() {
         $valid = $this->schema->validate($this->data, ['response' => true]);
         $this->assertEquals(['r' => 'r', 'rw' => 'rw'], $valid);
+    }
+
+    /**
+     * Required writeOnly properties are not required when validating a response.
+     */
+    public function testWriteOnlyResponse() {
+        $valid = $this->schema->validate(['r' => 'r'], ['response' => true]);
+
+        $this->assertEquals(['r' => 'r'], $valid);
     }
 
     /**
