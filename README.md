@@ -205,11 +205,21 @@ When you call **validate()** and validation fails a **ValidationException** is t
 
 If you are writing an API, you can **json_encode()** the **ValidationException** and it should provide a rich set of data that will help any consumer figure out exactly what they did wrong. You can also use various properties of the **Validation** property to help render the error output appropriately. 
 
-### Sparse Validation
+## Validation Options
 
-Both **validate()** and **isValid()** can take an additional **$sparse** parameter which does a sparse validation if set to true.
+Both **validate()** and **isValid()** can take an additional **$options** argument which modifies the behavior of the validation slightly, depending on the option.
 
-When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
+### The `request` Option
+
+You can pass an option of `['request' => true]` to specify that you are validating request data. When validating request data, properties that have been marked as `readOnly: true` will be treated as if they don't exist, even if they are marked as required.
+
+### The `response` Option
+
+You can pass an option of `['response' => true]` to specify that you are validating response data. When validating response data, properties that have been marked as `writeOnly: true` will be treated as if they don't exist, even if they are marked as required.
+
+### The `sparse` Option
+
+You can pass an option of `['sparse' => true]` to specify a sparse validation. When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
 
 ## Overriding the Validation Class and Localization
 
