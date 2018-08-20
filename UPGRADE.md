@@ -2,11 +2,13 @@
 
 ## Version 1 to Version 2
 
+With version 2, Garden Schema is moving away from JSON Schema and towards Open API. Since Open API is base on JSON Schema this isn't a major transition, but there are some differences. 
+
 ### New Features
 
 - The `nullable` schema property has been added to allow a value to also be null.
 - The `readOnly` and `writeOnly` properties are now supported. To use them in validation pass either `['request' => true]` or `['response' => true]` as options to one of the schema validation functions.
-- Support for the following validation properties has been added: `multipleOf`, `maximum`, `exclusiveMaximum`, `minimum`, `exclusiveMinimum`, `uniqueItems`, `maxProperties`, `minProperties`.
+- Support for the following validation properties has been added: `multipleOf`, `maximum`, `exclusiveMaximum`, `minimum`, `exclusiveMinimum`, `uniqueItems`, `maxProperties`, `minProperties`, `additionalProperties`.
 
 ### Deprecations
 
