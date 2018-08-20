@@ -1002,6 +1002,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $properties = $field->val('properties', []);
         $additionalProperties = $field->val('additionalProperties');
         $required = array_flip($field->val('required', []));
+        $isRequest = $field->isRequest();
+        $isResponse = $field->isResponse();
 
         if (is_array($data)) {
             $keys = array_keys($data);
@@ -1029,7 +1031,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $lName = strtolower($propertyName);
             $isRequired = isset($required[$propertyName]);
 
-            // First check for required fields.
+            // Check to strip this field if it is readOnly or writeOnly.
+            if (($isRequest && $propertyField->val('readOnly')) || ($isResponse && $propertyField->val('writeOnly'))) {
+                unset($keys[$lName]);
+                continue;
+            }
+
+            // Check for required fields.
             if (!array_key_exists($lName, $keys)) {
                 if ($field->isSparse()) {
                     // Sparse validation can leave required fields out.

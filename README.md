@@ -205,11 +205,21 @@ When you call **validate()** and validation fails a **ValidationException** is t
 
 If you are writing an API, you can **json_encode()** the **ValidationException** and it should provide a rich set of data that will help any consumer figure out exactly what they did wrong. You can also use various properties of the **Validation** property to help render the error output appropriately. 
 
-### Sparse Validation
+## Validation Options
 
-Both **validate()** and **isValid()** can take an additional **$sparse** parameter which does a sparse validation if set to true.
+Both **validate()** and **isValid()** can take an additional **$options** argument which modifies the behavior of the validation slightly, depending on the option.
 
-When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
+### The `request` Option
+
+You can pass an option of `['request' => true]` to specify that you are validating request data. When validating request data, properties that have been marked as `readOnly: true` will be treated as if they don't exist, even if they are marked as required.
+
+### The `response` Option
+
+You can pass an option of `['response' => true]` to specify that you are validating response data. When validating response data, properties that have been marked as `writeOnly: true` will be treated as if they don't exist, even if they are marked as required.
+
+### The `sparse` Option
+
+You can pass an option of `['sparse' => true]` to specify a sparse validation. When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
 
 ## Overriding the Validation Class and Localization
 
@@ -242,8 +252,8 @@ There are a few things to note in the above example:
 
 The **Schema** object is a wrapper for an [Open API Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
 
-| Property | Type | Notes |
-| -------- | ---- | ----------- |
+| Property | Applies To | Notes |
+| -------- | ---------- | ----------- |
 | [multipleOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.1) | integer/number | A numeric instance is only valid if division by this keyword's value results in an integer. |
 | [maximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.2) | integer/number |  If the instance is a number, then this keyword validates only if the instance is less than or exactly equal to "maximum". |
 | [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum". |
@@ -265,3 +275,13 @@ The **Schema** object is a wrapper for an [Open API Schema](https://github.com/O
 | [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25) | any | Specify a type of an array of types to validate a value. |
 | [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3) | object | Applies to a schema that is in an object property. |
 | [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri. | 
+
+## OpenAPI Schema Support
+
+OpenAPI defines some extended properties that are applied during validation.
+
+| Property | Type | Notes |
+| -------- | ---- | ----- |
+| nullable | boolean | If a field is nullable then it can also take the value **null**. |
+| readOnly | boolean | Relevant only for Schema "properties" definitions. Declares the property as "read only". This means that it MAY be sent as part of a response but SHOULD NOT be sent as part of the request. If the property is marked as readOnly being true and is in the required list, the required will take effect on the response only. |
+| writeOnly | boolean |  Relevant only for Schema "properties" definitions. Declares the property as "write only". Therefore, it MAY be sent as part of a request but SHOULD NOT be sent as part of the response. If the property is marked as writeOnly being true and is in the required list, the required will take effect on the request only. |
