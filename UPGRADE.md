@@ -24,6 +24,6 @@ The following deprecations will throw deprecation notices, but still work in ver
 
 - Protected methods of the `Schema` class have changed signatures.
 
-- The "datetime" type has been removed and replaced with the standard "string" type and a "date-time" format. The format still still returns `DateTime` instances though so having an explicit type of "string" with a "date-time" format now returns a different type.
+- The "datetime" type has been removed and replaced with the standard "string" type and a "date-time" format. The format still returns `DateTimeInterface` instances though so having an explicit type of "string" with a "date-time" format now returns a different type.
 
 - The "timestamp" type has been removed and replaced with the standard "integer" type and a "timestamp" format. A short type of "ts" is still supported, but is now converted to the aforementioned type/format combination.
