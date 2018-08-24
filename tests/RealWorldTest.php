@@ -156,4 +156,20 @@ class RealWorldTest extends TestCase {
 
         $this->assertEquals('boolean', $sch->getField('properties/foo:bar/type'));
     }
+
+    /**
+     * A nested schema object should have its default value respected.
+     */
+    public function testNestedDefaultRequired() {
+        $schema = Schema::parse([
+            'letter' => Schema::parse([
+                'default' => 'a',
+                'type' => 'string',
+            ])
+        ]);
+        $data = [];
+        $data = $schema->validate($data);
+
+        $this->assertEquals(['letter' => 'a'], $data);
+    }
 }
