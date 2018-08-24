@@ -82,7 +82,7 @@ class PropertyTest extends TestCase {
     public function testGetField() {
         $schema = Schema::parse([':a' => 's']);
 
-        $this->assertSame('string', $schema->getField('items.type'));
+        $this->assertSame('string', $schema->getField('items/type'));
     }
 
     /**
@@ -91,10 +91,13 @@ class PropertyTest extends TestCase {
     public function testSetField() {
         $schema = Schema::parse([':a' => 's']);
 
-        $schema->setField('items.type', 'integer');
-        $this->assertSame('integer', $schema->getField('items.type'));
+        $schema->setField('items/type', 'integer');
+        $this->assertSame('integer', $schema->getField('items/type'));
     }
 
+    /**
+     * The schema object should be accessible like an array.
+     */
     public function testArrayAccess() {
         $schema = Schema::parse([':a' => 's']);
 
@@ -114,10 +117,10 @@ class PropertyTest extends TestCase {
 
         $sc1->setField('items', $sc2);
 
-        $this->assertSame('string', $sc1->getField('items.properties.name.type'));
+        $this->assertSame('string', $sc1->getField('items/properties/name/type'));
 
-        $sc1->setField('items.properties.name.type', 'integer');
-        $this->assertSame('integer', $sc1->getField('items.properties.name.type'));
-        $this->assertSame('integer', $sc2->getField('properties.name.type'));
+        $sc1->setField('items/properties/name/type', 'integer');
+        $this->assertSame('integer', $sc1->getField('items/properties/name/type'));
+        $this->assertSame('integer', $sc2->getField('properties/name/type'));
     }
 }

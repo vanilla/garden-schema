@@ -325,12 +325,12 @@ class Validation {
 
         foreach ($paths as $path => $errors) {
             foreach ($errors as $error) {
-                if (!empty($name)) {
+                if (strlen($name) > 0) {
                     // We are merging a sub-schema error that did not occur on a particular property of the sub-schema.
                     if ($path === '') {
-                        $fullPath = "$name";
+                        $fullPath = $name;
                     } else {
-                        $fullPath = "{$name}.{$path}";
+                        $fullPath = "{$name}/{$path}";
                     }
                     $this->addError($fullPath, $error['code'], $error);
                 }

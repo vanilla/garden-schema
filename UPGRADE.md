@@ -18,14 +18,20 @@ The following deprecations will throw deprecation notices, but still work in ver
 
 - `Schema::validate()` and `Schema::isValid()` no longer take the `$sparse` parameter. Instead, pass an array with `['sparse' => true]` to do the same thing. Right now the boolean is still supported, but will be removed in future versions.
 
-- Specifying a type of "datetime" is deprecated. Replace it with a type of "string" and a format of "date-time". This also introduces a backwards incompatibility.
+- Specifying a type of `datetime` is deprecated. Replace it with a type of `string` and a format of `date-time`. This also introduces a backwards incompatibility.
 
-- Specifying a type of "timestamp" is deprecated. Replace it with a type of "integer" and a format of "timestamp". This also introduces a backwards incompatibility. 
+- Specifying a type of `timestamp` is deprecated. Replace it with a type of `integer` and a format of `timestamp`. This also introduces a backwards incompatibility. 
+
+- Specifying schema paths separated with `.` is now deprecated and will trigger a deprecated error. Paths should now be separated with `/` in `Schema::addFilter()`, `Schema::addValidator()`, `Schema::getField()`, and `Schema::setField()`.
 
 ### Backwards Incompatibility
 
 - Protected methods of the `Schema` class have changed signatures.
 
-- The "datetime" type has been removed and replaced with the standard "string" type and a "date-time" format. The format still returns `DateTimeInterface` instances though so having an explicit type of "string" with a "date-time" format now returns a different type.
+- The `datetime` type has been removed and replaced with the standard `string` type and a `date-time` format. The format still returns `DateTimeInterface` instances though so having an explicit type of `string` with a `date-time` format now returns a different type.
 
-- The "timestamp" type has been removed and replaced with the standard "integer" type and a "timestamp" format. A short type of "ts" is still supported, but is now converted to the aforementioned type/format combination.
+- The `timestamp` type has been removed and replaced with the standard `integer` type and a `timestamp` format. A short type of `ts` is still supported, but is now converted to the aforementioned type/format combination.
+
+- Paths in validation results are now seperated by `/` instead of `.` to more closely follow the JSON ref spec.
+
+- When specifying paths with `Schema::addValidator()` and `Schema::addFilter()` you should separate paths with `/` instead of `.` and specify the full schema path you want to add your callback to. So for example: `foo.bar[]` would become `properties/foo/properties/bar/items`. Currently, the schema will attempt to fix some old format validators and trigger a deprecation error, but may not catch every edge case.

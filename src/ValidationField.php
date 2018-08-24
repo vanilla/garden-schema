@@ -34,19 +34,26 @@ class ValidationField {
     private $options;
 
     /**
+     * @var string
+     */
+    private $schemaPath;
+
+    /**
      * Construct a new {@link ValidationField} object.
      *
      * @param Validation $validation The validation object that contains errors.
      * @param array|Schema $field The field definition.
      * @param string $name The path to the field.
-     * @param array $options Validation options.
+     * @param string $schemaPath The path to the field within the parent schema.
      *
      * - **sparse**: Whether or not this is a sparse validation.
+     * @param array $options Validation options.
      */
-    public function __construct(Validation $validation, $field, $name, array $options = []) {
+    public function __construct(Validation $validation, $field, string $name, string $schemaPath, array $options = []) {
         $this->field = $field;
         $this->validation = $validation;
         $this->name = $name;
+        $this->schemaPath = $schemaPath;
         $this->options = $options + ['sparse' => false];
     }
 
@@ -154,7 +161,7 @@ class ValidationField {
      * @return $this
      */
     public function setName($name) {
-        $this->name = $name;
+        $this->name = ltrim($name, '/');
         return $this;
     }
 
@@ -250,5 +257,35 @@ class ValidationField {
      */
     public function getOption(string $option, $default = null) {
         return $this->options[$option] ?? $default;
+    }
+
+    /**
+     * Get the schemaPath.
+     *
+     * @return string Returns the schemaPath.
+     */
+    public function getSchemaPath(): string {
+        return $this->schemaPath;
+    }
+
+    /**
+     * Set the schemaPath.
+     *
+     * @param string $schemaPath
+     * @return $this
+     */
+    public function setSchemaPath(string $schemaPath) {
+        $this->schemaPath = ltrim($schemaPath, '/');
+        return $this;
+    }
+
+    /**
+     * Escape a JSON reference field.
+     *
+     * @param string $ref The reference to escape.
+     * @return string Returns an escaped reference.
+     */
+    public static function escapeRef(string $ref): string {
+        return str_replace(['~', '/'], ['~0', '~1'], $ref);
     }
 }

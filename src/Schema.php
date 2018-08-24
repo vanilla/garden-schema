@@ -126,7 +126,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function getField($path, $default = null) {
         if (is_string($path)) {
-            $path = explode('.', $path);
+            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
+                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
+                $path = explode('.', $path);
+            } else {
+                $path = explode('/', $path);
+            }
         }
 
         $value = $this->schema;
@@ -145,13 +150,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Set a schema field.
      *
-     * @param string|array $path The JSON schema path of the field with parts separated by dots.
+     * @param string|array $path The JSON schema path of the field with parts separated by slashes.
      * @param mixed $value The new value.
      * @return $this
      */
     public function setField($path, $value) {
         if (is_string($path)) {
-            $path = explode('.', $path);
+            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
+                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
+                $path = explode('.', $path);
+            } else {
+                $path = explode('/', $path);
+            }
         }
 
         $selection = &$this->schema;
@@ -606,6 +616,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return $this
      */
     public function addFilter(string $fieldname, callable $callback) {
+        $fieldname = $this->parseFieldSelector($fieldname);
         $this->filters[$fieldname][] = $callback;
         return $this;
     }
@@ -620,6 +631,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return Schema Returns `$this` for fluent calls.
      */
     public function addValidator(string $fieldname, callable $callback) {
+        $fieldname = $this->parseFieldSelector($fieldname);
         $this->validators[$fieldname][] = $callback;
         return $this;
     }
@@ -699,13 +711,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function validate($data, $options = []) {
         if (is_bool($options)) {
-            trigger_error("The $options parameter is deprecated. Use ['sparse' => true] instead.'", E_USER_DEPRECATED);
+            trigger_error('The $sparse parameter is deprecated. Use [\'sparse\' => true] instead.', E_USER_DEPRECATED);
             $options = ['sparse' => true];
         }
         $options += ['sparse' => false];
 
 
-        $field = new ValidationField($this->createValidation(), $this->schema, '', $options);
+        $field = new ValidationField($this->createValidation(), $this->schema, '', '', $options);
 
         $clean = $this->validateField($data, $field);
 
@@ -826,15 +838,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
                 // Validate each of the types.
                 $itemValidation = new ValidationField(
-                    $field->getValidation(),
-                    $field->val('items'),
-                    '',
-                    $field->getOptions()
+                    $field->getValidation(), $field->val('items'), '', $field->getSchemaPath().'/items', $field->getOptions()
                 );
 
                 $count = 0;
                 foreach ($value as $i => $item) {
-                    $itemValidation->setName($field->getName()."[{$i}]");
+                    $itemValidation->setName($field->getName()."/$i");
                     $validItem = $this->validateField($item, $itemValidation);
                     if (Invalid::isValid($validItem)) {
                         $result[] = $validItem;
@@ -1020,13 +1029,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
         $keys = array_combine(array_map('strtolower', $keys), $keys);
 
-        $propertyField = new ValidationField($field->getValidation(), [], null, $field->getOptions());
+        $propertyField = new ValidationField($field->getValidation(), [], '', '', $field->getOptions());
 
         // Loop through the schema fields and validate each one.
         foreach ($properties as $propertyName => $property) {
             $propertyField
                 ->setField($property)
-                ->setName(ltrim($field->getName().".$propertyName", '.'));
+                ->setName(ltrim($field->getName().'/'.$propertyField->escapeRef($propertyName), '/'))
+                ->setSchemaPath($field->getSchemaPath().'/properties/'.$propertyField->escapeRef($propertyName))
+            ;
 
             $lName = strtolower($propertyName);
             $isRequired = isset($required[$propertyName]);
@@ -1064,11 +1075,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Look for extraneous properties.
         if (!empty($keys)) {
             if ($additionalProperties) {
-                $propertyField = new ValidationField($field->getValidation(), $additionalProperties, null, $field->getOptions());
+                $propertyField = new ValidationField(
+                    $field->getValidation(),
+                    $additionalProperties,
+                    '',
+                    $field->getSchemaPath().'/additionalProperties',
+                    $field->getOptions()
+                );
 
                 foreach ($keys as $key) {
                     $propertyField
-                        ->setName(ltrim($field->getName().".$key", '.'));
+                        ->setName(ltrim($field->getName()."/$key", '/'));
 
                     $valid = $this->validateField($data[$key], $propertyField);
                     if (Invalid::isValid($valid)) {
@@ -1261,7 +1278,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     protected function callFilters($value, ValidationField $field) {
         // Strip array references in the name except for the last one.
-        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $field->getName());
+        $key = $field->getSchemaPath();
         if (!empty($this->filters[$key])) {
             foreach ($this->filters[$key] as $filter) {
                 $value = call_user_func($filter, $value, $field);
@@ -1280,7 +1297,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $valid = true;
 
         // Strip array references in the name except for the last one.
-        $key = preg_replace(['`\[\d+\]$`', '`\[\d+\]`'], ['[]', ''], $field->getName());
+        $key = $field->getSchemaPath();
         if (!empty($this->validators[$key])) {
             foreach ($this->validators[$key] as $validator) {
                 $r = call_user_func($validator, $value, $field);
@@ -1674,7 +1691,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         // Clone the validation field to collect errors.
-        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', $field->getOptions());
+        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', '', $field->getOptions());
 
         // Try and validate against each type.
         foreach ($types as $type) {
@@ -1734,5 +1751,44 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         return $field->getErrorCount() === $count ? $value : Invalid::value();
+    }
+
+    /**
+     * Parse a nested field name selector.
+     *
+     * Field selectors should be separated by "/" characters, but may currently be separated by "." characters which
+     * triggers a deprecated error.
+     *
+     * @param string $field The field selector.
+     * @return string Returns the field selector in the correct format.
+     */
+    private function parseFieldSelector(string $field): string {
+        if (strlen($field) === 0) {
+            return $field;
+        }
+
+        if (strpos($field, '.') !== false) {
+            if (strpos($field, '/') === false) {
+                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
+
+                $parts = explode('.', $field);
+                $parts = @array_map([$this, 'parseFieldSelector'], $parts); // silence because error triggered already.
+
+                $field = implode('/', $parts);
+            }
+        } elseif ($field === '[]') {
+            trigger_error('Field selectors with item selector "[]" must be converted to "items".', E_USER_DEPRECATED);
+            $field = 'items';
+        } elseif (strpos($field, '/') === false && !in_array($field, ['items', 'additionalProperties'], true)) {
+            trigger_error("Field selectors must specify full schema paths. ($field)", E_USER_DEPRECATED);
+            $field = "/properties/$field";
+        }
+
+        if (strpos($field, '[]') !== false) {
+            trigger_error('Field selectors with item selector "[]" must be converted to "/items".', E_USER_DEPRECATED);
+            $field = str_replace('[]', '/items', $field);
+        }
+
+        return ltrim($field, '/');
     }
 }
