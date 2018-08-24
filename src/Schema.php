@@ -539,13 +539,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         // Check for a type.
-        $parts = explode(':', $key);
-        $name = $parts[0];
+        if (false !== ($pos = strrpos($key, ':'))) {
+            $name = substr($key, 0, $pos);
+            $typeStr = substr($key, $pos + 1);
+
+            // Kludge for names with colons that are not specifying an array of a type.
+            if (isset($value['type']) && 'array' !== $this->getType($typeStr)) {
+                $name = $key;
+                $typeStr = '';
+            }
+        } else {
+            $name = $key;
+            $typeStr = '';
+        }
         $types = [];
         $param = [];
 
-        if (!empty($parts[1])) {
-            $shortTypes = explode('|', $parts[1]);
+        if (!empty($typeStr)) {
+            $shortTypes = explode('|', $typeStr);
             foreach ($shortTypes as $alias) {
                 $found = $this->getType($alias);
                 if ($found === null) {

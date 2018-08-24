@@ -116,4 +116,44 @@ class RealWorldTest extends TestCase {
         $validatedData = $filteredSchema->validate($data);
         $this->assertEquals($expectedData, $validatedData);
     }
+
+    /**
+     * Colons should be allowed in property name short definitions.
+     */
+    public function testColonShortParse() {
+        $sch = Schema::parse([
+            'foo:bar:b',
+        ]);
+
+        $this->assertEquals('boolean', $sch->getField('properties/foo:bar/type'));
+    }
+
+    /**
+     * Colons should be allowed in property name short definitions.
+     */
+    public function testColonLongParse() {
+        $sch = Schema::parse([
+            'foo:bar' => [
+                'type' => 'boolean',
+            ],
+        ]);
+
+        $this->assertEquals('boolean', $sch->getField('properties/foo:bar/type'));
+    }
+
+    /**
+     * Colons should be allowed in full property name definitions.
+     */
+    public function testColonFullParse() {
+        $sch = Schema::parse([
+            'type' => 'object',
+            'properties' => [
+                'foo:bar' => [
+                    'type' => 'boolean',
+                ],
+            ],
+        ]);
+
+        $this->assertEquals('boolean', $sch->getField('properties/foo:bar/type'));
+    }
 }
