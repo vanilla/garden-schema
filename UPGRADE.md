@@ -2,7 +2,11 @@
 
 ## Version 1 to Version 2
 
-With version 2, Garden Schema is moving away from JSON Schema and towards Open API. Since Open API is base on JSON Schema this isn't a major transition, but there are some differences. 
+With version 2, Garden Schema is moving away from JSON Schema and towards Open API. Since Open API is base on JSON Schema this isn't a major transition, but there are some differences.
+
+## Bug Fixes
+
+- Properties with colons in them no longer throw an invalid type exception. 
 
 ### New Features
 
