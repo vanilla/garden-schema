@@ -268,7 +268,7 @@ class ParseTest extends AbstractSchemaTest {
      */
     public function testCustomFilter() {
         $sch = Schema::parse(['foo:s', 'bar:i']);
-        $sch->addFilter('foo', function ($v) {
+        $sch->addFilter('properties/foo', function ($v) {
             return $v.'!';
         });
 

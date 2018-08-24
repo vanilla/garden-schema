@@ -182,7 +182,7 @@ class OperationsTest extends AbstractSchemaTest {
 
         $sch3 = $sch2->withSparse();
 
-        $this->assertSame($sch3->getField('properties.u1'), $sch3->getField('properties.u2'));
+        $this->assertSame($sch3->getField('properties/u1'), $sch3->getField('properties/u2'));
 
         $data = [
             'u1' => ['id' => 1],

@@ -19,7 +19,7 @@ class SchemaValidationFail extends Schema {
      * {@inheritdoc}
      */
     public function validate($data, $options = false) {
-        $field = new ValidationField($this->createValidation(), $this->getSchemaArray(), '', $options);
+        $field = new ValidationField($this->createValidation(), $this->getSchemaArray(), '', '', $options);
         $field->addError('invalid', ['messageCode' => '{field} is always invalid.']);
         throw new ValidationException($field->getValidation());
     }

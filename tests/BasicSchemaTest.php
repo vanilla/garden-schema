@@ -291,7 +291,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         // Test requiring 2 of.
         $schema = $this
             ->getAtomicSchema()
-            ->requireOneOf(['description', 'amount', 'enabled'], 2);
+            ->requireOneOf(['description', 'amount', 'enabled'], '', 2);
 
         $valid4 = ['id' => 123, 'name' => 'Foo', 'description' => 'Hello', 'enabled' => true];
         $this->assertTrue($schema->isValid($valid4));
@@ -592,8 +592,8 @@ class BasicSchemaTest extends AbstractSchemaTest {
             ]
         ]);
 
-        $this->assertArrayNotHasKey('allowNull', $sch->getField('properties.photo'));
-        $this->assertEquals(true, $sch->getField('properties.photo.nullable'));
+        $this->assertArrayNotHasKey('allowNull', $sch->getField('properties/photo'));
+        $this->assertEquals(true, $sch->getField('properties/photo/nullable'));
     }
 
     /**

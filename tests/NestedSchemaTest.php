@@ -54,8 +54,8 @@ class NestedSchemaTest extends AbstractSchemaTest {
             $this->fail("The data should not be valid.");
         } catch (ValidationException $ex) {
             $validation = $ex->getValidation();
-            $this->assertFalse($validation->isValidField('addr.city'), "addr.street should be invalid.");
-            $this->assertFalse($validation->isValidField('addr.zip'), "addr.zip should be invalid.");
+            $this->assertFalse($validation->isValidField('addr/city'), "addr.street should be invalid.");
+            $this->assertFalse($validation->isValidField('addr/zip'), "addr.zip should be invalid.");
         }
     }
 
@@ -63,7 +63,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
      * Verify field names in nested schema error messages appear as expected.
      *
      * @expectedException Garden\Schema\ValidationException
-     * @expectedExceptionMessage addr.zip is not a valid integer.
+     * @expectedExceptionMessage addr/zip is not a valid integer.
      */
     public function testNestedInvalidMessage() {
         $sch = $this->getNestedSchema();
@@ -91,7 +91,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
         $this->assertFalse($schema->isValid($invalidData));
 
         // Try a custom validator for the items.
-        $schema->addValidator('arr[]', function ($value, ValidationField $field) {
+        $schema->addValidator('properties/arr/items', function ($value, ValidationField $field) {
             if ($value > 2) {
                 $field->addError('{field} must be less than 2.', 422);
             }
@@ -101,8 +101,8 @@ class NestedSchemaTest extends AbstractSchemaTest {
             $this->fail("The data should not validate.");
         } catch (ValidationException $ex) {
             $validation = $ex->getValidation();
-            $this->assertFalse($validation->isValidField('arr[2]'));
-            $this->assertEquals('arr[2] must be less than 2.', $validation->getMessage());
+            $this->assertFalse($validation->isValidField('arr/2'));
+            $this->assertEquals('arr/2 must be less than 2.', $validation->getMessage());
         }
     }
 
@@ -180,7 +180,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
             $nullItemData = ['rows' => [null]];
             $schema->validate($nullItemData);
         } catch (ValidationException $ex) {
-            $this->assertFalse($ex->getValidation()->isValidField('rows[0]'));
+            $this->assertFalse($ex->getValidation()->isValidField('rows/0'));
         }
 
         try {
@@ -192,11 +192,10 @@ class NestedSchemaTest extends AbstractSchemaTest {
             $schema->validate($invalidRowsData);
         } catch (ValidationException $ex) {
             $v4 = $ex->getValidation();
-            $this->assertFalse($v4->isValidField('rows[0].id'));
-            $this->assertTrue($v4->isValidField('rows[1].id'));
-            $this->assertFalse($v4->isValidField('rows[2].id'));
+            $this->assertFalse($v4->isValidField('rows/0/id'));
+            $this->assertTrue($v4->isValidField('rows/1/id'));
+            $this->assertFalse($v4->isValidField('rows/2/id'));
         }
-
     }
 
     /**
@@ -357,8 +356,8 @@ class NestedSchemaTest extends AbstractSchemaTest {
         } catch (ValidationException $ex) {
             $errors = $ex->getValidation()->getErrors();
             $this->assertCount(2, $errors);
-            $this->assertEquals('item[0].name is required.', $errors[0]['message']);
-            $this->assertEquals('item[1].name is not a valid string.', $errors[1]['message']);
+            $this->assertEquals('0/name is required.', $errors[0]['message']);
+            $this->assertEquals('1/name is not a valid string.', $errors[1]['message']);
         }
     }
 
@@ -404,7 +403,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
             'children:a?'
         ]);
 
-        $sch->setField('properties.children.items', $sch);
+        $sch->setField('properties/children/items', $sch);
         $sch->validate(['name' => 'boo']);
 
         $data = [
