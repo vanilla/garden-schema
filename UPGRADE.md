@@ -4,9 +4,10 @@
 
 With version 2, Garden Schema is moving away from JSON Schema and towards Open API. Since Open API is base on JSON Schema this isn't a major transition, but there are some differences.
 
-## Bug Fixes
+### Bug Fixes
 
-- Properties with colons in them no longer throw an invalid type exception. 
+- Properties with colons in them no longer throw an invalid type exception.
+- Fixed bug where nested schema objects were not getting their default values respected. 
 
 ### New Features
 
