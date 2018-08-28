@@ -55,7 +55,7 @@ In the above example a **Schema** object is created with the schema definition p
 
 ## Defining Schemas
 
-The **Schema** class is instantiated with an array defining the schema. The array can be in [OpenAPI 3.0 Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) format or it can be in custom short format which is much quicker to write. The short format will be described in this section.
+The **Schema** class is instantiated with an array defining the schema. The array can be in [OpenAPI 3.0 Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) format or it can be in custom short format. It is recommended you define your schemas in the OpenAPI format, but the short format is good for those wanting to write quick prototypes. The short format will be described in this section.
 
 By default the schema is an array where each element of the array defines an object property. By "object" we mean javascript object or PHP array with string keys. There are several ways a property can be defined:
  
@@ -140,25 +140,21 @@ This schema would apply to something like the following data:
 ]
 ```
 
-### Optional Properties and Allow Null
+### Optional Properties and Nullable Properties
 
-When defining an object schema you can use a "?" to say that the property is optional. This means that the property can be completely omitted during validation. This is not the same a providing a null value for the property which is considered invalid for optional properties.
+When defining an object schema you can use a "?" to say that the property is optional. This means that the property can be completely omitted during validation. This is not the same a providing a **null** value for the property which is considered invalid for optional properties.
 
-If you want a property to allow null values you can specify the **allowNull** attribute on the property. There are two ways to do this:
+If you want a property to allow null values you can specify the `nullable` attribute on the property. There are two ways to do this:
 
 ```php
 [
     // You can specify allowNull as a property attribute.
-    'opt1:s?' => ['allowNull' => true],
+    'opt1:s?' => ['nullable' => true],
     
     // You can specify null as an optional type in the declaration.
-    'opt2:s|n?' => 'Another optional property.'
+    'opt2:s|n?' => 'Another nullable, optional property.'
 ] 
 ```
-
-### Multiple Types
-
-The type property of the schema can accept an array of types. An array of types means that the data must be any one of the types. 
 
 ### Default Values
 
@@ -205,6 +201,76 @@ When you call **validate()** and validation fails a **ValidationException** is t
 
 If you are writing an API, you can **json_encode()** the **ValidationException** and it should provide a rich set of data that will help any consumer figure out exactly what they did wrong. You can also use various properties of the **Validation** property to help render the error output appropriately. 
 
+## Schema References
+
+OpenAPI allows for schemas to be accessed with references using the `$ref` attribute. Using references allows you to define commonly used schemas in one place and then reference them from many locations.
+
+To use references you must:
+
+1. Define the schema you want to reference somewhere.
+2. Reference the schema with a `$ref` attribute.
+3. Add a schema lookup function to your main schema with `Schema::setRefLookp()`
+
+### Defining a Reusable Schema
+
+The OpenAPI specification places all reusable schemas under `/components/schemas`. If you are defining everything in a big array that is a good place to put them.
+
+```php
+$components = [
+    'components' => [
+        'schemas' => [
+            'User' => [
+                'type' => 'object',
+                'properties' => [
+                    'id' => [
+                        'type' => 'integer'
+                    ],
+                    'username' => [
+                        'type' => 'string'
+                    ]
+                ]
+            ]
+        ]
+    ]
+]
+```
+
+### Referencing Schemas With `$ref`
+
+Reference the schema's path with keys separated by `/` characters.
+
+```php
+$userArray = [
+    'type' => 'array',
+    'items' => [
+        '$ref' => '#/components/schemas/User'
+    ]
+]
+```
+
+### Using `Schema::setRefLookup()` to Resolve References
+
+The `Schema` class has a `setRefLookup()` method that lets you add a callable that is use to resolve references. The callable should have the following signature:
+
+```php
+function(string $ref): array|Schema|null {
+   ...
+}
+```
+
+The function takes the string from the `$ref` attribute and returns a schema array, `Schema` object, or **null** if the schema cannot be found. Garden Schema has a default implementation of a ref lookup in the `ArrayRefLookup` class that can resolve references from a static array. This should be good enough for most uses, but you are always free to define your own.
+
+You can put everything together like this:
+
+```php
+$sch = new Schema($userArray);
+$sch->setRefLookup(new ArrayRefLookup($components));
+
+$valid = $sch->validate(...);
+```
+
+The references are resolved during validation so if there are any mistakes in your references then a `RefNotFoundException` is thrown during validation, not when you set your schema or ref lookup function.
+
 ## Validation Options
 
 Both **validate()** and **isValid()** can take an additional **$options** argument which modifies the behavior of the validation slightly, depending on the option.
@@ -250,7 +316,7 @@ There are a few things to note in the above example:
 
 ## JSON Schema Support
 
-The **Schema** object is a wrapper for an [Open API Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
+The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
 
 | Property | Applies To | Notes |
 | -------- | ---------- | ----------- |
