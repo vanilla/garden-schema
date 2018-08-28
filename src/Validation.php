@@ -24,7 +24,7 @@ class Validation {
     /**
      * @var int
      */
-    private $mainStatus = 0;
+    private $mainNumber = 0;
 
     /**
      * @var bool Whether or not fields should be translated.
@@ -36,18 +36,22 @@ class Validation {
      *
      * @param string $field The name and path of the field to add or an empty string if this is a global error.
      * @param string $error The message code.
-     * @param int|array $options An array of additional information to add to the error entry or a numeric error code.
+     * @param array $options An array of additional information to add to the error entry or a numeric error code.
+     * @param mixed $value The value the failed validation.
      * @return $this
      */
-    public function addError(string $field, string $error, $options = []) {
+    public function addError(string $field, string $error, $options = [], $value = null) {
         if (empty($error)) {
             throw new \InvalidArgumentException('The error code cannot be empty.', 500);
         } elseif (!in_array(gettype($options), ['integer', 'array'], true)) {
             throw new \InvalidArgumentException('$options must be an integer or array.', 500);
         }
+        if (is_int($options)) {
+            trigger_error('Passing an integer for $options in Validation::addError() is deprecated.', E_USER_DEPRECATED);
+        }
 
         $fieldKey = $field;
-        $row = ['field' => null, 'code' => null, 'path' => null, 'index' => null];
+        $row = ['field' => null, 'code' => null, 'path' => null, 'index' => null, 'value' => $value];
 
         // Split the field out into a path, field, and possible index.
         if (($pos = strrpos($field, '.')) !== false) {
@@ -66,8 +70,14 @@ class Validation {
         });
 
         if (is_int($options)) {
-            $row['status'] = $options;
+            $row['number'] = $options;
         } else {
+            if (isset($options['status'])) {
+                trigger_error('Validation::addError() expects $options[\'number\'], not $options[\'status\'].', E_USER_DEPRECATED);
+                $options['number'] = $options['status'];
+                unset($options['status']);
+            }
+
             $row += $options;
         }
 
@@ -77,14 +87,14 @@ class Validation {
     }
 
     /**
-     * Get or set the error status code.
+     * Get the error number.
      *
-     * The status code is an http response code and should be of the 4xx variety.
+     * The number is an HTTP response code and should be of the 4xx variety.
      *
-     * @return int Returns the current status code.
+     * @return int Returns an error number.
      */
-    public function getStatus(): int {
-        if ($status = $this->getMainStatus()) {
+    public function getNumber(): int {
+        if ($status = $this->getMainNumber()) {
             return $status;
         }
 
@@ -93,14 +103,27 @@ class Validation {
         }
 
         // There was no status so loop through the errors and look for the highest one.
-        $maxStatus = 0;
+        $maxNumber = 0;
         foreach ($this->getRawErrors() as $error) {
-            if (isset($error['status']) && $error['status'] > $maxStatus) {
-                $maxStatus = $error['status'];
+            if (isset($error['number']) && $error['number'] > $maxNumber) {
+                $maxNumber = $error['number'];
             }
         }
 
-        return $maxStatus?: 400;
+        return $maxNumber?: 400;
+    }
+
+    /**
+     * Get or set the error status code.
+     *
+     * The status code is an http response code and should be of the 4xx variety.
+     *
+     * @return int Returns the current status code.
+     * @deprecated
+     */
+    public function getStatus(): int {
+        trigger_error("Validation::getStatus() is deprecated. Use Validation::getNumber() instead.", E_USER_DEPRECATED);
+        return $this->getNumber();
     }
 
     /**
@@ -238,6 +261,24 @@ class Validation {
     }
 
     /**
+     * Format a value for output in a message.
+     *
+     * @param mixed $value The value to format.
+     * @return string Returns the formatted value.
+     */
+    protected function formatValue($value): string {
+        if (is_string($value) && mb_strlen($value) > 20) {
+            $value = mb_substr($value, 0, 20).'…';
+        }
+
+        if (is_scalar($value)) {
+            return json_encode($value);
+        } else {
+            return $this->translate('value');
+        }
+    }
+
+    /**
      * Expand and translate a message format against an array of values.
      *
      * @param string $format The message format.
@@ -250,7 +291,11 @@ class Validation {
         $msg = preg_replace_callback('`({[^{}]+})`', function ($m) use ($context) {
             $args = array_filter(array_map('trim', explode(',', trim($m[1], '{}'))));
             $field = array_shift($args);
-            return $this->formatField(isset($context[$field]) ? $context[$field] : null, $args);
+            if ($field === 'value') {
+                return $this->formatValue($context[$field] ?? null);
+            } else {
+                return $this->formatField(isset($context[$field]) ? $context[$field] : null, $args);
+            }
         }, $format);
         return $msg;
     }
@@ -363,24 +408,49 @@ class Validation {
     }
 
     /**
-     * Get the main status.
+     * Get the main error number.
      *
      * @return int Returns an HTTP response code or zero to indicate it should be calculated.
      */
-    public function getMainStatus() {
-        return $this->mainStatus;
+    public function getMainNumber(): int {
+        return $this->mainNumber;
     }
 
     /**
-     * Set the main status.
+     * Set the main error number.
      *
      * @param int $status An HTTP response code or zero.
      * @return $this
      */
-    public function setMainStatus($status) {
-        $this->mainStatus = $status;
+    public function setMainNumber(int $status) {
+        $this->mainNumber = $status;
         return $this;
     }
+
+    /**
+     * Get the main error number.
+     *
+     * @return int Returns an HTTP response code or zero to indicate it should be calculated.
+     * @deprecated
+     */
+    public function getMainStatus(): int {
+        trigger_error("Validation::getMainStatus() is deprecated. Use Validation::getMainNumber() instead.", E_USER_DEPRECATED);
+        return $this->mainNumber;
+    }
+
+    /**
+     * Set the main error number.
+     *
+     * @param int $status An HTTP response code or zero.
+     * @return $this
+     * @deprecated
+     */
+    public function setMainStatus(int $status) {
+        trigger_error("Validation::setMainStatus() is deprecated. Use Validation::getMainNumber() instead.", E_USER_DEPRECATED);
+        $this->mainNumber = $status;
+        return $this;
+    }
+
 
     /**
      * Whether or not fields should be translated.
@@ -411,8 +481,8 @@ class Validation {
     private function formatError(array $error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1, 'status' => 1]
-        ) + ['status' => 400];
+            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1, 'number' => 1]
+        ) + ['number' => 400];
 
         $row['message'] = $this->getErrorMessage($error);
         return $row;

@@ -144,7 +144,7 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @expectedException \Garden\Schema\ValidationException
      * @expectedExceptionMessage value must be one of: one, two, three, null.
-     * @expectedExceptionCode 422
+     * @expectedExceptionCode 400
      */
     public function testEnum() {
         $enum = ['one', 'two', 'three', null];

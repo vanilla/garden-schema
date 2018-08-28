@@ -751,7 +751,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (Invalid::isInvalid($clean) && $field->isValid()) {
             // This really shouldn't happen, but we want to protect against seeing the invalid object.
-            $field->addError('invalid', ['messageCode' => '{field} is invalid.', 'status' => 422]);
+            $field->addError('invalid', ['messageCode' => '{field} is invalid.']);
         }
 
         if (!$field->getValidation()->isValid()) {
@@ -828,7 +828,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     protected function validateArray($value, ValidationField $field) {
         if ((!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) && !$value instanceof \Traversable) {
-            $field->addTypeError('array');
+            $field->addTypeError($value, 'array');
             return Invalid::value();
         } else {
             if ((null !== $minItems = $field->val('minItems')) && count($value) < $minItems) {
@@ -837,7 +837,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     [
                         'messageCode' => '{field} must contain at least {minItems} {minItems,plural,item}.',
                         'minItems' => $minItems,
-                        'status' => 422
                     ]
                 );
             }
@@ -847,7 +846,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     [
                         'messageCode' => '{field} must contain no more than {maxItems} {maxItems,plural,item}.',
                         'maxItems' => $maxItems,
-                        'status' => 422
                     ]
                 );
             }
@@ -857,7 +855,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     'uniqueItems',
                     [
                         'messageCode' => '{field} must contain unique items.',
-                        'status' => 422,
                     ]
                 );
             }
@@ -904,7 +901,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     protected function validateBoolean($value, ValidationField $field) {
         $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if ($value === null) {
-            $field->addTypeError('boolean');
+            $field->addTypeError($value, 'boolean');
             return Invalid::value();
         }
 
@@ -943,7 +940,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         if (Invalid::isInvalid($value)) {
-            $field->addTypeError('datetime');
+            $field->addTypeError($value, 'datetime');
         }
         return $value;
     }
@@ -958,7 +955,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     protected function validateNumber($value, ValidationField $field) {
         $result = filter_var($value, FILTER_VALIDATE_FLOAT);
         if ($result === false) {
-            $field->addTypeError('number');
+            $field->addTypeError($value, 'number');
             return Invalid::value();
         }
 
@@ -981,7 +978,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $result = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($result === false) {
-            $field->addTypeError('integer');
+            $field->addTypeError($value, 'integer');
             return Invalid::value();
         }
 
@@ -999,7 +996,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     protected function validateObject($value, ValidationField $field) {
         if (!$this->isArray($value) || isset($value[0])) {
-            $field->addTypeError('object');
+            $field->addTypeError($value, 'object');
             return Invalid::value();
         } elseif (is_array($field->val('properties')) || null !== $field->val('additionalProperties')) {
             // Validate the data against the internal schema.
@@ -1014,7 +1011,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 [
                     'messageCode' => '{field} must contain no more than {maxProperties} {maxProperties,plural,item}.',
                     'maxItems' => $maxProperties,
-                    'status' => 422
                 ]
             );
         }
@@ -1025,7 +1021,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 [
                     'messageCode' => '{field} must contain at least {minProperties} {minProperties,plural,item}.',
                     'minItems' => $minProperties,
-                    'status' => 422
                 ]
             );
         }
@@ -1141,7 +1136,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError('invalid', [
                     'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
                     'extra' => array_values($keys),
-                    'status' => 422
                 ]);
             }
         }
@@ -1165,20 +1159,19 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if (is_string($value) || is_numeric($value)) {
             $value = $result = (string)$value;
         } else {
-            $field->addTypeError('string');
+            $field->addTypeError($value, 'string');
             return Invalid::value();
         }
 
         if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
             if (!empty($field->getName()) && $minLength === 1) {
-                $field->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
+                $field->addError('missingField', ['messageCode' => '{field} is required.']);
             } else {
                 $field->addError(
                     'minLength',
                     [
                         'messageCode' => '{field} should be at least {minLength} {minLength,plural,character} long.',
                         'minLength' => $minLength,
-                        'status' => 422
                     ]
                 );
             }
@@ -1190,7 +1183,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     'messageCode' => '{field} is {overflow} {overflow,plural,characters} too long.',
                     'maxLength' => $maxLength,
                     'overflow' => mb_strlen($value) - $maxLength,
-                    'status' => 422
                 ]
             );
         }
@@ -1202,7 +1194,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     'invalid',
                     [
                         'messageCode' => '{field} is in the incorrect format.',
-                        'status' => 422
                     ]
                 );
             }
@@ -1239,7 +1230,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
             }
             if ($result === false) {
-                $field->addTypeError($type);
+                $field->addTypeError($value, $type);
             }
         }
 
@@ -1263,7 +1254,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif (is_string($value) && $ts = strtotime($value)) {
             $result = $ts;
         } else {
-            $field->addTypeError('timestamp');
+            $field->addTypeError($value, 'timestamp');
             $result = Invalid::value();
         }
         return $result;
@@ -1280,7 +1271,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ($value === null) {
             return null;
         }
-        $field->addError('invalid', ['messageCode' => '{field} should be null.', 'status' => 422]);
+        $field->addError('invalidType', ['messageCode' => 'The value should be null.']);
         return Invalid::value();
     }
 
@@ -1301,9 +1292,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addError(
                 'invalid',
                 [
-                    'messageCode' => '{field} must be one of: {enum}.',
+                    'messageCode' => 'The value must be one of: {enum}.',
                     'enum' => $enum,
-                    'status' => 422
                 ]
             );
             return Invalid::value();
@@ -1352,7 +1342,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Add an error on the field if the validator hasn't done so.
         if (!$valid && $field->isValid()) {
-            $field->addError('invalid', ['messageCode' => '{field} is invalid.', 'status' => 422]);
+            $field->addError('invalid', ['messageCode' => '{field} is invalid.']);
         }
     }
 
@@ -1768,7 +1758,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $divided = $value / $multipleOf;
 
             if ($divided != round($divided)) {
-                $field->addError('multipleOf', ['messageCode' => '{field} is not a multiple of {multipleOf}.', 'status' => 422, 'multipleOf' => $multipleOf]);
+                $field->addError('multipleOf', ['messageCode' => '{field} is not a multiple of {multipleOf}.', 'multipleOf' => $multipleOf]);
             }
         }
 
@@ -1777,9 +1767,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             if ($value > $maximum || ($exclusive && $value == $maximum)) {
                 if ($exclusive) {
-                    $field->addError('maximum', ['messageCode' => '{field} is greater than or equal to {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                    $field->addError('maximum', ['messageCode' => '{field} must be less than {maximum}.', 'maximum' => $maximum]);
                 } else {
-                    $field->addError('maximum', ['messageCode' => '{field} is greater than {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                    $field->addError('maximum', ['messageCode' => '{field} must be less than or equal to {maximum}.', 'maximum' => $maximum]);
                 }
 
             }
@@ -1790,9 +1780,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             if ($value < $minimum || ($exclusive && $value == $minimum)) {
                 if ($exclusive) {
-                    $field->addError('minimum', ['messageCode' => '{field} is greater than or equal to {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                    $field->addError('minimum', ['messageCode' => '{field} must be greater than {minimum}.', 'minimum' => $minimum]);
                 } else {
-                    $field->addError('minimum', ['messageCode' => '{field} is greater than {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                    $field->addError('minimum', ['messageCode' => '{field} must be greater than or equal to {minimum}.', 'minimum' => $minimum]);
                 }
 
             }

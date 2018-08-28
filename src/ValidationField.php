@@ -61,32 +61,34 @@ class ValidationField {
      * Add a validation error.
      *
      * @param string $error The message code.
-     * @param int|array $options An array of additional information to add to the error entry or a numeric error code.
+     * @param array $options An array of additional information to add to the error entry or a numeric error code.
+     * @param mixed $value The erroneous value.
      * @return $this
      * @see Validation::addError()
      */
-    public function addError($error, $options = []) {
-        $this->validation->addError($this->getName(), $error, $options);
+    public function addError(string $error, array $options = [], $value = null) {
+        $this->validation->addError($this->getName(), $error, $options, $value);
         return $this;
     }
 
     /**
      * Add an invalid type error.
      *
+     * @param mixed $value The erroneous value.
      * @param string $type The type that was checked.
      * @return $this
      */
-    public function addTypeError($type = '') {
+    public function addTypeError($value, $type = '') {
         $type = $type ?: $this->getType();
 
         $this->validation->addError(
             $this->getName(),
-            'invalid',
+            'type',
             [
                 'type' => $type,
-                'messageCode' => '{field} is not a valid {type}.',
-                'status' => 422
-            ]
+                'messageCode' => is_scalar($value) ? "{value} is not a valid $type." : "The value is not a valid $type."
+            ],
+            $value
         );
 
         return $this;

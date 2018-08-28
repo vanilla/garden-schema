@@ -401,7 +401,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      *
      * @expectedException \Garden\Schema\ValidationException
      * @expectedExceptionMessage value has unexpected fields: admin, role.
-     * @expectedExceptionCode 422
+     * @expectedExceptionCode 400
      */
     public function testValidateException() {
         try {
@@ -438,14 +438,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
-        }
-
-        $schema->setValidationFactory(TestValidation::createFactory('?', true));
-        try {
-            $schema->validate('aaa');
-        } catch (ValidationException $ex) {
-            $this->assertSame('??value is not a valid ?integer.', $ex->getMessage());
+            $this->assertSame('!"aaa" is not a valid integer.', $ex->getMessage());
         }
     }
 

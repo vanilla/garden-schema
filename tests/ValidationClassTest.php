@@ -95,10 +95,10 @@ class ValidationClassTest extends TestCase {
     public function testCalcStatus() {
         $vld = new Validation();
 
-        $vld->addError('foo', 'err', 302)
-            ->addError('bar', 'err', 301);
+        $vld->addError('foo', 'err', ['number' => 302])
+            ->addError('bar', 'err', ['number' => 301]);
 
-        $this->assertSame(302, $vld->getStatus());
+        $this->assertSame(302, $vld->getNumber());
     }
 
     /**
@@ -109,7 +109,7 @@ class ValidationClassTest extends TestCase {
 
         $vld->addError('foo', 'err');
 
-        $this->assertSame(400, $vld->getStatus());
+        $this->assertSame(400, $vld->getNumber());
     }
 
     /**
@@ -117,7 +117,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testValidStatus() {
         $vld = new Validation();
-        $this->assertSame(200, $vld->getStatus());
+        $this->assertSame(200, $vld->getNumber());
     }
 
     /**
@@ -126,10 +126,10 @@ class ValidationClassTest extends TestCase {
     public function testMainStatusOverride() {
         $vld = new Validation();
 
-        $vld->addError('foo', 'bar', 500)
-            ->setMainStatus(100);
+        $vld->addError('foo', 'bar', ['number' => 500])
+            ->setMainNumber(100);
 
-        $this->assertSame(100, $vld->getStatus());
+        $this->assertSame(100, $vld->getNumber());
     }
 
     /**
@@ -139,7 +139,7 @@ class ValidationClassTest extends TestCase {
         $vld = new TestValidation();
         $vld->setTranslateFieldNames(true);
 
-        $vld->addError('it', 'Keeping {field} {status}', 100);
+        $vld->addError('it', 'Keeping {field} {number}', ['number' => 100]);
 
         $this->assertSame('!!Keeping !it 100.', $vld->getMessage());
     }

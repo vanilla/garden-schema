@@ -37,6 +37,17 @@ class TestValidation extends Validation {
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function formatValue($value): string {
+        $r = parent::formatValue($value);
+        if ($this->getTranslateFieldNames()) {
+            $r = $this->translate($r);
+        }
+        return $r;
+    }
+
+    /**
      * Create a factory function for this class.
      *
      * @param string $prefix The prefix for the constructor.
