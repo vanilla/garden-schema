@@ -22,7 +22,7 @@ class Invalid {
      *
      * @noinspection PhpUnusedPrivateMethodInspection
      */
-    private function __constructor() {
+    private function __construct() {
         // no-op
     }
 

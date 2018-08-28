@@ -67,6 +67,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     private $validationClass = Validation::class;
 
+    /**
+     * @var callable
+     */
+    private $refLookup;
 
     /// Methods ///
 
@@ -77,6 +81,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function __construct(array $schema = []) {
         $this->schema = $schema;
+        $this->refLookup = function (string $name) {
+            return null;
+        };
     }
 
     /**
@@ -470,7 +477,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $node['items'] = $this->parseInternal($node['items']);
             } elseif ($node['type'] === 'object' && isset($node['properties'])) {
                 list($node['properties']) = $this->parseProperties($node['properties']);
-
             }
         }
 
@@ -719,6 +725,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * - **sparse**: Whether or not this is a sparse validation.
      * @return mixed Returns a cleaned version of the data.
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
+     * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
     public function validate($data, $options = []) {
         if (is_bool($options)) {
@@ -728,7 +735,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $options += ['sparse' => false];
 
 
-        $field = new ValidationField($this->createValidation(), $this->schema, '', '', $options);
+        list($schema, $schemaPath) = $this->lookupSchema($this->schema, '');
+        $field = new ValidationField($this->createValidation(), $schema, '', $schemaPath, $options);
 
         $clean = $this->validateField($data, $field);
 
@@ -807,6 +815,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
      * @return array|Invalid Returns an array or invalid if validation fails.
+     * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
      */
     protected function validateArray($value, ValidationField $field) {
         if ((!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) && !$value instanceof \Traversable) {
@@ -845,13 +854,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
 
             if ($field->val('items') !== null) {
-                $result = [];
+                list ($items, $schemaPath) = $this->lookupSchema($field->val('items'), $field->getSchemaPath().'/items');
 
                 // Validate each of the types.
                 $itemValidation = new ValidationField(
-                    $field->getValidation(), $field->val('items'), '', $field->getSchemaPath().'/items', $field->getOptions()
+                    $field->getValidation(),
+                    $items,
+                    '',
+                    $schemaPath,
+                    $field->getOptions()
                 );
 
+                $result = [];
                 $count = 0;
                 foreach ($value as $i => $item) {
                     $itemValidation->setName($field->getName()."/$i");
@@ -1013,10 +1027,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Validate data against the schema and return the result.
      *
-     * @param array|\Traversable&\ArrayAccess $data The data to validate.
+     * @param array|\Traversable|\ArrayAccess $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
      * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
      * or invalid if there are no valid properties.
+     * @throws RefNotFoundException Throws an exception of a property or additional property has a `$ref` that cannot be found.
      */
     protected function validateProperties($data, ValidationField $field) {
         $properties = $field->val('properties', []);
@@ -1044,10 +1059,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Loop through the schema fields and validate each one.
         foreach ($properties as $propertyName => $property) {
+            list($property, $schemaPath) = $this->lookupSchema($property, $field->getSchemaPath().'/properties/'.$propertyField->escapeRef($propertyName));
+
             $propertyField
                 ->setField($property)
                 ->setName(ltrim($field->getName().'/'.$propertyField->escapeRef($propertyName), '/'))
-                ->setSchemaPath($field->getSchemaPath().'/properties/'.$propertyField->escapeRef($propertyName))
+                ->setSchemaPath($schemaPath)
             ;
 
             $lName = strtolower($propertyName);
@@ -1086,11 +1103,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Look for extraneous properties.
         if (!empty($keys)) {
             if ($additionalProperties) {
+                list($additionalProperties, $schemaPath) = $this->lookupSchema(
+                    $additionalProperties,
+                    $field->getSchemaPath().'/additionalProperties'
+                );
+
                 $propertyField = new ValidationField(
                     $field->getValidation(),
                     $additionalProperties,
                     '',
-                    $field->getSchemaPath().'/additionalProperties',
+                    $schemaPath,
                     $field->getOptions()
                 );
 
@@ -1801,5 +1823,65 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         return ltrim($field, '/');
+    }
+
+    /**
+     * Lookup a schema based on a schema node.
+     *
+     * The node could be a schema array, `Schema` object, or a schema reference.
+     *
+     * @param mixed $schema The schema node to lookup with.
+     * @param string $schemaPath The current path of the schema.
+     * @return array Returns an array with two elements:
+     * - Schema|array|\ArrayAccess The schema that was found.
+     * - string The path of the schema. This is either the reference or the `$path` parameter for inline schemas.
+     * @throws RefNotFoundException Throws an exception when a reference could not be found.
+     */
+    private function lookupSchema($schema, string $schemaPath) {
+        if ($schema instanceof Schema) {
+            return [$schema, $schemaPath];
+        } else {
+            $lookup = $this->getRefLookup();
+            $visited = [];
+
+            while (!empty($schema['$ref'])) {
+                $schemaPath = $schema['$ref'];
+
+                if (isset($visited[$schemaPath])) {
+                    throw new RefNotFoundException("Cyclical reference cannot be resolved. ($schemaPath)", 508);
+                }
+                $visited[$schemaPath] = true;
+
+                try {
+                    $schema = call_user_func($lookup, $schemaPath);
+                } catch (\Exception $ex) {
+                    throw new RefNotFoundException($ex->getMessage(), $ex->getCode(), $ex);
+                }
+                if ($schema === null) {
+                    throw new RefNotFoundException("Schema reference could not be found. ($schemaPath)");
+                }
+            }
+            return [$schema, $schemaPath];
+        }
+    }
+
+    /**
+     * Get the refLookup.
+     *
+     * @return callable Returns the refLookup.
+     */
+    public function getRefLookup(): callable {
+        return $this->refLookup;
+    }
+
+    /**
+     * Set the refLookup.
+     *
+     * @param callable $refLookup
+     * @return $this
+     */
+    public function setRefLookup(callable $refLookup) {
+        $this->refLookup = $refLookup;
+        return $this;
     }
 }
