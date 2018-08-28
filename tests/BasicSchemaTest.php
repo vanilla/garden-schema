@@ -433,7 +433,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      */
     public function testDifferentValidationClass() {
         $schema = Schema::parse([':i']);
-        $schema->setValidationClass(TestValidation::class);
+        $schema->setValidationFactory(TestValidation::createFactory());
 
         try {
             $schema->validate('aaa');
@@ -441,19 +441,11 @@ class BasicSchemaTest extends AbstractSchemaTest {
             $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
         }
 
-        $validation = new TestValidation();
-        $schema->setValidationClass($validation);
+        $schema->setValidationFactory(TestValidation::createFactory('?', true));
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
-        }
-
-        $validation->setTranslateFieldNames(true);
-        try {
-            $schema->validate('aaa');
-        } catch (ValidationException $ex) {
-            $this->assertSame('!!value is not a valid !integer.', $ex->getMessage());
+            $this->assertSame('??value is not a valid ?integer.', $ex->getMessage());
         }
     }
 

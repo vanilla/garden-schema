@@ -64,8 +64,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
     /**
      * @var string|Validation The name of the class or an instance that will be cloned.
+     * @deprecated
      */
     private $validationClass = Validation::class;
+
+    /**
+     * @var callable A callback is used to create validation objects.
+     */
+    private $validationFactory;
 
     /**
      * @var callable
@@ -83,6 +89,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $this->schema = $schema;
         $this->refLookup = function (string $name) {
             return null;
+        };
+        $this->validationFactory = function () {
+            return new Validation();
         };
     }
 
@@ -1420,8 +1429,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Get the class that's used to contain validation information.
      *
      * @return Validation|string Returns the validation class.
+     * @deprecated
      */
     public function getValidationClass() {
+        trigger_error('Schema::getValidationClass() is deprecated. Use Schema::getValidationFactory() instead.', E_USER_DEPRECATED);
         return $this->validationClass;
     }
 
@@ -1430,12 +1441,23 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param Validation|string $class Either the name of a class or a class that will be cloned.
      * @return $this
+     * @deprecated
      */
     public function setValidationClass($class) {
+        trigger_error('Schema::setValidationClass() is deprecated. Use Schema::setValidationFactory() instead.', E_USER_DEPRECATED);
+
         if (!is_a($class, Validation::class, true)) {
             throw new \InvalidArgumentException("$class must be a subclass of ".Validation::class, 500);
         }
 
+        $this->setValidationFactory(function () use ($class) {
+            if ($class instanceof Validation) {
+                $result = clone $class;
+            } else {
+                $result = new $class;
+            }
+            return $result;
+        });
         $this->validationClass = $class;
         return $this;
     }
@@ -1445,15 +1467,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return Validation Returns a validation object.
      */
-    protected function createValidation() {
-        $class = $this->getValidationClass();
-
-        if ($class instanceof Validation) {
-            $result = clone $class;
-        } else {
-            $result = new $class;
-        }
-        return $result;
+    protected function createValidation(): Validation {
+        return call_user_func($this->getValidationFactory());
     }
 
     /**
@@ -1866,22 +1881,43 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Get the refLookup.
+     * Get the function used to resolve `$ref` lookups.
      *
-     * @return callable Returns the refLookup.
+     * @return callable Returns the current `$ref` lookup.
      */
     public function getRefLookup(): callable {
         return $this->refLookup;
     }
 
     /**
-     * Set the refLookup.
+     * Set the function used to resolve `$ref` lookups.
      *
-     * @param callable $refLookup
+     * @param callable $refLookup The new lookup function.
      * @return $this
      */
     public function setRefLookup(callable $refLookup) {
         $this->refLookup = $refLookup;
+        return $this;
+    }
+
+    /**
+     * Get factory used to create validation objects.
+     *
+     * @return callable Returns the current factory.
+     */
+    public function getValidationFactory(): callable {
+        return $this->validationFactory;
+    }
+
+    /**
+     * Set the factory used to create validation objects.
+     *
+     * @param callable $validationFactory The new factory.
+     * @return $this
+     */
+    public function setValidationFactory(callable $validationFactory) {
+        $this->validationFactory = $validationFactory;
+        $this->validationClass = null;
         return $this;
     }
 }

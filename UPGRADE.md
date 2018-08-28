@@ -15,6 +15,7 @@ With version 2, Garden Schema is moving away from JSON Schema and towards Open A
 - The `readOnly` and `writeOnly` properties are now supported. To use them in validation pass either `['request' => true]` or `['response' => true]` as options to one of the schema validation functions.
 - Support for the following validation properties has been added: `multipleOf`, `maximum`, `exclusiveMaximum`, `minimum`, `exclusiveMinimum`, `uniqueItems`, `maxProperties`, `minProperties`, `additionalProperties`.
 - Schemas now support references with the `$ref` attribute! To use references you can use `Schema::setRefLookup()` with the built in `ArrayRefLookup` class.
+- You can now create custom `Validation` instances by using a custom `Schema::setValidationFactory()` method. This is much more flexible than the deprecated `Schema::setValidationClass()` method.
 
 ### Deprecations
 
@@ -30,6 +31,8 @@ The following deprecations will throw deprecation notices, but still work in ver
 
 - Specifying schema paths separated with `.` is now deprecated and will trigger a deprecated error. Paths should now be separated with `/` in `Schema::addFilter()`, `Schema::addValidator()`, `Schema::getField()`, and `Schema::setField()`.
 
+- The `Schema::setValidationClass()` and `Schema::getValidationClass()` methods are deprecated. Use the new `Schema::setValidationFactory()` and `Schema::getValidationFactory()` instead.
+
 ### Backwards Incompatibility
 
 - Protected methods of the `Schema` class have changed signatures.
@@ -41,3 +44,5 @@ The following deprecations will throw deprecation notices, but still work in ver
 - Paths in validation results are now seperated by `/` instead of `.` to more closely follow the JSON ref spec.
 
 - When specifying paths with `Schema::addValidator()` and `Schema::addFilter()` you should separate paths with `/` instead of `.` and specify the full schema path you want to add your callback to. So for example: `foo.bar[]` would become `properties/foo/properties/bar/items`. Currently, the schema will attempt to fix some old format validators and trigger a deprecation error, but may not catch every edge case.
+
+- The `Validation` class now has type hints. You will need to update subclasses to avoid exceptions.
