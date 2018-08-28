@@ -39,7 +39,7 @@ class Validation {
      * @param int|array $options An array of additional information to add to the error entry or a numeric error code.
      * @return $this
      */
-    public function addError($field, $error, $options = []) {
+    public function addError(string $field, string $error, $options = []) {
         if (empty($error)) {
             throw new \InvalidArgumentException('The error code cannot be empty.', 500);
         } elseif (!in_array(gettype($options), ['integer', 'array'], true)) {
@@ -83,7 +83,7 @@ class Validation {
      *
      * @return int Returns the current status code.
      */
-    public function getStatus() {
+    public function getStatus(): int {
         if ($status = $this->getMainStatus()) {
             return $status;
         }
@@ -108,7 +108,7 @@ class Validation {
      *
      * @return string Returns the exception message.
      */
-    public function getMessage() {
+    public function getMessage(): string {
         if ($message = $this->getMainMessage()) {
             return $message;
         }
@@ -123,7 +123,7 @@ class Validation {
      *
      * @return array Returns all of the errors.
      */
-    public function getErrors() {
+    public function getErrors(): array {
         $result = [];
         foreach ($this->getRawErrors() as $error) {
             $result[] = $this->formatError($error);
@@ -137,7 +137,7 @@ class Validation {
      * @param string $field The full path to the field.
      * @return array Returns an array of errors.
      */
-    public function getFieldErrors($field) {
+    public function getFieldErrors(string $field): array {
         if (empty($this->errors[$field])) {
             return [];
         } else {
@@ -169,7 +169,7 @@ class Validation {
      *
      * @return bool Returns true if there are no errors, false otherwise.
      */
-    public function isValid() {
+    public function isValid(): bool {
         return empty($this->errors);
     }
 
@@ -179,7 +179,7 @@ class Validation {
      * @param string $field The name of the field to check for validity.
      * @return bool Returns true if the field has no errors, false otherwise.
      */
-    public function isValidField($field) {
+    public function isValidField(string $field): bool {
         $result = empty($this->errors[$field]);
         return $result;
     }
@@ -304,7 +304,7 @@ class Validation {
      * @param string $str The string to translate.
      * @return string Returns the translated string.
      */
-    public function translate($str) {
+    public function translate(string $str): string {
         if (substr($str, 0, 1) === '@') {
             // This is a literal string that bypasses translation.
             return substr($str, 1);

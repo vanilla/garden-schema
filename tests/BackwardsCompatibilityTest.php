@@ -8,6 +8,8 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
+use Garden\Schema\Tests\Fixtures\TestValidation;
+use Garden\Schema\ValidationException;
 
 
 /**
@@ -123,5 +125,39 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
 
         $actual = $fn($old);
         $this->assertEquals($new, $actual);
+    }
+
+    /**
+     * Test a custom validation class.
+     */
+    public function testDifferentValidationClass() {
+        $schema = Schema::parse([':i']);
+        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $schema->setValidationClass(TestValidation::class);
+
+        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->assertSame(TestValidation::class, $schema->getValidationClass());
+
+        try {
+            $schema->validate('aaa');
+        } catch (ValidationException $ex) {
+            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
+        }
+
+        $validation = new TestValidation();
+        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $schema->setValidationClass($validation);
+        try {
+            $schema->validate('aaa');
+        } catch (ValidationException $ex) {
+            $this->assertSame('!value is not a valid !integer.', $ex->getMessage());
+        }
+
+        $validation->setTranslateFieldNames(true);
+        try {
+            $schema->validate('aaa');
+        } catch (ValidationException $ex) {
+            $this->assertSame('!!value is not a valid !integer.', $ex->getMessage());
+        }
     }
 }
