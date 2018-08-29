@@ -145,4 +145,38 @@ class ValidationClassTest extends TestCase {
         $vld = new Validation();
         $this->assertSame('foo', $vld->translate('@foo'));
     }
+
+    /**
+     * The error code cannot be empty.
+     *
+     * @expectedException \InvalidArgumentException
+     */
+    public function testEmptyError() {
+        $vld = new Validation();
+        $vld->addError('foo', '');
+    }
+
+    /**
+     * The error count function should return the correct count when filtered by field.
+     */
+    public function testErrorCountWithField() {
+        $vld = new Validation();
+        $vld->addError('foo', 'foo');
+        $vld->addError('bar', 'foo');
+
+        $this->assertSame(1, $vld->getErrorCount('foo'));
+        $this->assertSame(2, $vld->getErrorCount());
+    }
+
+    /**
+     * Null and empty strings have a different meaning in `Validation::getErrorCount()`.
+     */
+    public function testErrorCountNullVsEmpty() {
+        $vld = new Validation();
+        $vld->addError('', 'foo');
+        $vld->addError('foo', 'foo');
+
+        $this->assertSame(1, $vld->getErrorCount(''));
+        $this->assertSame(2, $vld->getErrorCount());
+    }
 }

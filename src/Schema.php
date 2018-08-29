@@ -87,7 +87,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function __construct(array $schema = []) {
         $this->schema = $schema;
-        $this->refLookup = function (string $name) {
+        $this->refLookup = function (string $_) {
             return null;
         };
         $this->validationFactory = function () {
@@ -205,22 +205,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string
      */
     public function getID(): string {
-        return isset($this->schema['id']) ? $this->schema['id'] : '';
+        return $this->schema['id'] ?? '';
     }
 
     /**
      * Set the ID for the schema.
      *
      * @param string $id The new ID.
-     * @throws \InvalidArgumentException Throws an exception when the provided ID is not a string.
-     * @return Schema
+     * @return $this
      */
     public function setID(string $id) {
-        if (is_string($id)) {
-            $this->schema['id'] = $id;
-        } else {
-            throw new \InvalidArgumentException("The ID is not a valid string.", 500);
-        }
+        $this->schema['id'] = $id;
 
         return $this;
     }
@@ -241,9 +236,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return Schema Returns the current instance for fluent calls.
      */
     public function setFlags(int $flags) {
-        if (!is_int($flags)) {
-            throw new \InvalidArgumentException('Invalid flags.', 500);
-        }
         $this->flags = $flags;
 
         return $this;
@@ -400,7 +392,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array $arr The array to parse into a schema.
      * @return array The full schema array.
-     * @throws \InvalidArgumentException Throws an exception when an item in the schema is invalid.
+     * @throws ParseException Throws an exception when an item in the schema is invalid.
      */
     protected function parseInternal(array $arr): array {
         if (empty($arr)) {
@@ -438,9 +430,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Parse a schema node.
      *
-     * @param array $node The node to parse.
+     * @param array|Schema $node The node to parse.
      * @param mixed $value Additional information from the node.
      * @return array|\ArrayAccess Returns a JSON schema compatible node.
+     * @throws ParseException Throws an exception if there was a problem parsing the schema node.
      */
     private function parseNode($node, $value = null) {
         if (is_array($value)) {
@@ -508,6 +501,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array $arr An object property schema.
      * @return array Returns a schema array suitable to be placed in the **properties** key of a schema.
+     * @throws ParseException Throws an exception if a property name cannot be determined for an array item.
      */
     private function parseProperties(array $arr): array {
         $properties = [];
@@ -519,7 +513,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     $key = $value;
                     $value = '';
                 } else {
-                    throw new \InvalidArgumentException("Schema at position $key is not a valid parameter.", 500);
+                    throw new ParseException("Schema at position $key is not a valid parameter.", 500);
                 }
             }
 
@@ -542,7 +536,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $key The short parameter string to parse.
      * @param array $value An array of other information that might help resolve ambiguity.
      * @return array Returns an array in the form `[string name, array param, bool required]`.
-     * @throws \InvalidArgumentException Throws an exception if the short param is not in the correct format.
+     * @throws ParseException Throws an exception if the short param is not in the correct format.
      */
     public function parseShortParam(string $key, $value = []): array {
         // Is the parameter optional?
@@ -575,7 +569,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             foreach ($shortTypes as $alias) {
                 $found = $this->getType($alias);
                 if ($found === null) {
-                    throw new \InvalidArgumentException("Unknown type '$alias'", 500);
+                    throw new ParseException("Unknown type '$alias'.", 500);
                 } elseif ($found === 'datetime') {
                     $param['format'] = 'date-time';
                     $types[] = 'string';
@@ -603,11 +597,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $typesStr = implode('|', $types);
                 $paramTypesStr = implode('|', (array)$param['type']);
 
-                throw new \InvalidArgumentException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
+                throw new ParseException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
             }
         } else {
             if (empty($types) && !empty($parts[1])) {
-                throw new \InvalidArgumentException("Invalid type {$parts[1]} for field $name.", 500);
+                throw new ParseException("Invalid type {$parts[1]} for field $name.", 500);
             }
             if (empty($types)) {
                 $param += ['type' => null];
@@ -1627,9 +1621,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Validate a field against a single type.
      *
      * @param mixed $value The value to validate.
-     * @param string $type The type to validate against.
+     * @param string|null $type The type to validate against.
      * @param ValidationField $field Contains field and validation information.
      * @return mixed Returns the valid value or `Invalid`.
+     * @throws \InvalidArgumentException Throws an exception when `$type` is not recognized.
+     * @throws RefNotFoundException Throws an exception when internal validation has a reference that isn't found.
      */
     protected function validateSingleType($value, $type, ValidationField $field) {
         switch ($type) {
@@ -1788,7 +1784,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } else {
                     $field->addError('minimum', ['messageCode' => 'The value must be greater than or equal to {minimum}.', 'minimum' => $minimum]);
                 }
-
             }
         }
 

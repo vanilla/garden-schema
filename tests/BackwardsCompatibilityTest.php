@@ -160,4 +160,17 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
             $this->assertSame('!!"aaa" is not a valid integer.', $ex->getMessage());
         }
     }
+
+    /**
+     * Test validating the null type.
+     */
+    public function testNullValidation() {
+        $sch = new Schema(['type' => 'null']);
+
+        $valid = $sch->validate(null);
+        $this->assertNull($valid);
+
+        $this->expectException(ValidationException::class);
+        $valid = $sch->validate(123);
+    }
 }
