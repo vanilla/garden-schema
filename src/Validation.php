@@ -37,10 +37,13 @@ class Validation {
      * @param string $field The name and path of the field to add or an empty string if this is a global error.
      * @param string $error The message code.
      * @param array $options An array of additional information to add to the error entry or a numeric error code.
-     * @param mixed $value The value the failed validation.
+     *
+     * - **messageCode**: A specific message translation code for the final error.
+     * - **number**: An error number for the error.
+     * - Error specific fields can be added to format a custom error message.
      * @return $this
      */
-    public function addError(string $field, string $error, $options = [], $value = null) {
+    public function addError(string $field, string $error, $options = []) {
         if (empty($error)) {
             throw new \InvalidArgumentException('The error code cannot be empty.', 500);
         } elseif (!in_array(gettype($options), ['integer', 'array'], true)) {
@@ -48,40 +51,15 @@ class Validation {
         }
         if (is_int($options)) {
             trigger_error('Passing an integer for $options in Validation::addError() is deprecated.', E_USER_DEPRECATED);
+            $options = ['number' => $options];
+        } elseif (isset($options['status'])) {
+            trigger_error('Validation::addError() expects $options[\'number\'], not $options[\'status\'].', E_USER_DEPRECATED);
+            $options['number'] = $options['status'];
+            unset($options['status']);
         }
 
-        $fieldKey = $field;
-        $row = ['field' => null, 'code' => null, 'path' => null, 'index' => null, 'value' => $value];
-
-        // Split the field out into a path, field, and possible index.
-        if (($pos = strrpos($field, '.')) !== false) {
-            $row['path'] = substr($field, 0, $pos);
-            $field = substr($field, $pos + 1);
-        }
-        if (preg_match('`^([^[]+)\[(\d+)\]$`', $field, $m)) {
-            $row['index'] = (int)$m[2];
-            $field = $m[1];
-        }
-        $row['field'] = $field;
-        $row['code'] = $error;
-
-        $row = array_filter($row, function ($v) {
-            return $v !== null;
-        });
-
-        if (is_int($options)) {
-            $row['number'] = $options;
-        } else {
-            if (isset($options['status'])) {
-                trigger_error('Validation::addError() expects $options[\'number\'], not $options[\'status\'].', E_USER_DEPRECATED);
-                $options['number'] = $options['status'];
-                unset($options['status']);
-            }
-
-            $row += $options;
-        }
-
-        $this->errors[$fieldKey][] = $row;
+        $row = ['error' => $error] + $options;
+        $this->errors[$field][] = $row;
 
         return $this;
     }
@@ -148,8 +126,8 @@ class Validation {
      */
     public function getErrors(): array {
         $result = [];
-        foreach ($this->getRawErrors() as $error) {
-            $result[] = $this->formatError($error);
+        foreach ($this->getRawErrors() as $field => $error) {
+            $result[] = $this->pluckError(['field' => $field] + $error);
         }
         return $result;
     }
@@ -166,7 +144,7 @@ class Validation {
         } else {
             $result = [];
             foreach ($this->errors[$field] as $error) {
-                $result[] = $this->formatError($error);
+                $result[] = $this->pluckError($error + ['field' => $field]);
             }
             return $result;
         }
@@ -180,9 +158,9 @@ class Validation {
      * @return \Traversable Returns all of the errors.
      */
     protected function getRawErrors() {
-        foreach ($this->errors as $errors) {
+        foreach ($this->errors as $field => $errors) {
             foreach ($errors as $error) {
-                yield $error;
+                yield $field => $error;
             }
         }
     }
@@ -229,33 +207,16 @@ class Validation {
      * @param array $error The error row.
      * @return string Returns a formatted/translated error message.
      */
-    private function getErrorMessage(array $error) {
+    private function formatErrorMessage(array $error) {
         if (isset($error['messageCode'])) {
             $messageCode = $error['messageCode'];
         } elseif (isset($error['message'])) {
             return $error['message'];
         } else {
-            $messageCode = $error['code'];
+            $messageCode = $error['error'];
         }
 
         // Massage the field name for better formatting.
-        if (!$this->getTranslateFieldNames()) {
-            $field = (!empty($error['path']) ? ($error['path'][0] !== '[' ? '' : 'item').$error['path'].'.' : '').$error['field'];
-            $field = $field ?: (isset($error['index']) ? 'item' : 'value');
-            if (isset($error['index'])) {
-                $field .= '['.$error['index'].']';
-            }
-            $error['field'] = '@'.$field;
-        } elseif (isset($error['index'])) {
-            if (empty($error['field'])) {
-                $error['field'] = '@'.$this->formatMessage('item {index}', $error);
-            } else {
-                $error['field'] = '@'.$this->formatMessage('{field} at position {index}', $error);
-            }
-        } elseif (empty($error['field'])) {
-            $error['field'] = 'value';
-        }
-
         $msg = $this->formatMessage($messageCode, $error);
         return $msg;
     }
@@ -291,10 +252,19 @@ class Validation {
         $msg = preg_replace_callback('`({[^{}]+})`', function ($m) use ($context) {
             $args = array_filter(array_map('trim', explode(',', trim($m[1], '{}'))));
             $field = array_shift($args);
-            if ($field === 'value') {
-                return $this->formatValue($context[$field] ?? null);
-            } else {
-                return $this->formatField(isset($context[$field]) ? $context[$field] : null, $args);
+
+            switch ($field) {
+                case 'value':
+                    return $this->formatValue($context[$field] ?? null);
+                case 'field':
+                    $field = $context['field'] ?: 'value';
+                    if ($this->getTranslateFieldNames()) {
+                        return $this->translate($field);
+                    } else {
+                        return $field;
+                    }
+                default:
+                    return $this->formatField(isset($context[$field]) ? $context[$field] : null, $args);
             }
         }, $format);
         return $msg;
@@ -377,7 +347,7 @@ class Validation {
                     } else {
                         $fullPath = "{$name}/{$path}";
                     }
-                    $this->addError($fullPath, $error['code'], $error);
+                    $this->addError($fullPath, $error['error'], $error);
                 }
             }
         }
@@ -478,13 +448,13 @@ class Validation {
      * @param array $error The error to format.
      * @return array Returns the error stripped of default values.
      */
-    private function formatError(array $error) {
+    private function pluckError(array $error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'path' => 1, 'index' => 1, 'code' => 1, 'number' => 1]
+            ['field' => 1, 'error' => 1, 'number' => 1]
         ) + ['number' => 400];
 
-        $row['message'] = $this->getErrorMessage($error);
+        $row['message'] = $this->formatErrorMessage($error);
         return $row;
     }
 
@@ -497,14 +467,12 @@ class Validation {
     public function getConcatMessage($field = null): string {
         $sentence = $this->translate('%s.');
 
+        $errors = $field === null ? $this->getRawErrors() : ($this->errors[$field] ?? []);
+
         // Generate the message by concatenating all of the errors together.
         $messages = [];
-        foreach ($this->getRawErrors() as $error) {
-            if ($field !== null && $field !== $error['field']) {
-                continue;
-            }
-
-            $message = $this->getErrorMessage($error);
+        foreach ($errors as $field => $error) {
+            $message = $this->formatErrorMessage($error + ['field' => $field]);
             if (preg_match('`\PP$`u', $message)) {
                 $message = sprintf($sentence, $message);
             }

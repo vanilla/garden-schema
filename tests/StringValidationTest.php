@@ -52,7 +52,7 @@ class StringValidationTest extends AbstractSchemaTest {
             'abc' => ['abc', ''],
             'abcd' => ['abcd', ''],
 
-            'empty 1' => ['', 'missingField', 1],
+            'empty 1' => ['', 'minLength', 1],
             'empty 0' => ['', '', 0]
         ];
 
@@ -130,10 +130,10 @@ class StringValidationTest extends AbstractSchemaTest {
      */
     public function providePatternTests() {
         $r = [
-            'empty' => ['', 'invalid'],
+            'empty' => ['', 'pattern'],
             'fo' => ['fo', ''],
             'foo' => ['foooooooooo', ''],
-            'abcd' => ['abcd', 'invalid'],
+            'abcd' => ['abcd', 'pattern'],
         ];
 
         return $r;

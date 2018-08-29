@@ -26,7 +26,7 @@ class ValidationException extends \Exception implements \JsonSerializable {
      */
     public function __construct(Validation $validation) {
         $this->validation = $validation;
-        parent::__construct($validation->getMessage(), (int)$validation->getNumber());
+        parent::__construct($validation->getMessage(), $validation->getNumber());
     }
 
     /**

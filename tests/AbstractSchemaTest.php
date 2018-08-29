@@ -232,9 +232,9 @@ abstract class AbstractSchemaTest extends TestCase {
      *
      * @param Validation $validation The validation object to inspect.
      * @param string $field The field to look for.
-     * @param string $code The error code that must be present.
+     * @param string $error The error code that must be present.
      */
-    public function assertFieldHasError(Validation $validation, $field, $code) {
+    public function assertFieldHasError(Validation $validation, $field, $error) {
         $name = $field ?: 'value';
 
         if ($validation->isValidField($field)) {
@@ -243,15 +243,15 @@ abstract class AbstractSchemaTest extends TestCase {
         }
 
         $codes = [];
-        foreach ($validation->getFieldErrors($field) as $error) {
-            if ($code === $error['code']) {
-                $this->assertEquals($code, $error['code']); // Need at least one assertion.
+        foreach ($validation->getFieldErrors($field) as $row) {
+            if ($error === $row['error']) {
+                $this->assertEquals($error, $row['error']); // Need at least one assertion.
                 return;
             }
-            $codes[] = $error['code'];
+            $codes[] = $row['error'];
         }
 
         $has = implode(', ', $codes);
-        $this->fail("The $name does not have the $code error (has $has).");
+        $this->fail("The $name does not have the $error error (has $has).");
     }
 }

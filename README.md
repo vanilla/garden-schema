@@ -327,7 +327,7 @@ The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OA
 | [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
 | [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the length of a string. |
 | [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
-| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimeters. |
+| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimiters. You can add a custom error message with the `x-patternMessageCode` field. |
 | [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9) | array | Ony supports a single schema. |
 | [maxItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.11) | array | Limit the number of items in an array. |
 | [minItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.12) | array | Minimum number of items in an array. |

@@ -8,6 +8,7 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Schema;
+use Garden\Schema\ValidationException;
 
 class ObjectValidationTest extends AbstractSchemaTest {
     /**
@@ -87,5 +88,26 @@ class ObjectValidationTest extends AbstractSchemaTest {
 
         $valid = $sch->validate(['A' => 'false', 'b' => 'true']);
         $this->assertEquals(['A' => 'false', 'b' => 'true'], $valid);
+    }
+
+    /**
+     * Properties that have special characters should show up as escaped in errors.
+     */
+    public function testPropertyEscapingErrors() {
+        $sch = new Schema([
+            'type' => 'object',
+            'properties' => [
+                '~/' => [
+                    'type' => 'integer',
+                ],
+            ],
+        ]);
+
+        try {
+            $valid = $sch->validate(['~/' => 123.4]);
+            $this->fail("There should be a validation exception.");
+        } catch (ValidationException $ex) {
+            $this->assertSame('123.4 is not a valid integer.', $ex->getValidation()->getConcatMessage('~0~1'));
+        }
     }
 }

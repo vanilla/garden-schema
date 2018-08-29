@@ -31,26 +31,11 @@ class ValidationClassTest extends TestCase {
     public function testAddErrorWithPath() {
         $vld = new Validation();
 
-        $vld->addError('foo.bar', 'error');
+        $vld->addError('foo/bar', 'error');
         $error = $vld->getErrors()[0];
 
         $this->assertArraySubset(
-            ['field' => 'bar', 'path' => 'foo', 'code' => 'error'],
-            $error
-        );
-    }
-
-    /**
-     * Test adding an error with a path and index.
-     */
-    public function testAddErrorWithPathAndIndex() {
-        $vld = new Validation();
-
-        $vld->addError('foo.bar.baz[0]', 'error');
-        $error = $vld->getErrors()[0];
-
-        $this->assertArraySubset(
-            ['field' => 'baz', 'path' => 'foo.bar', 'index' => 0, 'code' => 'error'],
+            ['field' => 'foo/bar', 'error' => 'error'],
             $error
         );
     }
@@ -126,7 +111,7 @@ class ValidationClassTest extends TestCase {
     public function testMainStatusOverride() {
         $vld = new Validation();
 
-        $vld->addError('foo', 'bar', ['number' => 500])
+        $vld->addError('foo', 'bar')
             ->setMainNumber(100);
 
         $this->assertSame(100, $vld->getNumber());

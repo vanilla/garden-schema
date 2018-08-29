@@ -49,7 +49,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         } catch (ValidationException $ex) {
             $errors = $ex->getValidation()->getErrors();
             foreach ($errors as $error) {
-                $this->assertSame('missingField', $error['code']);
+                $this->assertSame('required', $error['error']);
             }
         }
     }
@@ -400,7 +400,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
      * Test throwing an exception when removing unexpected parameters from validated data.
      *
      * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessage value has unexpected fields: admin, role.
+     * @expectedExceptionMessage Unexpected properties: admin, role.
      * @expectedExceptionCode 400
      */
     public function testValidateException() {
