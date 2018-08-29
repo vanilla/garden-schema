@@ -169,10 +169,10 @@ class ValidationField {
     /**
      * Get the field type.
      *
-     * @return string|string[]|null Returns a type string, array of type strings, or null if there isn't one.
+     * @return string|string[] Returns a type string, array of type strings, or null if there isn't one.
      */
     public function getType() {
-        return $this->field['type'] ?? null;
+        return $this->field['type'] ?? '';
     }
 
     /**

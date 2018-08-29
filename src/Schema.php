@@ -87,7 +87,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function __construct(array $schema = []) {
         $this->schema = $schema;
-        $this->refLookup = function (string $_) {
+        $this->refLookup = function (/** @scrutinizer ignore-unused */ string $_) {
             return null;
         };
         $this->validationFactory = function () {
@@ -1027,7 +1027,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array|\Traversable|\ArrayAccess $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
-     * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
+     * @return array|\ArrayObject|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
      * or invalid if there are no valid properties.
      * @throws RefNotFoundException Throws an exception of a property or additional property has a `$ref` that cannot be found.
      */
@@ -1621,13 +1621,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Validate a field against a single type.
      *
      * @param mixed $value The value to validate.
-     * @param string|null $type The type to validate against.
+     * @param string $type The type to validate against.
      * @param ValidationField $field Contains field and validation information.
      * @return mixed Returns the valid value or `Invalid`.
      * @throws \InvalidArgumentException Throws an exception when `$type` is not recognized.
      * @throws RefNotFoundException Throws an exception when internal validation has a reference that isn't found.
      */
-    protected function validateSingleType($value, $type, ValidationField $field) {
+    protected function validateSingleType($value, string $type, ValidationField $field) {
         switch ($type) {
             case 'boolean':
                 $result = $this->validateBoolean($value, $field);
@@ -1658,7 +1658,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             case 'null':
                 $result = $this->validateNull($value, $field);
                 break;
-            case null:
+            case '':
                 // No type was specified so we are valid.
                 $result = $value;
                 break;
