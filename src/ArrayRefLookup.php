@@ -47,7 +47,7 @@ class ArrayRefLookup {
         if ($fragment === '/') {
             return $this->array;
         }
-        $parts = array_map([$this, 'unescape'], explode('/', substr($fragment, 1)));
+        $parts = Schema::explodeRef(substr($fragment, 1));
 
         $value = $this->array;
         foreach ($parts as $key) {
@@ -58,16 +58,6 @@ class ArrayRefLookup {
             }
         }
         return $value;
-    }
-
-    /**
-     * Unescape a JSON reference segment.
-     *
-     * @param string $str The segment to unescape.
-     * @return string Returns the unescaped string.
-     */
-    private function unescape(string $str): string {
-        return str_replace(['~1', '~0'], ['/', '~'], $str);
     }
 
     /**

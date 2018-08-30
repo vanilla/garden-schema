@@ -71,7 +71,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * @var callable A callback is used to create validation objects.
      */
-    private $validationFactory;
+    private $validationFactory = [Validation::class, 'createValidation'];
 
     /**
      * @var callable
@@ -84,14 +84,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * Initialize an instance of a new {@link Schema} class.
      *
      * @param array $schema The array schema to validate against.
+     * @param callable $refLookup The function used to lookup references.
      */
-    public function __construct(array $schema = []) {
+    public function __construct(array $schema = [], callable $refLookup = null) {
         $this->schema = $schema;
-        $this->refLookup = function (string $name) {
+
+        $this->refLookup = $refLookup ?? function (/** @scrutinizer ignore-unused */string $_) {
             return null;
-        };
-        $this->validationFactory = function () {
-            return new Validation();
         };
     }
 
@@ -205,22 +204,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string
      */
     public function getID(): string {
-        return isset($this->schema['id']) ? $this->schema['id'] : '';
+        return $this->schema['id'] ?? '';
     }
 
     /**
      * Set the ID for the schema.
      *
      * @param string $id The new ID.
-     * @throws \InvalidArgumentException Throws an exception when the provided ID is not a string.
-     * @return Schema
+     * @return $this
      */
     public function setID(string $id) {
-        if (is_string($id)) {
-            $this->schema['id'] = $id;
-        } else {
-            throw new \InvalidArgumentException("The ID is not a valid string.", 500);
-        }
+        $this->schema['id'] = $id;
 
         return $this;
     }
@@ -241,9 +235,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return Schema Returns the current instance for fluent calls.
      */
     public function setFlags(int $flags) {
-        if (!is_int($flags)) {
-            throw new \InvalidArgumentException('Invalid flags.', 500);
-        }
         $this->flags = $flags;
 
         return $this;
@@ -303,7 +294,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * The internal implementation of schema merging.
      *
-     * @param array &$target The target of the merge.
+     * @param array $target The target of the merge.
      * @param array $source The source of the merge.
      * @param bool $overwrite Whether or not to replace values.
      * @param bool $addProperties Whether or not to add object properties to the target.
@@ -370,8 +361,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         return $target;
     }
 
-//    public function overlay(Schema $schema )
-
     /**
      * Returns the internal schema array.
      *
@@ -400,7 +389,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array $arr The array to parse into a schema.
      * @return array The full schema array.
-     * @throws \InvalidArgumentException Throws an exception when an item in the schema is invalid.
+     * @throws ParseException Throws an exception when an item in the schema is invalid.
      */
     protected function parseInternal(array $arr): array {
         if (empty($arr)) {
@@ -438,14 +427,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Parse a schema node.
      *
-     * @param array $node The node to parse.
+     * @param array|Schema $node The node to parse.
      * @param mixed $value Additional information from the node.
      * @return array|\ArrayAccess Returns a JSON schema compatible node.
+     * @throws ParseException Throws an exception if there was a problem parsing the schema node.
      */
     private function parseNode($node, $value = null) {
         if (is_array($value)) {
             if (is_array($node['type'])) {
-                trigger_error('Schemas with multiple types is deprecated.', E_USER_DEPRECATED);
+                trigger_error('Schemas with multiple types are deprecated.', E_USER_DEPRECATED);
             }
 
             // The value describes a bit more about the schema.
@@ -508,6 +498,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array $arr An object property schema.
      * @return array Returns a schema array suitable to be placed in the **properties** key of a schema.
+     * @throws ParseException Throws an exception if a property name cannot be determined for an array item.
      */
     private function parseProperties(array $arr): array {
         $properties = [];
@@ -519,7 +510,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     $key = $value;
                     $value = '';
                 } else {
-                    throw new \InvalidArgumentException("Schema at position $key is not a valid parameter.", 500);
+                    throw new ParseException("Schema at position $key is not a valid parameter.", 500);
                 }
             }
 
@@ -542,7 +533,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $key The short parameter string to parse.
      * @param array $value An array of other information that might help resolve ambiguity.
      * @return array Returns an array in the form `[string name, array param, bool required]`.
-     * @throws \InvalidArgumentException Throws an exception if the short param is not in the correct format.
+     * @throws ParseException Throws an exception if the short param is not in the correct format.
      */
     public function parseShortParam(string $key, $value = []): array {
         // Is the parameter optional?
@@ -575,7 +566,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             foreach ($shortTypes as $alias) {
                 $found = $this->getType($alias);
                 if ($found === null) {
-                    throw new \InvalidArgumentException("Unknown type '$alias'", 500);
+                    throw new ParseException("Unknown type '$alias'.", 500);
                 } elseif ($found === 'datetime') {
                     $param['format'] = 'date-time';
                     $types[] = 'string';
@@ -603,11 +594,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $typesStr = implode('|', $types);
                 $paramTypesStr = implode('|', (array)$param['type']);
 
-                throw new \InvalidArgumentException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
+                throw new ParseException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
             }
         } else {
             if (empty($types) && !empty($parts[1])) {
-                throw new \InvalidArgumentException("Invalid type {$parts[1]} for field $name.", 500);
+                throw new ParseException("Invalid type {$parts[1]} for field $name.", 500);
             }
             if (empty($types)) {
                 $param += ['type' => null];
@@ -708,14 +699,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 }
 
                 if ($count === 1) {
-                    $message = 'One of {required} are required.';
+                    $message = 'One of {properties} are required.';
                 } else {
-                    $message = '{count} of {required} are required.';
+                    $message = '{count} of {properties} are required.';
                 }
 
-                $field->addError('missingField', [
+                $field->addError('oneOfRequired', [
                     'messageCode' => $message,
-                    'required' => $required,
+                    'properties' => $required,
                     'count' => $count
                 ]);
                 return false;
@@ -751,7 +742,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (Invalid::isInvalid($clean) && $field->isValid()) {
             // This really shouldn't happen, but we want to protect against seeing the invalid object.
-            $field->addError('invalid', ['messageCode' => '{field} is invalid.', 'status' => 422]);
+            $field->addError('invalid', ['messageCode' => 'The value is invalid.']);
         }
 
         if (!$field->getValidation()->isValid()) {
@@ -767,6 +758,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $data The data to validate.
      * @param array $options Validation options. See `Schema::validate()`.
      * @return bool Returns true if the data is valid. False otherwise.
+     * @throws RefNotFoundException Throws an exception when there is an unknown `$ref` in the schema.
      */
     public function isValid($data, $options = []) {
         try {
@@ -784,6 +776,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field A validation object to add errors to.
      * @return mixed|Invalid Returns a clean version of the value with all extra fields stripped out or invalid if the value
      * is completely invalid.
+     * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
     protected function validateField($value, ValidationField $field) {
         $result = $value = $this->filterField($value, $field);
@@ -828,16 +821,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     protected function validateArray($value, ValidationField $field) {
         if ((!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) && !$value instanceof \Traversable) {
-            $field->addTypeError('array');
+            $field->addTypeError($value, 'array');
             return Invalid::value();
         } else {
             if ((null !== $minItems = $field->val('minItems')) && count($value) < $minItems) {
                 $field->addError(
                     'minItems',
                     [
-                        'messageCode' => '{field} must contain at least {minItems} {minItems,plural,item}.',
+                        'messageCode' => 'This must contain at least {minItems} {minItems,plural,item,items}.',
                         'minItems' => $minItems,
-                        'status' => 422
                     ]
                 );
             }
@@ -845,9 +837,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError(
                     'maxItems',
                     [
-                        'messageCode' => '{field} must contain no more than {maxItems} {maxItems,plural,item}.',
+                        'messageCode' => 'This must contain no more than {maxItems} {maxItems,plural,item,items}.',
                         'maxItems' => $maxItems,
-                        'status' => 422
                     ]
                 );
             }
@@ -856,8 +847,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError(
                     'uniqueItems',
                     [
-                        'messageCode' => '{field} must contain unique items.',
-                        'status' => 422,
+                        'messageCode' => 'The array must contain unique items.',
                     ]
                 );
             }
@@ -904,7 +894,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     protected function validateBoolean($value, ValidationField $field) {
         $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         if ($value === null) {
-            $field->addTypeError('boolean');
+            $field->addTypeError($value, 'boolean');
             return Invalid::value();
         }
 
@@ -943,7 +933,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         if (Invalid::isInvalid($value)) {
-            $field->addTypeError('datetime');
+            $field->addTypeError($value, 'date/time');
         }
         return $value;
     }
@@ -958,7 +948,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     protected function validateNumber($value, ValidationField $field) {
         $result = filter_var($value, FILTER_VALIDATE_FLOAT);
         if ($result === false) {
-            $field->addTypeError('number');
+            $field->addTypeError($value, 'number');
             return Invalid::value();
         }
 
@@ -981,7 +971,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $result = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($result === false) {
-            $field->addTypeError('integer');
+            $field->addTypeError($value, 'integer');
             return Invalid::value();
         }
 
@@ -996,10 +986,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to validate.
      * @param ValidationField $field The validation results to add.
      * @return object|Invalid Returns a clean object or **null** if validation fails.
+     * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
     protected function validateObject($value, ValidationField $field) {
         if (!$this->isArray($value) || isset($value[0])) {
-            $field->addTypeError('object');
+            $field->addTypeError($value, 'object');
             return Invalid::value();
         } elseif (is_array($field->val('properties')) || null !== $field->val('additionalProperties')) {
             // Validate the data against the internal schema.
@@ -1010,22 +1001,20 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (($maxProperties = $field->val('maxProperties')) && count($value) > $maxProperties) {
             $field->addError(
-                'maxItems',
+                'maxProperties',
                 [
-                    'messageCode' => '{field} must contain no more than {maxProperties} {maxProperties,plural,item}.',
+                    'messageCode' => 'This must contain no more than {maxProperties} {maxProperties,plural,item,items}.',
                     'maxItems' => $maxProperties,
-                    'status' => 422
                 ]
             );
         }
 
         if (($minProperties = $field->val('minProperties')) && count($value) < $minProperties) {
             $field->addError(
-                'minItems',
+                'minProperties',
                 [
-                    'messageCode' => '{field} must contain at least {minProperties} {minProperties,plural,item}.',
+                    'messageCode' => 'This must contain at least {minProperties} {minProperties,plural,item,items}.',
                     'minItems' => $minProperties,
-                    'status' => 422
                 ]
             );
         }
@@ -1038,7 +1027,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param array|\Traversable|\ArrayAccess $data The data to validate.
      * @param ValidationField $field This argument will be filled with the validation result.
-     * @return array|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
+     * @return array|\ArrayObject|Invalid Returns a clean array with only the appropriate properties and the data coerced to proper types.
      * or invalid if there are no valid properties.
      * @throws RefNotFoundException Throws an exception of a property or additional property has a `$ref` that cannot be found.
      */
@@ -1068,11 +1057,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Loop through the schema fields and validate each one.
         foreach ($properties as $propertyName => $property) {
-            list($property, $schemaPath) = $this->lookupSchema($property, $field->getSchemaPath().'/properties/'.$propertyField->escapeRef($propertyName));
+            list($property, $schemaPath) = $this->lookupSchema($property, $field->getSchemaPath().'/properties/'.self::escapeRef($propertyName));
 
             $propertyField
                 ->setField($property)
-                ->setName(ltrim($field->getName().'/'.$propertyField->escapeRef($propertyName), '/'))
+                ->setName(ltrim($field->getName().'/'.self::escapeRef($propertyName), '/'))
                 ->setSchemaPath($schemaPath)
             ;
 
@@ -1092,7 +1081,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($propertyField->hasVal('default')) {
                     $clean[$propertyName] = $propertyField->val('default');
                 } elseif ($isRequired) {
-                    $propertyField->addError('missingField', ['messageCode' => '{field} is required.']);
+                    $propertyField->addError(
+                        'required',
+                        ['messageCode' => '{property} is required.', 'property' => $propertyName]
+                    );
                 }
             } else {
                 $value = $data[$keys[$lName]];
@@ -1135,13 +1127,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     }
                 }
             } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE)) {
-                $msg = sprintf("%s has unexpected field(s): %s.", $field->getName() ?: 'value', implode(', ', $keys));
+                $msg = sprintf("Unexpected properties: %s.", implode(', ', $keys));
                 trigger_error($msg, E_USER_NOTICE);
             } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)) {
-                $field->addError('invalid', [
-                    'messageCode' => '{field} has {extra,plural,an unexpected field,unexpected fields}: {extra}.',
+                $field->addError('unexpectedProperties', [
+                    'messageCode' => 'Unexpected {extra,plural,property,properties}: {extra}.',
                     'extra' => array_values($keys),
-                    'status' => 422
                 ]);
             }
         }
@@ -1165,32 +1156,26 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if (is_string($value) || is_numeric($value)) {
             $value = $result = (string)$value;
         } else {
-            $field->addTypeError('string');
+            $field->addTypeError($value, 'string');
             return Invalid::value();
         }
 
         if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
-            if (!empty($field->getName()) && $minLength === 1) {
-                $field->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
-            } else {
-                $field->addError(
-                    'minLength',
-                    [
-                        'messageCode' => '{field} should be at least {minLength} {minLength,plural,character} long.',
-                        'minLength' => $minLength,
-                        'status' => 422
-                    ]
-                );
-            }
+            $field->addError(
+                'minLength',
+                [
+                    'messageCode' => 'The value should be at least {minLength} {minLength,plural,character,characters} long.',
+                    'minLength' => $minLength,
+                ]
+            );
         }
         if (($maxLength = $field->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
             $field->addError(
                 'maxLength',
                 [
-                    'messageCode' => '{field} is {overflow} {overflow,plural,characters} too long.',
+                    'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
                     'maxLength' => $maxLength,
                     'overflow' => mb_strlen($value) - $maxLength,
-                    'status' => 422
                 ]
             );
         }
@@ -1199,10 +1184,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             if (!preg_match($regex, $value)) {
                 $field->addError(
-                    'invalid',
+                    'pattern',
                     [
-                        'messageCode' => '{field} is in the incorrect format.',
-                        'status' => 422
+                        'messageCode' => $field->val('x-patternMessageCode'. 'The value doesn\'t match the required pattern.'),
                     ]
                 );
             }
@@ -1232,14 +1216,19 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     $result = filter_var($result, FILTER_VALIDATE_IP);
                     break;
                 case 'uri':
-                    $type = 'URI';
+                    $type = 'URL';
                     $result = filter_var($result, FILTER_VALIDATE_URL);
                     break;
                 default:
                     trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
             }
             if ($result === false) {
-                $field->addTypeError($type);
+                $field->addError('format', [
+                    'format' => $format,
+                    'formatCode' => $type,
+                    'value' => $value,
+                    'messageCode' => '{value} is not a valid {formatCode}.'
+                ]);
             }
         }
 
@@ -1263,7 +1252,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif (is_string($value) && $ts = strtotime($value)) {
             $result = $ts;
         } else {
-            $field->addTypeError('timestamp');
+            $field->addTypeError($value, 'timestamp');
             $result = Invalid::value();
         }
         return $result;
@@ -1280,7 +1269,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ($value === null) {
             return null;
         }
-        $field->addError('invalid', ['messageCode' => '{field} should be null.', 'status' => 422]);
+        $field->addError('type', ['messageCode' => 'The value should be null.', 'type' => 'null']);
         return Invalid::value();
     }
 
@@ -1299,11 +1288,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (!in_array($value, $enum, true)) {
             $field->addError(
-                'invalid',
+                'enum',
                 [
-                    'messageCode' => '{field} must be one of: {enum}.',
+                    'messageCode' => 'The value must be one of: {enum}.',
                     'enum' => $enum,
-                    'status' => 422
                 ]
             );
             return Invalid::value();
@@ -1352,7 +1340,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Add an error on the field if the validator hasn't done so.
         if (!$valid && $field->isValid()) {
-            $field->addError('invalid', ['messageCode' => '{field} is invalid.', 'status' => 422]);
+            $field->addError('invalid', ['messageCode' => 'The value is invalid.']);
         }
     }
 
@@ -1636,8 +1624,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $type The type to validate against.
      * @param ValidationField $field Contains field and validation information.
      * @return mixed Returns the valid value or `Invalid`.
+     * @throws \InvalidArgumentException Throws an exception when `$type` is not recognized.
+     * @throws RefNotFoundException Throws an exception when internal validation has a reference that isn't found.
      */
-    protected function validateSingleType($value, $type, ValidationField $field) {
+    protected function validateSingleType($value, string $type, ValidationField $field) {
         switch ($type) {
             case 'boolean':
                 $result = $this->validateBoolean($value, $field);
@@ -1668,7 +1658,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             case 'null':
                 $result = $this->validateNull($value, $field);
                 break;
-            case null:
+            case '':
                 // No type was specified so we are valid.
                 $result = $value;
                 break;
@@ -1687,6 +1677,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string[] $types The types to validate against.
      * @param ValidationField $field Contains field and validation information.
      * @return mixed Returns the valid value or `Invalid`.
+     * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
+     * @deprecated Multiple types are being removed next version.
      */
     private function validateMultipleTypes($value, array $types, ValidationField $field) {
         trigger_error('Multiple schema types are deprecated.', E_USER_DEPRECATED);
@@ -1768,7 +1760,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $divided = $value / $multipleOf;
 
             if ($divided != round($divided)) {
-                $field->addError('multipleOf', ['messageCode' => '{field} is not a multiple of {multipleOf}.', 'status' => 422, 'multipleOf' => $multipleOf]);
+                $field->addError('multipleOf', ['messageCode' => 'The value must be a multiple of {multipleOf}.', 'multipleOf' => $multipleOf]);
             }
         }
 
@@ -1777,11 +1769,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             if ($value > $maximum || ($exclusive && $value == $maximum)) {
                 if ($exclusive) {
-                    $field->addError('maximum', ['messageCode' => '{field} is greater than or equal to {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                    $field->addError('maximum', ['messageCode' => 'The value must be less than {maximum}.', 'maximum' => $maximum]);
                 } else {
-                    $field->addError('maximum', ['messageCode' => '{field} is greater than {maximum}.', 'status' => 422, 'maximum' => $maximum]);
+                    $field->addError('maximum', ['messageCode' => 'The value must be less than or equal to {maximum}.', 'maximum' => $maximum]);
                 }
-
             }
         }
 
@@ -1790,11 +1781,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             if ($value < $minimum || ($exclusive && $value == $minimum)) {
                 if ($exclusive) {
-                    $field->addError('minimum', ['messageCode' => '{field} is greater than or equal to {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                    $field->addError('minimum', ['messageCode' => 'The value must be greater than {minimum}.', 'minimum' => $minimum]);
                 } else {
-                    $field->addError('minimum', ['messageCode' => '{field} is greater than {minimum}.', 'status' => 422, 'minimum' => $minimum]);
+                    $field->addError('minimum', ['messageCode' => 'The value must be greater than or equal to {minimum}.', 'minimum' => $minimum]);
                 }
-
             }
         }
 
@@ -1892,6 +1882,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * Set the function used to resolve `$ref` lookups.
      *
+     * The function should have the following signature:
+     *
+     * ```php
+     * function(string $ref): array|Schema|null {
+     *     ...
+     * }
+     * ```
+     * The function should take a string reference and return a schema array, `Schema` or **null**.
+     *
      * @param callable $refLookup The new lookup function.
      * @return $this
      */
@@ -1919,5 +1918,35 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $this->validationFactory = $validationFactory;
         $this->validationClass = null;
         return $this;
+    }
+
+    /**
+     * Escape a JSON reference field.
+     *
+     * @param string $field The reference field to escape.
+     * @return string Returns an escaped reference.
+     */
+    public static function escapeRef(string $field): string {
+        return str_replace(['~', '/'], ['~0', '~1'], $field);
+    }
+
+    /**
+     * Unescape a JSON reference segment.
+     *
+     * @param string $str The segment to unescapeRef.
+     * @return string Returns the unescaped string.
+     */
+    public static function unescapeRef(string $str): string {
+        return str_replace(['~1', '~0'], ['/', '~'], $str);
+    }
+
+    /**
+     * Explode a references into its individual parts.
+     *
+     * @param string $ref A JSON reference.
+     * @return string[] The individual parts of the reference.
+     */
+    public static function explodeRef(string $ref): array {
+        return array_map([self::class, 'unescapeRef'], explode('/', $ref));
     }
 }

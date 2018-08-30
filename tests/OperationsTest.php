@@ -7,10 +7,25 @@
 
 namespace Garden\Schema\Tests;
 
-
 use Garden\Schema\Schema;
 
+/**
+ * Tests for schema modification operations.
+ */
 class OperationsTest extends AbstractSchemaTest {
+
+    /**
+     * Test the schema title property.
+     */
+    public function testTitle() {
+        $sch = new Schema([]);
+
+        $this->assertEmpty($sch->getTitle());
+        $sch->setTitle('foo');
+        $this->assertSame('foo', $sch->getTitle());
+    }
+
+
     /**
      * Test merging basic schemas.
      */

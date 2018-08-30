@@ -276,4 +276,13 @@ class ParseTest extends AbstractSchemaTest {
 
         $this->assertEquals(['foo' => 'bar!', 'bar' => 2], $valid);
     }
+
+    /**
+     * Unknown types should throw an exception when parsing.
+     *
+     * @expectedException \Garden\Schema\ParseException
+     */
+    public function testInvalidTypeError() {
+        $sch = Schema::parse(['foo:dd']);
+    }
 }

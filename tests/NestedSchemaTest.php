@@ -62,8 +62,8 @@ class NestedSchemaTest extends AbstractSchemaTest {
     /**
      * Verify field names in nested schema error messages appear as expected.
      *
-     * @expectedException Garden\Schema\ValidationException
-     * @expectedExceptionMessage addr/zip is not a valid integer.
+     * @expectedException \Garden\Schema\ValidationException
+     * @expectedExceptionMessage false is not a valid integer.
      */
     public function testNestedInvalidMessage() {
         $sch = $this->getNestedSchema();
@@ -93,7 +93,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
         // Try a custom validator for the items.
         $schema->addValidator('properties/arr/items', function ($value, ValidationField $field) {
             if ($value > 2) {
-                $field->addError('{field} must be less than 2.', 422);
+                $field->addError('{field} must be less than 2.');
             }
         });
         try {
@@ -102,7 +102,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
         } catch (ValidationException $ex) {
             $validation = $ex->getValidation();
             $this->assertFalse($validation->isValidField('arr/2'));
-            $this->assertEquals('arr/2 must be less than 2.', $validation->getMessage());
+            $this->assertEquals('arr/2: arr/2 must be less than 2.', $validation->getMessage());
         }
     }
 
@@ -356,8 +356,8 @@ class NestedSchemaTest extends AbstractSchemaTest {
         } catch (ValidationException $ex) {
             $errors = $ex->getValidation()->getErrors();
             $this->assertCount(2, $errors);
-            $this->assertEquals('0/name is required.', $errors[0]['message']);
-            $this->assertEquals('1/name is not a valid string.', $errors[1]['message']);
+            $this->assertEquals('name is required.', $errors[0]['message']);
+            $this->assertEquals('The value is not a valid string.', $errors[1]['message']);
         }
     }
 

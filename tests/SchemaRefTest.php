@@ -218,4 +218,15 @@ class SchemaRefTest extends TestCase {
 
         return $sch;
     }
+
+    /**
+     * By default references should not be found.
+     *
+     * @expectedException \Garden\Schema\RefNotFoundException
+     */
+    public function testDefaultRefNotFound() {
+        $sch = new Schema(['$ref' => '#/foo']);
+
+        $valid = $sch->validate(123);
+    }
 }

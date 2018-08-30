@@ -201,6 +201,28 @@ When you call **validate()** and validation fails a **ValidationException** is t
 
 If you are writing an API, you can **json_encode()** the **ValidationException** and it should provide a rich set of data that will help any consumer figure out exactly what they did wrong. You can also use various properties of the **Validation** property to help render the error output appropriately. 
 
+#### The Validation JSON Format
+
+The `Validation` object and `ValidationException` both encode to the following format:
+
+```js
+ValidationError = {
+    "message": "string", // Main error message.
+    "number": "integer", // Max error number.
+    "errors": { // Specific field errors.
+        "<fieldRef>": [ // Each key is a JSON reference field name.
+            {
+                "message": "string", // Field error message.
+                "error": "string", // Specific error code, usually a schema attribute.
+                "number": "integer" // Field error number.
+            }
+        ]
+    }
+}
+```
+
+This format is optimized for helping present errors to user interfaces. You can loop through the specific `errors` collection and line up errors with their inputs on a user interface. For deeply nested objects, the field name is a JSON reference.
+
 ## Schema References
 
 OpenAPI allows for schemas to be accessed with references using the `$ref` attribute. Using references allows you to define commonly used schemas in one place and then reference them from many locations.
@@ -327,7 +349,7 @@ The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OA
 | [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
 | [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the length of a string. |
 | [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
-| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimeters. |
+| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimiters. You can add a custom error message with the `x-patternMessageCode` field. |
 | [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9) | array | Ony supports a single schema. |
 | [maxItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.11) | array | Limit the number of items in an array. |
 | [minItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.12) | array | Minimum number of items in an array. |

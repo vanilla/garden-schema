@@ -61,11 +61,11 @@ class ValidationField {
      * Add a validation error.
      *
      * @param string $error The message code.
-     * @param int|array $options An array of additional information to add to the error entry or a numeric error code.
+     * @param array $options An array of additional information to add to the error entry or a numeric error code.
      * @return $this
      * @see Validation::addError()
      */
-    public function addError($error, $options = []) {
+    public function addError(string $error, array $options = []) {
         $this->validation->addError($this->getName(), $error, $options);
         return $this;
     }
@@ -73,19 +73,20 @@ class ValidationField {
     /**
      * Add an invalid type error.
      *
+     * @param mixed $value The erroneous value.
      * @param string $type The type that was checked.
      * @return $this
      */
-    public function addTypeError($type = '') {
+    public function addTypeError($value, $type = '') {
         $type = $type ?: $this->getType();
 
         $this->validation->addError(
             $this->getName(),
-            'invalid',
+            'type',
             [
                 'type' => $type,
-                'messageCode' => '{field} is not a valid {type}.',
-                'status' => 422
+                'value' => is_scalar($value) ? $value : null,
+                'messageCode' => is_scalar($value) ? "{value} is not a valid $type." : "The value is not a valid $type."
             ]
         );
 
@@ -168,10 +169,10 @@ class ValidationField {
     /**
      * Get the field type.
      *
-     * @return string|string[]|null Returns a type string, array of type strings, or null if there isn't one.
+     * @return string|string[] Returns a type string, array of type strings, or null if there isn't one.
      */
     public function getType() {
-        return $this->field['type'] ?? null;
+        return $this->field['type'] ?? '';
     }
 
     /**
@@ -277,15 +278,5 @@ class ValidationField {
     public function setSchemaPath(string $schemaPath) {
         $this->schemaPath = ltrim($schemaPath, '/');
         return $this;
-    }
-
-    /**
-     * Escape a JSON reference field.
-     *
-     * @param string $ref The reference to escape.
-     * @return string Returns an escaped reference.
-     */
-    public static function escapeRef(string $ref): string {
-        return str_replace(['~', '/'], ['~0', '~1'], $ref);
     }
 }

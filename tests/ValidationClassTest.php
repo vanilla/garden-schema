@@ -31,52 +31,13 @@ class ValidationClassTest extends TestCase {
     public function testAddErrorWithPath() {
         $vld = new Validation();
 
-        $vld->addError('foo.bar', 'error');
+        $vld->addError('foo/bar', 'error');
         $error = $vld->getErrors()[0];
 
         $this->assertArraySubset(
-            ['field' => 'bar', 'path' => 'foo', 'code' => 'error'],
+            ['field' => 'foo/bar', 'error' => 'error'],
             $error
         );
-    }
-
-    /**
-     * Test adding an error with a path and index.
-     */
-    public function testAddErrorWithPathAndIndex() {
-        $vld = new Validation();
-
-        $vld->addError('foo.bar.baz[0]', 'error');
-        $error = $vld->getErrors()[0];
-
-        $this->assertArraySubset(
-            ['field' => 'baz', 'path' => 'foo.bar', 'index' => 0, 'code' => 'error'],
-            $error
-        );
-    }
-
-    /**
-     * Test a calculated error message.
-     */
-    public function testCalcMessage() {
-        $vld = new Validation();
-
-        $vld->addError('foo', 'baz')
-            ->addError('foo', 'bar');
-
-        $msg = $vld->getMessage();
-        $this->assertSame('baz. bar.', $msg);
-    }
-
-    /**
-     * A specified main message should be the message.
-     */
-    public function testMainMessage() {
-        $vld = new Validation();
-        $vld->setMainMessage('foo')
-            ->addError('foo', 'baz');
-
-        $this->assertSame('foo', $vld->getMessage());
     }
 
     /**
@@ -86,7 +47,7 @@ class ValidationClassTest extends TestCase {
         $vld = new Validation();
         $vld->addError('foo', 'The {field}!');
 
-        $this->assertSame('The foo!', $vld->getMessage());
+        $this->assertSame('foo: The foo!', $vld->getMessage());
     }
 
     /**
@@ -95,10 +56,10 @@ class ValidationClassTest extends TestCase {
     public function testCalcStatus() {
         $vld = new Validation();
 
-        $vld->addError('foo', 'err', 302)
-            ->addError('bar', 'err', 301);
+        $vld->addError('foo', 'err', ['number' => 302])
+            ->addError('bar', 'err', ['number' => 301]);
 
-        $this->assertSame(302, $vld->getStatus());
+        $this->assertSame(302, $vld->getNumber());
     }
 
     /**
@@ -109,7 +70,7 @@ class ValidationClassTest extends TestCase {
 
         $vld->addError('foo', 'err');
 
-        $this->assertSame(400, $vld->getStatus());
+        $this->assertSame(400, $vld->getNumber());
     }
 
     /**
@@ -117,7 +78,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testValidStatus() {
         $vld = new Validation();
-        $this->assertSame(200, $vld->getStatus());
+        $this->assertSame(200, $vld->getNumber());
     }
 
     /**
@@ -126,10 +87,10 @@ class ValidationClassTest extends TestCase {
     public function testMainStatusOverride() {
         $vld = new Validation();
 
-        $vld->addError('foo', 'bar', 500)
-            ->setMainStatus(100);
+        $vld->addError('foo', 'bar')
+            ->setMainNumber(100);
 
-        $this->assertSame(100, $vld->getStatus());
+        $this->assertSame(100, $vld->getNumber());
     }
 
     /**
@@ -139,9 +100,9 @@ class ValidationClassTest extends TestCase {
         $vld = new TestValidation();
         $vld->setTranslateFieldNames(true);
 
-        $vld->addError('it', 'Keeping {field} {status}', 100);
+        $vld->addError('it', 'Keeping {field} {number}', ['number' => 100]);
 
-        $this->assertSame('!!Keeping !it 100.', $vld->getMessage());
+        $this->assertSame('!!it: !Keeping !it 100', $vld->getFullMessage());
     }
 
     /**
@@ -149,7 +110,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testPlural() {
         $vld = new TestValidation();
-        $vld->addError('it', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
+        $vld->addError('', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
         $this->assertSame('!apple berries pears.', $vld->getMessage());
     }
 
@@ -157,7 +118,41 @@ class ValidationClassTest extends TestCase {
      * Messages that start with "@" should not be translated.
      */
     public function testNoTranslate() {
+        $vld = new TestValidation();
+        $this->assertSame('foo', $vld->parentTranslate('@foo'));
+    }
+
+    /**
+     * The error code cannot be empty.
+     *
+     * @expectedException \InvalidArgumentException
+     */
+    public function testEmptyError() {
         $vld = new Validation();
-        $this->assertSame('foo', $vld->translate('@foo'));
+        $vld->addError('foo', '');
+    }
+
+    /**
+     * The error count function should return the correct count when filtered by field.
+     */
+    public function testErrorCountWithField() {
+        $vld = new Validation();
+        $vld->addError('foo', 'foo');
+        $vld->addError('bar', 'foo');
+
+        $this->assertSame(1, $vld->getErrorCount('foo'));
+        $this->assertSame(2, $vld->getErrorCount());
+    }
+
+    /**
+     * Null and empty strings have a different meaning in `Validation::getErrorCount()`.
+     */
+    public function testErrorCountNullVsEmpty() {
+        $vld = new Validation();
+        $vld->addError('', 'foo');
+        $vld->addError('foo', 'foo');
+
+        $this->assertSame(1, $vld->getErrorCount(''));
+        $this->assertSame(2, $vld->getErrorCount());
     }
 }

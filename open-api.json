@@ -1,0 +1,100 @@
+{
+	"openapi": "3.0.0",
+	"info": {
+		"title": "Garden Schema Data Formats",
+		"version": "2.0.0-alpha",
+		"license": {
+			"name": "MIT",
+			"url": "https://github.com/vanilla/garden-schema/blob/master/LICENSE.md"
+		}
+	},
+	"paths": {
+		"/validation-error": {
+			"get": {
+				"responses": {
+					"200": {
+						"description": "Get a sample validation error.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ValidationError"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"components": {
+		"schemas": {
+			"ValidationError": {
+				"description": "Contains error information when a schema fails to validate.",
+				"type": "object",
+				"properties": {
+					"message": {
+						"type": "string",
+						"description": "The main error message."
+					},
+					"number": {
+						"type": "integer",
+						"description": "The max error number.",
+						"default": 400
+					},
+					"errors": {
+						"title": "Field Errors",
+						"description": "A mapping of field references to errors.",
+						"type": "object",
+						"additionalProperties": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"message": {
+										"description": "A human-readable error message.",
+										"type": "string"
+									},
+									"error": {
+										"description": "A string code for the specific validation error meant for consumption by code.",
+										"type": "string"
+									},
+									"number": {
+										"description": "An HTTP-style error code for the error.",
+										"type": "integer",
+										"default": 400
+									}
+								},
+								"required": ["message", "number", "error"],
+								"example": {
+									"message": "The value should be at least 10 characters long.",
+									"error": "minLength",
+									"number": 400
+								}
+							}
+						}
+					}
+				},
+				"required": ["message", "number", "errors"],
+				"example": {
+					"message": "Validation failed.",
+					"number": 400,
+					"errors": {
+						"booleans": [
+							{ "message": "The value is not a valid boolean.", "error": "type", "number": 400 }
+						],
+						"strings": [
+							{ "message": "The value is not a valid string.", "error": "type", "number": 400 },
+							{ "message": "The value should be at least 5 characters long.", "error": "minLength", "number": 400 },
+							{ "message": "The value is 4 characters too long.", "error": "maxLength", "number": 400 },
+							{ "message": "The value doesn't match the required pattern.", "error": "pattern", "number": 400 }
+						],
+						"objects": [
+							{ "message": "The value is not a valid object.", "error": "type", "number": 400 },
+							{ "message": "Property is required.", "error": "required", "number": 400 }
+						]
+					}
+				}
+			}
+		}
+	}
+}
