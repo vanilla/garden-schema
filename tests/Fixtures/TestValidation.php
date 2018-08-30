@@ -25,6 +25,16 @@ class TestValidation extends Validation {
     }
 
     /**
+     * Call the parent's translation for testing translations specifically.
+     *
+     * @param string $str The string to translate.
+     * @return string Returns the translated string.
+     */
+    public function parentTranslate(string $str): string {
+        return parent::translate($str);
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function translate(string $str): string {
@@ -34,6 +44,19 @@ class TestValidation extends Validation {
         } else {
             return $this->prefix.parent::translate($str);
         }
+    }
+
+    /**
+     * Add brackets around fields so they can be seen in tests.
+     *
+     * @param string $field The field name.
+     * @return string Returns the formatted field name.
+     */
+    public function formatFieldName(string $field): string {
+        if ($this->getTranslateFieldNames()) {
+            return parent::formatFieldName($field);
+        }
+        return "[$field]";
     }
 
     /**

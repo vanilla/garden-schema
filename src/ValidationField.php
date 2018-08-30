@@ -279,14 +279,4 @@ class ValidationField {
         $this->schemaPath = ltrim($schemaPath, '/');
         return $this;
     }
-
-    /**
-     * Escape a JSON reference field.
-     *
-     * @param string $ref The reference to escape.
-     * @return string Returns an escaped reference.
-     */
-    public static function escapeRef(string $ref): string {
-        return str_replace(['~', '/'], ['~0', '~1'], $ref);
-    }
 }

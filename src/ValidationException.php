@@ -26,7 +26,7 @@ class ValidationException extends \Exception implements \JsonSerializable {
      */
     public function __construct(Validation $validation) {
         $this->validation = $validation;
-        parent::__construct($validation->getMessage(), $validation->getNumber());
+        parent::__construct($validation->getFullMessage(), $validation->getNumber());
     }
 
     /**
@@ -37,15 +37,7 @@ class ValidationException extends \Exception implements \JsonSerializable {
      * which is a value of any type other than a resource.
      */
     public function jsonSerialize() {
-        $errors = $this->validation->getErrors();
-        $message = $this->getValidation()->translate('Validation Failed');
-
-        $result = [
-            'message' => $message,
-            'status' => $this->getCode(),
-            'errors' => $errors
-        ];
-        return $result;
+        return $this->validation->jsonSerialize();
     }
 
     /**

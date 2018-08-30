@@ -7,6 +7,7 @@
 
 namespace Garden\Schema\Tests;
 
+use Garden\Schema\ArrayRefLookup;
 use PHPUnit\Framework\Error\Error;
 use PHPUnit\Framework\Error\Notice;
 use PHPUnit\Framework\TestCase;
@@ -253,5 +254,51 @@ abstract class AbstractSchemaTest extends TestCase {
 
         $has = implode(', ', $codes);
         $this->fail("The $name does not have the $error error (has $has).");
+    }
+
+    /**
+     * Load a schema from the project's open-api.json.
+     *
+     * @param string $ref The reference to the specific schema.
+     * @return Schema Returns a new schema pointing to the proper place.
+     * @throws \Exception Throws an exception if the open-api.json could not be decoded.
+     */
+    protected function loadOpenApiSchema(string $ref): Schema {
+        $data = json_decode(file_get_contents(__DIR__.'/../open-api.json'), true);
+        if ($data === null) {
+            throw new \Exception("The open-api.json could not be decoded.", 500);
+        }
+
+        $sch = new Schema(['$ref' => $ref], new ArrayRefLookup($data));
+
+        return $sch;
+    }
+
+    /**
+     * Compare two key-sorted arrays.
+     *
+     * @param array $expected The expected result.
+     * @param array $actual The actual result.
+     * @param string $message An error message.
+     */
+    public function assertSortedArrays(array $expected, array $actual, $message = '') {
+        $this->sortArrayKeys($expected);
+        $this->sortArrayKeys($actual);
+
+        $this->assertEquals($expected, $actual, $message);
+    }
+
+    /**
+     * Recursively sort the keys in an array.
+     *
+     * @param array $arr The array to check.
+     */
+    protected function sortArrayKeys(array &$arr) {
+        ksort($arr);
+        foreach ($arr as &$value) {
+            if (is_array($value)) {
+                $this->sortArrayKeys($value);
+            }
+        }
     }
 }

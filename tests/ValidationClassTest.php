@@ -41,37 +41,13 @@ class ValidationClassTest extends TestCase {
     }
 
     /**
-     * Test a calculated error message.
-     */
-    public function testCalcMessage() {
-        $vld = new Validation();
-
-        $vld->addError('foo', 'baz')
-            ->addError('foo', 'bar');
-
-        $msg = $vld->getMessage();
-        $this->assertSame('baz. bar.', $msg);
-    }
-
-    /**
-     * A specified main message should be the message.
-     */
-    public function testMainMessage() {
-        $vld = new Validation();
-        $vld->setMainMessage('foo')
-            ->addError('foo', 'baz');
-
-        $this->assertSame('foo', $vld->getMessage());
-    }
-
-    /**
      * Errors with "{field}" codes should be replaced.
      */
     public function testMessageReplacements() {
         $vld = new Validation();
         $vld->addError('foo', 'The {field}!');
 
-        $this->assertSame('The foo!', $vld->getMessage());
+        $this->assertSame('foo: The foo!', $vld->getMessage());
     }
 
     /**
@@ -126,7 +102,7 @@ class ValidationClassTest extends TestCase {
 
         $vld->addError('it', 'Keeping {field} {number}', ['number' => 100]);
 
-        $this->assertSame('!!Keeping !it 100.', $vld->getMessage());
+        $this->assertSame('!!it: !Keeping !it 100', $vld->getFullMessage());
     }
 
     /**
@@ -134,7 +110,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testPlural() {
         $vld = new TestValidation();
-        $vld->addError('it', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
+        $vld->addError('', '{a,plural, apple} {b,plural,berry,berries} {b, plural, pear}.', ['a' => 1, 'b' => 2]);
         $this->assertSame('!apple berries pears.', $vld->getMessage());
     }
 
@@ -142,8 +118,8 @@ class ValidationClassTest extends TestCase {
      * Messages that start with "@" should not be translated.
      */
     public function testNoTranslate() {
-        $vld = new Validation();
-        $this->assertSame('foo', $vld->translate('@foo'));
+        $vld = new TestValidation();
+        $this->assertSame('foo', $vld->parentTranslate('@foo'));
     }
 
     /**

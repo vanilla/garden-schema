@@ -45,4 +45,14 @@ The following deprecations will throw deprecation notices, but still work in ver
 
 - When specifying paths with `Schema::addValidator()` and `Schema::addFilter()` you should separate paths with `/` instead of `.` and specify the full schema path you want to add your callback to. So for example: `foo.bar[]` would become `properties/foo/properties/bar/items`. Currently, the schema will attempt to fix some old format validators and trigger a deprecation error, but may not catch every edge case.
 
-- The `Validation` class now has type hints. You will need to update subclasses to avoid exceptions.
+- Built-in validation errors are now have a number of `400` rather than a mix of `422` and `400`.
+
+- The `Validation` class has been largely changed and is largely incompatible with the previous version.
+
+    - The `Validation` class now has type hints. You will need to update subclasses to avoid exceptions.
+    - The `Validation` class now handles JSON encoding of its result.
+    - The `Validation` class now formats error messages differently where field errors are set as headings to their specific errors.
+    
+- The `ValidationException` now has a different message format where field names are used as headings and specific errors don't repeat the field name every time.
+
+- The `ValidationException` now uses the `Validation` object to JSON encode and thus has a different format.
