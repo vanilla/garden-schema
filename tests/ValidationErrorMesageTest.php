@@ -123,7 +123,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     public function testNoErrorJSON() {
         $vld = new TestValidation();
         $json = $vld->jsonSerialize();
-        $this->assertSame(['message' => '!Validation succeeded.', 'number' => 200, 'errors' => []], $json);
+        $this->assertSame(['message' => '!Validation succeeded.', 'code' => 200, 'errors' => []], $json);
     }
 
     /**
@@ -132,7 +132,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     public function testMainMessageJSON() {
         $vld = $this->createErrors('Foo');
         $json = $vld->jsonSerialize();
-        $this->assertSame(['message' => '!Foo', 'number' => 200, 'errors' => []], $json);
+        $this->assertSame(['message' => '!Foo', 'code' => 200, 'errors' => []], $json);
     }
 
     /**
@@ -141,8 +141,8 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     public function testOneFieldlessErrorJSON() {
         $vld = $this->createErrors('', 1);
         $json = $vld->jsonSerialize();
-        $this->assertEquals(['message' => '!Validation failed.', 'number' => 400, 'errors' => [
-            '' => [['error' => 'error 1', 'number' => 400, 'message' => '!error 1']]
+        $this->assertEquals(['message' => '!Validation failed.', 'code' => 400, 'errors' => [
+            '' => [['error' => 'error 1', 'message' => '!error 1']]
         ]], $json);
     }
 
@@ -151,19 +151,19 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
      */
     public function testComplexErrorJSON() {
         $vld = $this->createErrors('Foo', 0, 2, 2);
-        $vld->addError('Field X', 'error 1', ['number' => 433, 'messageCode' => 'foo']);
+        $vld->addError('Field X', 'error 1', ['code' => 433, 'messageCode' => 'foo']);
         $json = $vld->jsonSerialize();
-        $this->assertEquals(['message' => '!Foo', 'number' => 433, 'errors' => [
+        $this->assertEquals(['message' => '!Foo', 'code' => 433, 'errors' => [
             'Field 1' => [
-                ['error' => 'error 1', 'number' => 400, 'message' => '!error 1'],
-                ['error' => 'error 2', 'number' => 400, 'message' => '!error 2']
+                ['error' => 'error 1', 'message' => '!error 1'],
+                ['error' => 'error 2', 'message' => '!error 2']
             ],
             'Field 2' => [
-                ['error' => 'error 1', 'number' => 400, 'message' => '!error 1'],
-                ['error' => 'error 2', 'number' => 400, 'message' => '!error 2']
+                ['error' => 'error 1', 'message' => '!error 1'],
+                ['error' => 'error 2', 'message' => '!error 2']
             ],
             'Field X' => [
-                ['error' => 'error 1', 'number' => 433, 'message' => '!foo'],
+                ['error' => 'error 1', 'code' => 433, 'message' => '!foo'],
             ],
         ]], $json);
     }
@@ -185,7 +185,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     /**
      * The JSON data from validation should validate against the **ValidationError** schema.
      *
-     * @param Validation $vld
+     * @param Validation $vld The validation data to check.
      * @dataProvider provideValidationData
      */
     public function testValidationJSONAgainstSchema(Validation $vld) {
@@ -193,10 +193,15 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
         $json = $vld->jsonSerialize();
 
         $valid = $sch->validate($json);
-        $this->assertSortedArrays($json, $valid, '', 0.0, 10, true);
+        $this->assertSortedArrays($json, $valid);
     }
 
-    public function provideValidationData() {
+    /**
+     * Provide some dummy validation data.
+     *
+     * @return array Returns a data provider array.
+     */
+    public function provideValidationData(): array {
         $r = [
             'success' => [new Validation()],
             'main message' => [$this->createErrors('Error')],

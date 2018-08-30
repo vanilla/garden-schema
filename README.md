@@ -203,18 +203,18 @@ If you are writing an API, you can **json_encode()** the **ValidationException**
 
 #### The Validation JSON Format
 
-The `Validation` object and `ValidationException` both encode to the following format:
+The `Validation` object and `ValidationException` both encode to a [specific format]('open-api.json'). Here is an example:
 
 ```js
 ValidationError = {
     "message": "string", // Main error message.
-    "number": "integer", // Max error number.
+    "code": "integer", // HTTP-style status code.
     "errors": { // Specific field errors.
         "<fieldRef>": [ // Each key is a JSON reference field name.
             {
                 "message": "string", // Field error message.
                 "error": "string", // Specific error code, usually a schema attribute.
-                "number": "integer" // Field error number.
+                "code": "integer" // Optional field error code.
             }
         ]
     }

@@ -53,13 +53,13 @@ class ValidationClassTest extends TestCase {
     /**
      * The status should be the max status.
      */
-    public function testCalcStatus() {
+    public function testCalcCode() {
         $vld = new Validation();
 
-        $vld->addError('foo', 'err', ['number' => 302])
-            ->addError('bar', 'err', ['number' => 301]);
+        $vld->addError('foo', 'err', ['code' => 302])
+            ->addError('bar', 'err', ['code' => 301]);
 
-        $this->assertSame(302, $vld->getNumber());
+        $this->assertSame(302, $vld->getCode());
     }
 
     /**
@@ -70,7 +70,7 @@ class ValidationClassTest extends TestCase {
 
         $vld->addError('foo', 'err');
 
-        $this->assertSame(400, $vld->getNumber());
+        $this->assertSame(400, $vld->getCode());
     }
 
     /**
@@ -78,7 +78,7 @@ class ValidationClassTest extends TestCase {
      */
     public function testValidStatus() {
         $vld = new Validation();
-        $this->assertSame(200, $vld->getNumber());
+        $this->assertSame(200, $vld->getCode());
     }
 
     /**
@@ -88,9 +88,9 @@ class ValidationClassTest extends TestCase {
         $vld = new Validation();
 
         $vld->addError('foo', 'bar')
-            ->setMainNumber(100);
+            ->setMainCode(100);
 
-        $this->assertSame(100, $vld->getNumber());
+        $this->assertSame(100, $vld->getCode());
     }
 
     /**
