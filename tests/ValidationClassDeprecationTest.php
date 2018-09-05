@@ -24,7 +24,7 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
         $vld->setMainStatus(123);
 
         $this->expectErrorNumber(E_USER_DEPRECATED);
-        $this->assertSame($vld->getMainNumber(), $vld->getMainStatus());
+        $this->assertSame($vld->getMainCode(), $vld->getMainStatus());
     }
 
     /**
@@ -38,7 +38,7 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
         $vld->setMainStatus(123);
 
         $this->expectErrorNumber(E_USER_DEPRECATED);
-        $this->assertSame($vld->getNumber(), $vld->getStatus());
+        $this->assertSame($vld->getCode(), $vld->getStatus());
     }
 
     /**
@@ -49,7 +49,7 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
         $vld = new Validation();
         $this->expectErrorNumber(E_USER_DEPRECATED);
         $vld->addError('foo', 'bar', 123);
-        $this->assertSame(123, $vld->getNumber());
+        $this->assertSame(123, $vld->getCode());
     }
 
     /**
@@ -72,6 +72,6 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
 
         $this->expectErrorNumber(E_USER_DEPRECATED);
         $vld->addError('foo', 'bar', ['status' => 456]);
-        $this->assertSame(456, $vld->getNumber());
+        $this->assertSame(456, $vld->getCode());
     }
 }

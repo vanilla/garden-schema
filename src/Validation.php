@@ -24,7 +24,7 @@ class Validation implements \JsonSerializable {
     /**
      * @var int
      */
-    private $mainNumber = 0;
+    private $mainCode = 0;
 
     /**
      * @var bool Whether or not fields should be translated.
@@ -51,19 +51,19 @@ class Validation implements \JsonSerializable {
      * @deprecated
      */
     public function getStatus(): int {
-        trigger_error("Validation::getStatus() is deprecated. Use Validation::getNumber() instead.", E_USER_DEPRECATED);
-        return $this->getNumber();
+        trigger_error("Validation::getStatus() is deprecated. Use Validation::getCode() instead.", E_USER_DEPRECATED);
+        return $this->getCode();
     }
 
     /**
-     * Get the error number.
+     * Get the error code.
      *
-     * The number is an HTTP response code and should be of the 4xx variety.
+     * The code is an HTTP response code and should be of the 4xx variety.
      *
-     * @return int Returns an error number.
+     * @return int Returns an error code.
      */
-    public function getNumber(): int {
-        if ($status = $this->getMainNumber()) {
+    public function getCode(): int {
+        if ($status = $this->getMainCode()) {
             return $status;
         }
 
@@ -72,14 +72,14 @@ class Validation implements \JsonSerializable {
         }
 
         // There was no status so loop through the errors and look for the highest one.
-        $maxNumber = 0;
+        $max = 0;
         foreach ($this->getRawErrors() as $error) {
-            if (isset($error['number']) && $error['number'] > $maxNumber) {
-                $maxNumber = $error['number'];
+            if (isset($error['code']) && $error['code'] > $max) {
+                $max = $error['code'];
             }
         }
 
-        return $maxNumber ?: 400;
+        return $max ?: 400;
     }
 
     /**
@@ -87,8 +87,8 @@ class Validation implements \JsonSerializable {
      *
      * @return int Returns an HTTP response code or zero to indicate it should be calculated.
      */
-    public function getMainNumber(): int {
-        return $this->mainNumber;
+    public function getMainCode(): int {
+        return $this->mainCode;
     }
 
     /**
@@ -97,8 +97,8 @@ class Validation implements \JsonSerializable {
      * @param int $status An HTTP response code or zero.
      * @return $this
      */
-    public function setMainNumber(int $status) {
-        $this->mainNumber = $status;
+    public function setMainCode(int $status) {
+        $this->mainCode = $status;
         return $this;
     }
 
@@ -427,8 +427,8 @@ class Validation implements \JsonSerializable {
     private function pluckError(array $error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'error' => 1, 'number' => 1]
-        ) + ['number' => 400];
+            ['field' => 1, 'error' => 1, 'code' => 1]
+        );
 
         $row['message'] = $this->formatErrorMessage($error);
         return $row;
@@ -509,10 +509,10 @@ class Validation implements \JsonSerializable {
         }
         if (is_int($options)) {
             trigger_error('Passing an integer for $options in Validation::addError() is deprecated.', E_USER_DEPRECATED);
-            $options = ['number' => $options];
+            $options = ['code' => $options];
         } elseif (isset($options['status'])) {
             trigger_error('Validation::addError() expects $options[\'number\'], not $options[\'status\'].', E_USER_DEPRECATED);
-            $options['number'] = $options['status'];
+            $options['code'] = $options['status'];
             unset($options['status']);
         }
 
@@ -529,8 +529,8 @@ class Validation implements \JsonSerializable {
      * @deprecated
      */
     public function getMainStatus(): int {
-        trigger_error("Validation::getMainStatus() is deprecated. Use Validation::getMainNumber() instead.", E_USER_DEPRECATED);
-        return $this->mainNumber;
+        trigger_error("Validation::getMainStatus() is deprecated. Use Validation::getMainCode() instead.", E_USER_DEPRECATED);
+        return $this->mainCode;
     }
 
     /**
@@ -541,8 +541,8 @@ class Validation implements \JsonSerializable {
      * @deprecated
      */
     public function setMainStatus(int $status) {
-        trigger_error("Validation::setMainStatus() is deprecated. Use Validation::getMainNumber() instead.", E_USER_DEPRECATED);
-        $this->mainNumber = $status;
+        trigger_error("Validation::setMainStatus() is deprecated. Use Validation::getMainCode() instead.", E_USER_DEPRECATED);
+        $this->mainCode = $status;
         return $this;
     }
 
@@ -584,13 +584,13 @@ class Validation implements \JsonSerializable {
         foreach ($this->getRawErrors() as $field => $error) {
             $errors[$field][] = array_intersect_key(
                 $this->pluckError($error + ['field' => $field]),
-                ['error' => 1, 'message' => 1, 'number' => 1]
+                ['error' => 1, 'message' => 1, 'code' => 1]
             );
         }
 
         $result = [
             'message' => $this->getSummaryMessage(),
-            'number' => $this->getNumber(),
+            'code' => $this->getCode(),
             'errors' => $errors,
         ];
         return $result;

@@ -36,9 +36,9 @@
 						"type": "string",
 						"description": "The main error message."
 					},
-					"number": {
+					"code": {
 						"type": "integer",
-						"description": "The max error number.",
+						"description": "The maximum error code.",
 						"default": 400
 					},
 					"errors": {
@@ -58,39 +58,38 @@
 										"description": "A string code for the specific validation error meant for consumption by code.",
 										"type": "string"
 									},
-									"number": {
+									"code": {
 										"description": "An HTTP-style error code for the error.",
-										"type": "integer",
-										"default": 400
+										"type": "integer"
 									}
 								},
-								"required": ["message", "number", "error"],
+								"required": ["message", "error"],
 								"example": {
 									"message": "The value should be at least 10 characters long.",
 									"error": "minLength",
-									"number": 400
+									"code": 400
 								}
 							}
 						}
 					}
 				},
-				"required": ["message", "number", "errors"],
+				"required": ["message", "code", "errors"],
 				"example": {
 					"message": "Validation failed.",
-					"number": 400,
+					"code": 400,
 					"errors": {
 						"booleans": [
-							{ "message": "The value is not a valid boolean.", "error": "type", "number": 400 }
+							{ "message": "The value is not a valid boolean.", "error": "type" }
 						],
 						"strings": [
-							{ "message": "The value is not a valid string.", "error": "type", "number": 400 },
-							{ "message": "The value should be at least 5 characters long.", "error": "minLength", "number": 400 },
-							{ "message": "The value is 4 characters too long.", "error": "maxLength", "number": 400 },
-							{ "message": "The value doesn't match the required pattern.", "error": "pattern", "number": 400 }
+							{ "message": "The value is not a valid string.", "error": "type" },
+							{ "message": "The value should be at least 5 characters long.", "error": "minLength" },
+							{ "message": "The value is 4 characters too long.", "error": "maxLength" },
+							{ "message": "The value doesn't match the required pattern.", "error": "pattern" }
 						],
 						"objects": [
-							{ "message": "The value is not a valid object.", "error": "type", "number": 400 },
-							{ "message": "Property is required.", "error": "required", "number": 400 }
+							{ "message": "The value is not a valid object.", "error": "type" },
+							{ "message": "Property is required.", "error": "required" }
 						]
 					}
 				}
