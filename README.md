@@ -86,18 +86,16 @@ We provide first-class support for descriptions because we believe in writing re
  
 ### Types and Short Types
 
-The **Schema** class supports the following types. Each type has a short-form and a long-form. Usually you use the short-form when defining a schema in code and it gets converted to the long-form internally, including when used in errors.
+The **Schema** class supports the following types. Each type has one or more aliases. You can use an alias for brevity when defining a schema in code and it gets converted to the proper type internally, including when used in errors.
 
-Type      | Short-form
---------- | ----------
-boolean   | b, bool
-string    | s, str
-integer   | i, int
-number    | f, float
-timestamp | ts
-datetime  | dt
-array     | a
-object    | o
+Type        | Aliases       | Notes |
+----        | -------       | ----- |
+boolean     | b, bool       |
+string      | s, str, dt    | The "dt" alias adds a format of "date-time" and validates to `DateTimeInterface` instances |
+integer     | i, int, ts    | The "ts" alias adds a format of "timestamp" and will convert date strings into integer timestamps on validation. |
+number      | f, float      |
+array       | a             |
+object      | o             |
 
 ### Arrays and Objects
 
@@ -148,7 +146,7 @@ If you want a property to allow null values you can specify the `nullable` attri
 
 ```php
 [
-    // You can specify allowNull as a property attribute.
+    // You can specify nullable as a property attribute.
     'opt1:s?' => ['nullable' => true],
     
     // You can specify null as an optional type in the declaration.
@@ -158,7 +156,7 @@ If you want a property to allow null values you can specify the `nullable` attri
 
 ### Default Values
 
-You can specify a default value on object properties. If the property is omitted during validation then the default value will be used. Note that default values are not applied during sparse validation.
+You can specify a default value with the `default` attribute. If the value is omitted during validation then the default value will be used. Note that default values are not applied during sparse validation.
 
 ## Validating Data
 
@@ -203,7 +201,7 @@ If you are writing an API, you can **json_encode()** the **ValidationException**
 
 #### The Validation JSON Format
 
-The `Validation` object and `ValidationException` both encode to a [specific format]('open-api.json'). Here is an example:
+The `Validation` object and `ValidationException` both encode to a [specific format]('./open-api.json'). Here is an example:
 
 ```js
 ValidationError = {
