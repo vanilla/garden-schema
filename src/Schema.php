@@ -89,286 +89,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     public function __construct(array $schema = [], callable $refLookup = null) {
         $this->schema = $schema;
 
-        $this->refLookup = $refLookup ?? function (/** @scrutinizer ignore-unused */string $_) {
-            return null;
-        };
-    }
-
-    /**
-     * Grab the schema's current description.
-     *
-     * @return string
-     */
-    public function getDescription(): string {
-        return $this->schema['description'] ?? '';
-    }
-
-    /**
-     * Set the description for the schema.
-     *
-     * @param string $description The new description.
-     * @return $this
-     */
-    public function setDescription(string $description) {
-        $this->schema['description'] = $description;
-        return $this;
-    }
-
-    /**
-     * Get the schema's title.
-     *
-     * @return string Returns the title.
-     */
-    public function getTitle(): string {
-        return $this->schema['title'] ?? '';
-    }
-
-    /**
-     * Set the schema's title.
-     *
-     * @param string $title The new title.
-     */
-    public function setTitle(string $title) {
-        $this->schema['title'] = $title;
-    }
-
-    /**
-     * Get a schema field.
-     *
-     * @param string|array $path The JSON schema path of the field with parts separated by dots.
-     * @param mixed $default The value to return if the field isn't found.
-     * @return mixed Returns the field value or `$default`.
-     */
-    public function getField($path, $default = null) {
-        if (is_string($path)) {
-            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
-                $path = explode('.', $path);
-            } else {
-                $path = explode('/', $path);
-            }
-        }
-
-        $value = $this->schema;
-        foreach ($path as $i => $subKey) {
-            if (is_array($value) && isset($value[$subKey])) {
-                $value = $value[$subKey];
-            } elseif ($value instanceof Schema) {
-                return $value->getField(array_slice($path, $i), $default);
-            } else {
-                return $default;
-            }
-        }
-        return $value;
-    }
-
-    /**
-     * Set a schema field.
-     *
-     * @param string|array $path The JSON schema path of the field with parts separated by slashes.
-     * @param mixed $value The new value.
-     * @return $this
-     */
-    public function setField($path, $value) {
-        if (is_string($path)) {
-            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
-                $path = explode('.', $path);
-            } else {
-                $path = explode('/', $path);
-            }
-        }
-
-        $selection = &$this->schema;
-        foreach ($path as $i => $subSelector) {
-            if (is_array($selection)) {
-                if (!isset($selection[$subSelector])) {
-                    $selection[$subSelector] = [];
-                }
-            } elseif ($selection instanceof Schema) {
-                $selection->setField(array_slice($path, $i), $value);
-                return $this;
-            } else {
-                $selection = [$subSelector => []];
-            }
-            $selection = &$selection[$subSelector];
-        }
-
-        $selection = $value;
-        return $this;
-    }
-
-    /**
-     * Get the ID for the schema.
-     *
-     * @return string
-     */
-    public function getID(): string {
-        return $this->schema['id'] ?? '';
-    }
-
-    /**
-     * Set the ID for the schema.
-     *
-     * @param string $id The new ID.
-     * @return $this
-     */
-    public function setID(string $id) {
-        $this->schema['id'] = $id;
-
-        return $this;
-    }
-
-    /**
-     * Return the validation flags.
-     *
-     * @return int Returns a bitwise combination of flags.
-     */
-    public function getFlags(): int {
-        return $this->flags;
-    }
-
-    /**
-     * Set the validation flags.
-     *
-     * @param int $flags One or more of the **Schema::FLAG_*** constants.
-     * @return Schema Returns the current instance for fluent calls.
-     */
-    public function setFlags(int $flags) {
-        $this->flags = $flags;
-
-        return $this;
-    }
-
-    /**
-     * Whether or not the schema has a flag (or combination of flags).
-     *
-     * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
-     * @return bool Returns **true** if all of the flags are set or **false** otherwise.
-     */
-    public function hasFlag(int $flag): bool {
-        return ($this->flags & $flag) === $flag;
-    }
-
-    /**
-     * Set a flag.
-     *
-     * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
-     * @param bool $value Either true or false.
-     * @return $this
-     */
-    public function setFlag(int $flag, bool $value) {
-        if ($value) {
-            $this->flags = $this->flags | $flag;
-        } else {
-            $this->flags = $this->flags & ~$flag;
-        }
-        return $this;
-    }
-
-    /**
-     * Merge a schema with this one.
-     *
-     * @param Schema $schema A scheme instance. Its parameters will be merged into the current instance.
-     * @return $this
-     */
-    public function merge(Schema $schema) {
-        $this->mergeInternal($this->schema, $schema->getSchemaArray(), true, true);
-        return $this;
-    }
-
-    /**
-     * Add another schema to this one.
-     *
-     * Adding schemas together is analogous to array addition. When you add a schema it will only add missing information.
-     *
-     * @param Schema $schema The schema to add.
-     * @param bool $addProperties Whether to add properties that don't exist in this schema.
-     * @return $this
-     */
-    public function add(Schema $schema, $addProperties = false) {
-        $this->mergeInternal($this->schema, $schema->getSchemaArray(), false, $addProperties);
-        return $this;
-    }
-
-    /**
-     * The internal implementation of schema merging.
-     *
-     * @param array $target The target of the merge.
-     * @param array $source The source of the merge.
-     * @param bool $overwrite Whether or not to replace values.
-     * @param bool $addProperties Whether or not to add object properties to the target.
-     * @return array
-     */
-    private function mergeInternal(array &$target, array $source, $overwrite = true, $addProperties = true) {
-        // We need to do a fix for required properties here.
-        if (isset($target['properties']) && !empty($source['required'])) {
-            $required = isset($target['required']) ? $target['required'] : [];
-
-            if (isset($source['required']) && $addProperties) {
-                $newProperties = array_diff(array_keys($source['properties']), array_keys($target['properties']));
-                $newRequired = array_intersect($source['required'], $newProperties);
-
-                $required = array_merge($required, $newRequired);
-            }
-        }
-
-
-        foreach ($source as $key => $val) {
-            if (is_array($val) && array_key_exists($key, $target) && is_array($target[$key])) {
-                if ($key === 'properties' && !$addProperties) {
-                    // We just want to merge the properties that exist in the destination.
-                    foreach ($val as $name => $prop) {
-                        if (isset($target[$key][$name])) {
-                            $targetProp = &$target[$key][$name];
-
-                            if (is_array($targetProp) && is_array($prop)) {
-                                $this->mergeInternal($targetProp, $prop, $overwrite, $addProperties);
-                            } elseif (is_array($targetProp) && $prop instanceof Schema) {
-                                $this->mergeInternal($targetProp, $prop->getSchemaArray(), $overwrite, $addProperties);
-                            } elseif ($overwrite) {
-                                $targetProp = $prop;
-                            }
-                        }
-                    }
-                } elseif (isset($val[0]) || isset($target[$key][0])) {
-                    if ($overwrite) {
-                        // This is a numeric array, so just do a merge.
-                        $merged = array_merge($target[$key], $val);
-                        if (is_string($merged[0])) {
-                            $merged = array_keys(array_flip($merged));
-                        }
-                        $target[$key] = $merged;
-                    }
-                } else {
-                    $target[$key] = $this->mergeInternal($target[$key], $val, $overwrite, $addProperties);
-                }
-            } elseif (!$overwrite && array_key_exists($key, $target) && !is_array($val)) {
-                // Do nothing, we aren't replacing.
-            } else {
-                $target[$key] = $val;
-            }
-        }
-
-        if (isset($required)) {
-            if (empty($required)) {
-                unset($target['required']);
-            } else {
-                $target['required'] = $required;
-            }
-        }
-
-        return $target;
-    }
-
-    /**
-     * Returns the internal schema array.
-     *
-     * @return array
-     * @see Schema::jsonSerialize()
-     */
-    public function getSchemaArray(): array {
-        return $this->schema;
+        $this->refLookup = $refLookup ?? function (/** @scrutinizer ignore-unused */
+                string $_) {
+                return null;
+            };
     }
 
     /**
@@ -624,6 +348,290 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Look up a type based on its alias.
+     *
+     * @param string $alias The type alias or type name to lookup.
+     * @return mixed
+     */
+    private function getType($alias) {
+        if (isset(self::$types[$alias])) {
+            return $alias;
+        }
+        foreach (self::$types as $type => $aliases) {
+            if (in_array($alias, $aliases, true)) {
+                return $type;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Unescape a JSON reference segment.
+     *
+     * @param string $str The segment to unescapeRef.
+     * @return string Returns the unescaped string.
+     */
+    public static function unescapeRef(string $str): string {
+        return str_replace(['~1', '~0'], ['/', '~'], $str);
+    }
+
+    /**
+     * Explode a references into its individual parts.
+     *
+     * @param string $ref A JSON reference.
+     * @return string[] The individual parts of the reference.
+     */
+    public static function explodeRef(string $ref): array {
+        return array_map([self::class, 'unescapeRef'], explode('/', $ref));
+    }
+
+    /**
+     * Grab the schema's current description.
+     *
+     * @return string
+     */
+    public function getDescription(): string {
+        return $this->schema['description'] ?? '';
+    }
+
+    /**
+     * Set the description for the schema.
+     *
+     * @param string $description The new description.
+     * @return $this
+     */
+    public function setDescription(string $description) {
+        $this->schema['description'] = $description;
+        return $this;
+    }
+
+    /**
+     * Get the schema's title.
+     *
+     * @return string Returns the title.
+     */
+    public function getTitle(): string {
+        return $this->schema['title'] ?? '';
+    }
+
+    /**
+     * Set the schema's title.
+     *
+     * @param string $title The new title.
+     */
+    public function setTitle(string $title) {
+        $this->schema['title'] = $title;
+    }
+
+    /**
+     * Get a schema field.
+     *
+     * @param string|array $path The JSON schema path of the field with parts separated by dots.
+     * @param mixed $default The value to return if the field isn't found.
+     * @return mixed Returns the field value or `$default`.
+     */
+    public function getField($path, $default = null) {
+        if (is_string($path)) {
+            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
+                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
+                $path = explode('.', $path);
+            } else {
+                $path = explode('/', $path);
+            }
+        }
+
+        $value = $this->schema;
+        foreach ($path as $i => $subKey) {
+            if (is_array($value) && isset($value[$subKey])) {
+                $value = $value[$subKey];
+            } elseif ($value instanceof Schema) {
+                return $value->getField(array_slice($path, $i), $default);
+            } else {
+                return $default;
+            }
+        }
+        return $value;
+    }
+
+    /**
+     * Set a schema field.
+     *
+     * @param string|array $path The JSON schema path of the field with parts separated by slashes.
+     * @param mixed $value The new value.
+     * @return $this
+     */
+    public function setField($path, $value) {
+        if (is_string($path)) {
+            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
+                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
+                $path = explode('.', $path);
+            } else {
+                $path = explode('/', $path);
+            }
+        }
+
+        $selection = &$this->schema;
+        foreach ($path as $i => $subSelector) {
+            if (is_array($selection)) {
+                if (!isset($selection[$subSelector])) {
+                    $selection[$subSelector] = [];
+                }
+            } elseif ($selection instanceof Schema) {
+                $selection->setField(array_slice($path, $i), $value);
+                return $this;
+            } else {
+                $selection = [$subSelector => []];
+            }
+            $selection = &$selection[$subSelector];
+        }
+
+        $selection = $value;
+        return $this;
+    }
+
+    /**
+     * Return the validation flags.
+     *
+     * @return int Returns a bitwise combination of flags.
+     */
+    public function getFlags(): int {
+        return $this->flags;
+    }
+
+    /**
+     * Set the validation flags.
+     *
+     * @param int $flags One or more of the **Schema::FLAG_*** constants.
+     * @return Schema Returns the current instance for fluent calls.
+     */
+    public function setFlags(int $flags) {
+        $this->flags = $flags;
+
+        return $this;
+    }
+
+    /**
+     * Set a flag.
+     *
+     * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
+     * @param bool $value Either true or false.
+     * @return $this
+     */
+    public function setFlag(int $flag, bool $value) {
+        if ($value) {
+            $this->flags = $this->flags | $flag;
+        } else {
+            $this->flags = $this->flags & ~$flag;
+        }
+        return $this;
+    }
+
+    /**
+     * Merge a schema with this one.
+     *
+     * @param Schema $schema A scheme instance. Its parameters will be merged into the current instance.
+     * @return $this
+     */
+    public function merge(Schema $schema) {
+        $this->mergeInternal($this->schema, $schema->getSchemaArray(), true, true);
+        return $this;
+    }
+
+    /**
+     * The internal implementation of schema merging.
+     *
+     * @param array $target The target of the merge.
+     * @param array $source The source of the merge.
+     * @param bool $overwrite Whether or not to replace values.
+     * @param bool $addProperties Whether or not to add object properties to the target.
+     * @return array
+     */
+    private function mergeInternal(array &$target, array $source, $overwrite = true, $addProperties = true) {
+        // We need to do a fix for required properties here.
+        if (isset($target['properties']) && !empty($source['required'])) {
+            $required = isset($target['required']) ? $target['required'] : [];
+
+            if (isset($source['required']) && $addProperties) {
+                $newProperties = array_diff(array_keys($source['properties']), array_keys($target['properties']));
+                $newRequired = array_intersect($source['required'], $newProperties);
+
+                $required = array_merge($required, $newRequired);
+            }
+        }
+
+
+        foreach ($source as $key => $val) {
+            if (is_array($val) && array_key_exists($key, $target) && is_array($target[$key])) {
+                if ($key === 'properties' && !$addProperties) {
+                    // We just want to merge the properties that exist in the destination.
+                    foreach ($val as $name => $prop) {
+                        if (isset($target[$key][$name])) {
+                            $targetProp = &$target[$key][$name];
+
+                            if (is_array($targetProp) && is_array($prop)) {
+                                $this->mergeInternal($targetProp, $prop, $overwrite, $addProperties);
+                            } elseif (is_array($targetProp) && $prop instanceof Schema) {
+                                $this->mergeInternal($targetProp, $prop->getSchemaArray(), $overwrite, $addProperties);
+                            } elseif ($overwrite) {
+                                $targetProp = $prop;
+                            }
+                        }
+                    }
+                } elseif (isset($val[0]) || isset($target[$key][0])) {
+                    if ($overwrite) {
+                        // This is a numeric array, so just do a merge.
+                        $merged = array_merge($target[$key], $val);
+                        if (is_string($merged[0])) {
+                            $merged = array_keys(array_flip($merged));
+                        }
+                        $target[$key] = $merged;
+                    }
+                } else {
+                    $target[$key] = $this->mergeInternal($target[$key], $val, $overwrite, $addProperties);
+                }
+            } elseif (!$overwrite && array_key_exists($key, $target) && !is_array($val)) {
+                // Do nothing, we aren't replacing.
+            } else {
+                $target[$key] = $val;
+            }
+        }
+
+        if (isset($required)) {
+            if (empty($required)) {
+                unset($target['required']);
+            } else {
+                $target['required'] = $required;
+            }
+        }
+
+        return $target;
+    }
+
+    /**
+     * Returns the internal schema array.
+     *
+     * @return array
+     * @see Schema::jsonSerialize()
+     */
+    public function getSchemaArray(): array {
+        return $this->schema;
+    }
+
+    /**
+     * Add another schema to this one.
+     *
+     * Adding schemas together is analogous to array addition. When you add a schema it will only add missing information.
+     *
+     * @param Schema $schema The schema to add.
+     * @param bool $addProperties Whether to add properties that don't exist in this schema.
+     * @return $this
+     */
+    public function add(Schema $schema, $addProperties = false) {
+        $this->mergeInternal($this->schema, $schema->getSchemaArray(), false, $addProperties);
+        return $this;
+    }
+
+    /**
      * Add a custom filter to change data before validation.
      *
      * @param string $fieldname The name of the field to filter, if any.
@@ -640,18 +648,42 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Add a custom validator to to validate the schema.
+     * Parse a nested field name selector.
      *
-     * @param string $fieldname The name of the field to validate, if any.
+     * Field selectors should be separated by "/" characters, but may currently be separated by "." characters which
+     * triggers a deprecated error.
      *
-     * If you are adding a validator to a deeply nested field then separate the path with dots.
-     * @param callable $callback The callback to validate with.
-     * @return Schema Returns `$this` for fluent calls.
+     * @param string $field The field selector.
+     * @return string Returns the field selector in the correct format.
      */
-    public function addValidator(string $fieldname, callable $callback) {
-        $fieldname = $this->parseFieldSelector($fieldname);
-        $this->validators[$fieldname][] = $callback;
-        return $this;
+    private function parseFieldSelector(string $field): string {
+        if (strlen($field) === 0) {
+            return $field;
+        }
+
+        if (strpos($field, '.') !== false) {
+            if (strpos($field, '/') === false) {
+                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
+
+                $parts = explode('.', $field);
+                $parts = @array_map([$this, 'parseFieldSelector'], $parts); // silence because error triggered already.
+
+                $field = implode('/', $parts);
+            }
+        } elseif ($field === '[]') {
+            trigger_error('Field selectors with item selector "[]" must be converted to "items".', E_USER_DEPRECATED);
+            $field = 'items';
+        } elseif (strpos($field, '/') === false && !in_array($field, ['items', 'additionalProperties'], true)) {
+            trigger_error("Field selectors must specify full schema paths. ($field)", E_USER_DEPRECATED);
+            $field = "/properties/$field";
+        }
+
+        if (strpos($field, '[]') !== false) {
+            trigger_error('Field selectors with item selector "[]" must be converted to "/items".', E_USER_DEPRECATED);
+            $field = str_replace('[]', '/items', $field);
+        }
+
+        return ltrim($field, '/');
     }
 
     /**
@@ -718,6 +750,38 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Add a custom validator to to validate the schema.
+     *
+     * @param string $fieldname The name of the field to validate, if any.
+     *
+     * If you are adding a validator to a deeply nested field then separate the path with dots.
+     * @param callable $callback The callback to validate with.
+     * @return Schema Returns `$this` for fluent calls.
+     */
+    public function addValidator(string $fieldname, callable $callback) {
+        $fieldname = $this->parseFieldSelector($fieldname);
+        $this->validators[$fieldname][] = $callback;
+        return $this;
+    }
+
+    /**
+     * Validate data against the schema and return the result.
+     *
+     * @param mixed $data The data to validate.
+     * @param array $options Validation options. See `Schema::validate()`.
+     * @return bool Returns true if the data is valid. False otherwise.
+     * @throws RefNotFoundException Throws an exception when there is an unknown `$ref` in the schema.
+     */
+    public function isValid($data, $options = []) {
+        try {
+            $this->validate($data, $options);
+            return true;
+        } catch (ValidationException $ex) {
+            return false;
+        }
+    }
+
+    /**
      * Validate data against the schema.
      *
      * @param mixed $data The data to validate.
@@ -754,20 +818,102 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Validate data against the schema and return the result.
+     * Lookup a schema based on a schema node.
      *
-     * @param mixed $data The data to validate.
-     * @param array $options Validation options. See `Schema::validate()`.
-     * @return bool Returns true if the data is valid. False otherwise.
-     * @throws RefNotFoundException Throws an exception when there is an unknown `$ref` in the schema.
+     * The node could be a schema array, `Schema` object, or a schema reference.
+     *
+     * @param mixed $schema The schema node to lookup with.
+     * @param string $schemaPath The current path of the schema.
+     * @return array Returns an array with two elements:
+     * - Schema|array|\ArrayAccess The schema that was found.
+     * - string The path of the schema. This is either the reference or the `$path` parameter for inline schemas.
+     * @throws RefNotFoundException Throws an exception when a reference could not be found.
      */
-    public function isValid($data, $options = []) {
-        try {
-            $this->validate($data, $options);
-            return true;
-        } catch (ValidationException $ex) {
-            return false;
+    private function lookupSchema($schema, string $schemaPath) {
+        if ($schema instanceof Schema) {
+            return [$schema, $schemaPath];
+        } else {
+            $lookup = $this->getRefLookup();
+            $visited = [];
+
+            while (!empty($schema['$ref'])) {
+                $schemaPath = $schema['$ref'];
+
+                if (isset($visited[$schemaPath])) {
+                    throw new RefNotFoundException("Cyclical reference cannot be resolved. ($schemaPath)", 508);
+                }
+                $visited[$schemaPath] = true;
+
+                try {
+                    $schema = call_user_func($lookup, $schemaPath);
+                } catch (\Exception $ex) {
+                    throw new RefNotFoundException($ex->getMessage(), $ex->getCode(), $ex);
+                }
+                if ($schema === null) {
+                    throw new RefNotFoundException("Schema reference could not be found. ($schemaPath)");
+                }
+            }
+            return [$schema, $schemaPath];
         }
+    }
+
+    /**
+     * Get the function used to resolve `$ref` lookups.
+     *
+     * @return callable Returns the current `$ref` lookup.
+     */
+    public function getRefLookup(): callable {
+        return $this->refLookup;
+    }
+
+    /**
+     * Set the function used to resolve `$ref` lookups.
+     *
+     * The function should have the following signature:
+     *
+     * ```php
+     * function(string $ref): array|Schema|null {
+     *     ...
+     * }
+     * ```
+     * The function should take a string reference and return a schema array, `Schema` or **null**.
+     *
+     * @param callable $refLookup The new lookup function.
+     * @return $this
+     */
+    public function setRefLookup(callable $refLookup) {
+        $this->refLookup = $refLookup;
+        return $this;
+    }
+
+    /**
+     * Create a new validation instance.
+     *
+     * @return Validation Returns a validation object.
+     */
+    protected function createValidation(): Validation {
+        return call_user_func($this->getValidationFactory());
+    }
+
+    /**
+     * Get factory used to create validation objects.
+     *
+     * @return callable Returns the current factory.
+     */
+    public function getValidationFactory(): callable {
+        return $this->validationFactory;
+    }
+
+    /**
+     * Set the factory used to create validation objects.
+     *
+     * @param callable $validationFactory The new factory.
+     * @return $this
+     */
+    public function setValidationFactory(callable $validationFactory) {
+        $this->validationFactory = $validationFactory;
+        $this->validationClass = null;
+        return $this;
     }
 
     /**
@@ -813,6 +959,457 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         return $result;
+    }
+
+    /**
+     * Filter a field's value using built in and custom filters.
+     *
+     * @param mixed $value The original value of the field.
+     * @param ValidationField $field The field information for the field.
+     * @param bool $validated Whether or not a filter validated the value.
+     * @return mixed Returns the filtered field or the original field value if there are no filters.
+     */
+    private function filterField($value, ValidationField $field, bool &$validated = false) {
+        // Check for limited support for Open API style.
+        if (!empty($field->val('style')) && is_string($value)) {
+            $doFilter = true;
+            if ($field->hasType('boolean') && in_array($value, ['true', 'false', '0', '1'], true)) {
+                $doFilter = false;
+            } elseif ($field->hasType('integer') || $field->hasType('number') && is_numeric($value)) {
+                $doFilter = false;
+            }
+
+            if ($doFilter) {
+                switch ($field->val('style')) {
+                    case 'form':
+                        $value = explode(',', $value);
+                        break;
+                    case 'spaceDelimited':
+                        $value = explode(' ', $value);
+                        break;
+                    case 'pipeDelimited':
+                        $value = explode('|', $value);
+                        break;
+                }
+            }
+        }
+
+        $value = $this->callFilters($value, $field, $validated);
+
+        return $value;
+    }
+
+    /**
+     * Call all of the filters attached to a field.
+     *
+     * @param mixed $value The field value being filtered.
+     * @param ValidationField $field The validation object.
+     * @param bool $validated Whether or not a filter validated the field.
+     * @return mixed Returns the filtered value. If there are no filters for the field then the original value is returned.
+     */
+    private function callFilters($value, ValidationField $field, bool &$validated = false) {
+        // Strip array references in the name except for the last one.
+        $key = $field->getSchemaPath();
+        if (!empty($this->filters[$key])) {
+            foreach ($this->filters[$key] as list($filter, $validate)) {
+                $value = call_user_func($filter, $value, $field);
+                $validated |= $validate;
+
+                if (Invalid::isInvalid($value)) {
+                    return $value;
+                }
+            }
+        }
+        return $value;
+    }
+
+    /**
+     * Validate a field against multiple basic types.
+     *
+     * The first validation that passes will be returned. If no type can be validated against then validation will fail.
+     *
+     * @param mixed $value The value to validate.
+     * @param string[] $types The types to validate against.
+     * @param ValidationField $field Contains field and validation information.
+     * @return mixed Returns the valid value or `Invalid`.
+     * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
+     * @deprecated Multiple types are being removed next version.
+     */
+    private function validateMultipleTypes($value, array $types, ValidationField $field) {
+        trigger_error('Multiple schema types are deprecated.', E_USER_DEPRECATED);
+
+        // First check for an exact type match.
+        switch (gettype($value)) {
+            case 'boolean':
+                if (in_array('boolean', $types)) {
+                    $singleType = 'boolean';
+                }
+                break;
+            case 'integer':
+                if (in_array('integer', $types)) {
+                    $singleType = 'integer';
+                } elseif (in_array('number', $types)) {
+                    $singleType = 'number';
+                }
+                break;
+            case 'double':
+                if (in_array('number', $types)) {
+                    $singleType = 'number';
+                } elseif (in_array('integer', $types)) {
+                    $singleType = 'integer';
+                }
+                break;
+            case 'string':
+                if (in_array('datetime', $types) && preg_match(self::$DATE_REGEX, $value)) {
+                    $singleType = 'datetime';
+                } elseif (in_array('string', $types)) {
+                    $singleType = 'string';
+                }
+                break;
+            case 'array':
+                if (in_array('array', $types) && in_array('object', $types)) {
+                    $singleType = isset($value[0]) || empty($value) ? 'array' : 'object';
+                } elseif (in_array('object', $types)) {
+                    $singleType = 'object';
+                } elseif (in_array('array', $types)) {
+                    $singleType = 'array';
+                }
+                break;
+            case 'NULL':
+                if (in_array('null', $types)) {
+                    $singleType = $this->validateSingleType($value, 'null', $field);
+                }
+                break;
+        }
+        if (!empty($singleType)) {
+            return $this->validateSingleType($value, $singleType, $field);
+        }
+
+        // Clone the validation field to collect errors.
+        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', '', $field->getOptions());
+
+        // Try and validate against each type.
+        foreach ($types as $type) {
+            $result = $this->validateSingleType($value, $type, $typeValidation);
+            if (Invalid::isValid($result)) {
+                return $result;
+            }
+        }
+
+        // Since we got here the value is invalid.
+        $field->merge($typeValidation->getValidation());
+        return Invalid::value();
+    }
+
+    /**
+     * Validate a field against a single type.
+     *
+     * @param mixed $value The value to validate.
+     * @param string $type The type to validate against.
+     * @param ValidationField $field Contains field and validation information.
+     * @return mixed Returns the valid value or `Invalid`.
+     * @throws \InvalidArgumentException Throws an exception when `$type` is not recognized.
+     * @throws RefNotFoundException Throws an exception when internal validation has a reference that isn't found.
+     */
+    protected function validateSingleType($value, string $type, ValidationField $field) {
+        switch ($type) {
+            case 'boolean':
+                $result = $this->validateBoolean($value, $field);
+                break;
+            case 'integer':
+                $result = $this->validateInteger($value, $field);
+                break;
+            case 'number':
+                $result = $this->validateNumber($value, $field);
+                break;
+            case 'string':
+                $result = $this->validateString($value, $field);
+                break;
+            case 'timestamp':
+                trigger_error('The timestamp type is deprecated. Use an integer with a format of timestamp instead.', E_USER_DEPRECATED);
+                $result = $this->validateTimestamp($value, $field);
+                break;
+            case 'datetime':
+                trigger_error('The datetime type is deprecated. Use a string with a format of date-time instead.', E_USER_DEPRECATED);
+                $result = $this->validateDatetime($value, $field);
+                break;
+            case 'array':
+                $result = $this->validateArray($value, $field);
+                break;
+            case 'object':
+                $result = $this->validateObject($value, $field);
+                break;
+            case 'null':
+                $result = $this->validateNull($value, $field);
+                break;
+            case '':
+                // No type was specified so we are valid.
+                $result = $value;
+                break;
+            default:
+                throw new \InvalidArgumentException("Unrecognized type $type.", 500);
+        }
+        return $result;
+    }
+
+    /**
+     * Validate a boolean value.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return bool|Invalid Returns the cleaned value or invalid if validation fails.
+     */
+    protected function validateBoolean($value, ValidationField $field) {
+        $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($value === null) {
+            $field->addTypeError($value, 'boolean');
+            return Invalid::value();
+        }
+
+        return $value;
+    }
+
+    /**
+     * Validate and integer.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return int|Invalid Returns the cleaned value or **null** if validation fails.
+     */
+    protected function validateInteger($value, ValidationField $field) {
+        if ($field->val('format') === 'timestamp') {
+            return $this->validateTimestamp($value, $field);
+        }
+
+        $result = filter_var($value, FILTER_VALIDATE_INT);
+
+        if ($result === false) {
+            $field->addTypeError($value, 'integer');
+            return Invalid::value();
+        }
+
+        $result = $this->validateNumberProperties($result, $field);
+
+        return $result;
+    }
+
+    /**
+     * Validate a unix timestamp.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The field being validated.
+     * @return int|Invalid Returns a valid timestamp or invalid if the value doesn't validate.
+     */
+    protected function validateTimestamp($value, ValidationField $field) {
+        if (is_numeric($value) && $value > 0) {
+            $result = (int)$value;
+        } elseif (is_string($value) && $ts = strtotime($value)) {
+            $result = $ts;
+        } else {
+            $field->addTypeError($value, 'timestamp');
+            $result = Invalid::value();
+        }
+        return $result;
+    }
+
+    /**
+     * Validate specific numeric validation properties.
+     *
+     * @param int|float $value The value to test.
+     * @param ValidationField $field Field information.
+     * @return int|float|Invalid Returns the number of invalid.
+     */
+    private function validateNumberProperties($value, ValidationField $field) {
+        $count = $field->getErrorCount();
+
+        if ($multipleOf = $field->val('multipleOf')) {
+            $divided = $value / $multipleOf;
+
+            if ($divided != round($divided)) {
+                $field->addError('multipleOf', ['messageCode' => 'The value must be a multiple of {multipleOf}.', 'multipleOf' => $multipleOf]);
+            }
+        }
+
+        if ($maximum = $field->val('maximum')) {
+            $exclusive = $field->val('exclusiveMaximum');
+
+            if ($value > $maximum || ($exclusive && $value == $maximum)) {
+                if ($exclusive) {
+                    $field->addError('maximum', ['messageCode' => 'The value must be less than {maximum}.', 'maximum' => $maximum]);
+                } else {
+                    $field->addError('maximum', ['messageCode' => 'The value must be less than or equal to {maximum}.', 'maximum' => $maximum]);
+                }
+            }
+        }
+
+        if ($minimum = $field->val('minimum')) {
+            $exclusive = $field->val('exclusiveMinimum');
+
+            if ($value < $minimum || ($exclusive && $value == $minimum)) {
+                if ($exclusive) {
+                    $field->addError('minimum', ['messageCode' => 'The value must be greater than {minimum}.', 'minimum' => $minimum]);
+                } else {
+                    $field->addError('minimum', ['messageCode' => 'The value must be greater than or equal to {minimum}.', 'minimum' => $minimum]);
+                }
+            }
+        }
+
+        return $field->getErrorCount() === $count ? $value : Invalid::value();
+    }
+
+    /**
+     * Validate a float.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return float|Invalid Returns a number or **null** if validation fails.
+     */
+    protected function validateNumber($value, ValidationField $field) {
+        $result = filter_var($value, FILTER_VALIDATE_FLOAT);
+        if ($result === false) {
+            $field->addTypeError($value, 'number');
+            return Invalid::value();
+        }
+
+        $result = $this->validateNumberProperties($result, $field);
+
+        return $result;
+    }
+
+    /**
+     * Validate a string.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return string|Invalid Returns the valid string or **null** if validation fails.
+     */
+    protected function validateString($value, ValidationField $field) {
+        if ($field->val('format') === 'date-time') {
+            $result = $this->validateDatetime($value, $field);
+            return $result;
+        }
+
+        if (is_string($value) || is_numeric($value)) {
+            $value = $result = (string)$value;
+        } else {
+            $field->addTypeError($value, 'string');
+            return Invalid::value();
+        }
+
+        if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
+            $field->addError(
+                'minLength',
+                [
+                    'messageCode' => 'The value should be at least {minLength} {minLength,plural,character,characters} long.',
+                    'minLength' => $minLength,
+                ]
+            );
+        }
+        if (($maxLength = $field->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
+            $field->addError(
+                'maxLength',
+                [
+                    'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
+                    'maxLength' => $maxLength,
+                    'overflow' => mb_strlen($value) - $maxLength,
+                ]
+            );
+        }
+        if ($pattern = $field->val('pattern')) {
+            $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
+
+            if (!preg_match($regex, $value)) {
+                $field->addError(
+                    'pattern',
+                    [
+                        'messageCode' => $field->val('x-patternMessageCode', 'The value doesn\'t match the required pattern.'),
+                    ]
+                );
+            }
+        }
+        if ($format = $field->val('format')) {
+            $type = $format;
+            switch ($format) {
+                case 'date':
+                    $result = $this->validateDatetime($result, $field);
+                    if ($result instanceof \DateTimeInterface) {
+                        $result = $result->format("Y-m-d\T00:00:00P");
+                    }
+                    break;
+                case 'email':
+                    $result = filter_var($result, FILTER_VALIDATE_EMAIL);
+                    break;
+                case 'ipv4':
+                    $type = 'IPv4 address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
+                    break;
+                case 'ipv6':
+                    $type = 'IPv6 address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
+                    break;
+                case 'ip':
+                    $type = 'IP address';
+                    $result = filter_var($result, FILTER_VALIDATE_IP);
+                    break;
+                case 'uri':
+                    $type = 'URL';
+                    $result = filter_var($result, FILTER_VALIDATE_URL);
+                    break;
+                default:
+                    trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
+            }
+            if ($result === false) {
+                $field->addError('format', [
+                    'format' => $format,
+                    'formatCode' => $type,
+                    'value' => $value,
+                    'messageCode' => '{value} is not a valid {formatCode}.'
+                ]);
+            }
+        }
+
+        if ($field->isValid()) {
+            return $result;
+        } else {
+            return Invalid::value();
+        }
+    }
+
+    /**
+     * Validate a date time.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return \DateTimeInterface|Invalid Returns the cleaned value or **null** if it isn't valid.
+     */
+    protected function validateDatetime($value, ValidationField $field) {
+        if ($value instanceof \DateTimeInterface) {
+            // do nothing, we're good
+        } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
+            try {
+                $dt = new \DateTimeImmutable($value);
+                if ($dt) {
+                    $value = $dt;
+                } else {
+                    $value = null;
+                }
+            } catch (\Throwable $ex) {
+                $value = Invalid::value();
+            }
+        } elseif (is_int($value) && $value > 0) {
+            try {
+                $value = new \DateTimeImmutable('@'.(string)round($value));
+            } catch (\Throwable $ex) {
+                $value = Invalid::value();
+            }
+        } else {
+            $value = Invalid::value();
+        }
+
+        if (Invalid::isInvalid($value)) {
+            $field->addTypeError($value, 'date/time');
+        }
+        return $value;
     }
 
     /**
@@ -889,102 +1486,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Validate a boolean value.
-     *
-     * @param mixed $value The value to validate.
-     * @param ValidationField $field The validation results to add.
-     * @return bool|Invalid Returns the cleaned value or invalid if validation fails.
-     */
-    protected function validateBoolean($value, ValidationField $field) {
-        $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        if ($value === null) {
-            $field->addTypeError($value, 'boolean');
-            return Invalid::value();
-        }
-
-        return $value;
-    }
-
-    /**
-     * Validate a date time.
-     *
-     * @param mixed $value The value to validate.
-     * @param ValidationField $field The validation results to add.
-     * @return \DateTimeInterface|Invalid Returns the cleaned value or **null** if it isn't valid.
-     */
-    protected function validateDatetime($value, ValidationField $field) {
-        if ($value instanceof \DateTimeInterface) {
-            // do nothing, we're good
-        } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
-            try {
-                $dt = new \DateTimeImmutable($value);
-                if ($dt) {
-                    $value = $dt;
-                } else {
-                    $value = null;
-                }
-            } catch (\Throwable $ex) {
-                $value = Invalid::value();
-            }
-        } elseif (is_int($value) && $value > 0) {
-            try {
-                $value = new \DateTimeImmutable('@'.(string)round($value));
-            } catch (\Throwable $ex) {
-                $value = Invalid::value();
-            }
-        } else {
-            $value = Invalid::value();
-        }
-
-        if (Invalid::isInvalid($value)) {
-            $field->addTypeError($value, 'date/time');
-        }
-        return $value;
-    }
-
-    /**
-     * Validate a float.
-     *
-     * @param mixed $value The value to validate.
-     * @param ValidationField $field The validation results to add.
-     * @return float|Invalid Returns a number or **null** if validation fails.
-     */
-    protected function validateNumber($value, ValidationField $field) {
-        $result = filter_var($value, FILTER_VALIDATE_FLOAT);
-        if ($result === false) {
-            $field->addTypeError($value, 'number');
-            return Invalid::value();
-        }
-
-        $result = $this->validateNumberProperties($result, $field);
-
-        return $result;
-    }
-    /**
-     * Validate and integer.
-     *
-     * @param mixed $value The value to validate.
-     * @param ValidationField $field The validation results to add.
-     * @return int|Invalid Returns the cleaned value or **null** if validation fails.
-     */
-    protected function validateInteger($value, ValidationField $field) {
-        if ($field->val('format') === 'timestamp') {
-            return $this->validateTimestamp($value, $field);
-        }
-
-        $result = filter_var($value, FILTER_VALIDATE_INT);
-
-        if ($result === false) {
-            $field->addTypeError($value, 'integer');
-            return Invalid::value();
-        }
-
-        $result = $this->validateNumberProperties($result, $field);
-
-        return $result;
-    }
-
-    /**
      * Validate an object.
      *
      * @param mixed $value The value to validate.
@@ -1027,6 +1528,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Check whether or not a value is an array or accessible like an array.
+     *
+     * @param mixed $value The value to check.
+     * @return bool Returns **true** if the value can be used like an array or **false** otherwise.
+     */
+    private function isArray($value) {
+        return is_array($value) || ($value instanceof \ArrayAccess && $value instanceof \Traversable);
+    }
+
+    /**
      * Validate data against the schema and return the result.
      *
      * @param array|\Traversable|\ArrayAccess $data The data to validate.
@@ -1066,8 +1577,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $propertyField
                 ->setField($property)
                 ->setName(ltrim($field->getName().'/'.self::escapeRef($propertyName), '/'))
-                ->setSchemaPath($schemaPath)
-            ;
+                ->setSchemaPath($schemaPath);
 
             $lName = strtolower($propertyName);
             $isRequired = isset($required[$propertyName]);
@@ -1145,121 +1655,43 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Validate a string.
+     * Escape a JSON reference field.
      *
-     * @param mixed $value The value to validate.
-     * @param ValidationField $field The validation results to add.
-     * @return string|Invalid Returns the valid string or **null** if validation fails.
+     * @param string $field The reference field to escape.
+     * @return string Returns an escaped reference.
      */
-    protected function validateString($value, ValidationField $field) {
-        if ($field->val('format') === 'date-time') {
-            $result = $this->validateDatetime($value, $field);
-            return $result;
-        }
-
-        if (is_string($value) || is_numeric($value)) {
-            $value = $result = (string)$value;
-        } else {
-            $field->addTypeError($value, 'string');
-            return Invalid::value();
-        }
-
-        if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
-            $field->addError(
-                'minLength',
-                [
-                    'messageCode' => 'The value should be at least {minLength} {minLength,plural,character,characters} long.',
-                    'minLength' => $minLength,
-                ]
-            );
-        }
-        if (($maxLength = $field->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
-            $field->addError(
-                'maxLength',
-                [
-                    'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
-                    'maxLength' => $maxLength,
-                    'overflow' => mb_strlen($value) - $maxLength,
-                ]
-            );
-        }
-        if ($pattern = $field->val('pattern')) {
-            $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
-
-            if (!preg_match($regex, $value)) {
-                $field->addError(
-                    'pattern',
-                    [
-                        'messageCode' => $field->val('x-patternMessageCode'. 'The value doesn\'t match the required pattern.'),
-                    ]
-                );
-            }
-        }
-        if ($format = $field->val('format')) {
-            $type = $format;
-            switch ($format) {
-                case 'date':
-                    $result = $this->validateDatetime($result, $field);
-                    if ($result instanceof \DateTimeInterface) {
-                        $result = $result->format("Y-m-d\T00:00:00P");
-                    }
-                    break;
-                case 'email':
-                    $result = filter_var($result, FILTER_VALIDATE_EMAIL);
-                    break;
-                case 'ipv4':
-                    $type = 'IPv4 address';
-                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
-                    break;
-                case 'ipv6':
-                    $type = 'IPv6 address';
-                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
-                    break;
-                case 'ip':
-                    $type = 'IP address';
-                    $result = filter_var($result, FILTER_VALIDATE_IP);
-                    break;
-                case 'uri':
-                    $type = 'URL';
-                    $result = filter_var($result, FILTER_VALIDATE_URL);
-                    break;
-                default:
-                    trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
-            }
-            if ($result === false) {
-                $field->addError('format', [
-                    'format' => $format,
-                    'formatCode' => $type,
-                    'value' => $value,
-                    'messageCode' => '{value} is not a valid {formatCode}.'
-                ]);
-            }
-        }
-
-        if ($field->isValid()) {
-            return $result;
-        } else {
-            return Invalid::value();
-        }
+    public static function escapeRef(string $field): string {
+        return str_replace(['~', '/'], ['~0', '~1'], $field);
     }
 
     /**
-     * Validate a unix timestamp.
+     * Whether or not the schema has a flag (or combination of flags).
      *
-     * @param mixed $value The value to validate.
-     * @param ValidationField $field The field being validated.
-     * @return int|Invalid Returns a valid timestamp or invalid if the value doesn't validate.
+     * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
+     * @return bool Returns **true** if all of the flags are set or **false** otherwise.
      */
-    protected function validateTimestamp($value, ValidationField $field) {
-        if (is_numeric($value) && $value > 0) {
-            $result = (int)$value;
-        } elseif (is_string($value) && $ts = strtotime($value)) {
-            $result = $ts;
-        } else {
-            $field->addTypeError($value, 'timestamp');
-            $result = Invalid::value();
+    public function hasFlag(int $flag): bool {
+        return ($this->flags & $flag) === $flag;
+    }
+
+    /**
+     * Cast a value to an array.
+     *
+     * @param \Traversable $value The value to convert.
+     * @return array Returns an array.
+     */
+    private function toObjectArray(\Traversable $value) {
+        $class = get_class($value);
+        if ($value instanceof \ArrayObject) {
+            return new $class($value->getArrayCopy(), $value->getFlags(), $value->getIteratorClass());
+        } elseif ($value instanceof \ArrayAccess) {
+            $r = new $class;
+            foreach ($value as $k => $v) {
+                $r[$k] = $v;
+            }
+            return $r;
         }
-        return $result;
+        return iterator_to_array($value);
     }
 
     /**
@@ -1299,30 +1731,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 ]
             );
             return Invalid::value();
-        }
-        return $value;
-    }
-
-    /**
-     * Call all of the filters attached to a field.
-     *
-     * @param mixed $value The field value being filtered.
-     * @param ValidationField $field The validation object.
-     * @param bool $validated Whether or not a filter validated the field.
-     * @return mixed Returns the filtered value. If there are no filters for the field then the original value is returned.
-     */
-    private function callFilters($value, ValidationField $field, bool &$validated = false) {
-        // Strip array references in the name except for the last one.
-        $key = $field->getSchemaPath();
-        if (!empty($this->filters[$key])) {
-            foreach ($this->filters[$key] as list($filter, $validate)) {
-                $value = call_user_func($filter, $value, $field);
-                $validated |= $validate;
-
-                if (Invalid::isInvalid($value)) {
-                    return $value;
-                }
-            }
         }
         return $value;
     }
@@ -1406,24 +1814,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Look up a type based on its alias.
-     *
-     * @param string $alias The type alias or type name to lookup.
-     * @return mixed
-     */
-    private function getType($alias) {
-        if (isset(self::$types[$alias])) {
-            return $alias;
-        }
-        foreach (self::$types as $type => $aliases) {
-            if (in_array($alias, $aliases, true)) {
-                return $type;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Get the class that's used to contain validation information.
      *
      * @return Validation|string Returns the validation class.
@@ -1458,45 +1848,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         });
         $this->validationClass = $class;
         return $this;
-    }
-
-    /**
-     * Create a new validation instance.
-     *
-     * @return Validation Returns a validation object.
-     */
-    protected function createValidation(): Validation {
-        return call_user_func($this->getValidationFactory());
-    }
-
-    /**
-     * Check whether or not a value is an array or accessible like an array.
-     *
-     * @param mixed $value The value to check.
-     * @return bool Returns **true** if the value can be used like an array or **false** otherwise.
-     */
-    private function isArray($value) {
-        return is_array($value) || ($value instanceof \ArrayAccess && $value instanceof \Traversable);
-    }
-
-    /**
-     * Cast a value to an array.
-     *
-     * @param \Traversable $value The value to convert.
-     * @return array Returns an array.
-     */
-    private function toObjectArray(\Traversable $value) {
-        $class = get_class($value);
-        if ($value instanceof \ArrayObject) {
-            return new $class($value->getArrayCopy(), $value->getFlags(), $value->getIteratorClass());
-        } elseif ($value instanceof \ArrayAccess) {
-            $r = new $class;
-            foreach ($value as $k => $v) {
-                $r[$k] = $v;
-            }
-            return $r;
-        }
-        return iterator_to_array($value);
     }
 
     /**
@@ -1548,41 +1899,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Filter a field's value using built in and custom filters.
+     * Get the ID for the schema.
      *
-     * @param mixed $value The original value of the field.
-     * @param ValidationField $field The field information for the field.
-     * @param bool $validated Whether or not a filter validated the value.
-     * @return mixed Returns the filtered field or the original field value if there are no filters.
+     * @return string
      */
-    private function filterField($value, ValidationField $field, bool &$validated = false) {
-        // Check for limited support for Open API style.
-        if (!empty($field->val('style')) && is_string($value)) {
-            $doFilter = true;
-            if ($field->hasType('boolean') && in_array($value, ['true', 'false', '0', '1'], true)) {
-                $doFilter = false;
-            } elseif ($field->hasType('integer') || $field->hasType('number') && is_numeric($value)) {
-                $doFilter = false;
-            }
+    public function getID(): string {
+        return $this->schema['id'] ?? '';
+    }
 
-            if ($doFilter) {
-                switch ($field->val('style')) {
-                    case 'form':
-                        $value = explode(',', $value);
-                        break;
-                    case 'spaceDelimited':
-                        $value = explode(' ', $value);
-                        break;
-                    case 'pipeDelimited':
-                        $value = explode('|', $value);
-                        break;
-                }
-            }
-        }
+    /**
+     * Set the ID for the schema.
+     *
+     * @param string $id The new ID.
+     * @return $this
+     */
+    public function setID(string $id) {
+        $this->schema['id'] = $id;
 
-        $value = $this->callFilters($value, $field, $validated);
-
-        return $value;
+        return $this;
     }
 
     /**
@@ -1626,338 +1960,5 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function offsetUnset($offset) {
         unset($this->schema[$offset]);
-    }
-
-    /**
-     * Validate a field against a single type.
-     *
-     * @param mixed $value The value to validate.
-     * @param string $type The type to validate against.
-     * @param ValidationField $field Contains field and validation information.
-     * @return mixed Returns the valid value or `Invalid`.
-     * @throws \InvalidArgumentException Throws an exception when `$type` is not recognized.
-     * @throws RefNotFoundException Throws an exception when internal validation has a reference that isn't found.
-     */
-    protected function validateSingleType($value, string $type, ValidationField $field) {
-        switch ($type) {
-            case 'boolean':
-                $result = $this->validateBoolean($value, $field);
-                break;
-            case 'integer':
-                $result = $this->validateInteger($value, $field);
-                break;
-            case 'number':
-                $result = $this->validateNumber($value, $field);
-                break;
-            case 'string':
-                $result = $this->validateString($value, $field);
-                break;
-            case 'timestamp':
-                trigger_error('The timestamp type is deprecated. Use an integer with a format of timestamp instead.', E_USER_DEPRECATED);
-                $result = $this->validateTimestamp($value, $field);
-                break;
-            case 'datetime':
-                trigger_error('The datetime type is deprecated. Use a string with a format of date-time instead.', E_USER_DEPRECATED);
-                $result = $this->validateDatetime($value, $field);
-                break;
-            case 'array':
-                $result = $this->validateArray($value, $field);
-                break;
-            case 'object':
-                $result = $this->validateObject($value, $field);
-                break;
-            case 'null':
-                $result = $this->validateNull($value, $field);
-                break;
-            case '':
-                // No type was specified so we are valid.
-                $result = $value;
-                break;
-            default:
-                throw new \InvalidArgumentException("Unrecognized type $type.", 500);
-        }
-        return $result;
-    }
-
-    /**
-     * Validate a field against multiple basic types.
-     *
-     * The first validation that passes will be returned. If no type can be validated against then validation will fail.
-     *
-     * @param mixed $value The value to validate.
-     * @param string[] $types The types to validate against.
-     * @param ValidationField $field Contains field and validation information.
-     * @return mixed Returns the valid value or `Invalid`.
-     * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
-     * @deprecated Multiple types are being removed next version.
-     */
-    private function validateMultipleTypes($value, array $types, ValidationField $field) {
-        trigger_error('Multiple schema types are deprecated.', E_USER_DEPRECATED);
-
-        // First check for an exact type match.
-        switch (gettype($value)) {
-            case 'boolean':
-                if (in_array('boolean', $types)) {
-                    $singleType = 'boolean';
-                }
-                break;
-            case 'integer':
-                if (in_array('integer', $types)) {
-                    $singleType = 'integer';
-                } elseif (in_array('number', $types)) {
-                    $singleType = 'number';
-                }
-                break;
-            case 'double':
-                if (in_array('number', $types)) {
-                    $singleType = 'number';
-                } elseif (in_array('integer', $types)) {
-                    $singleType = 'integer';
-                }
-                break;
-            case 'string':
-                if (in_array('datetime', $types) && preg_match(self::$DATE_REGEX, $value)) {
-                    $singleType = 'datetime';
-                } elseif (in_array('string', $types)) {
-                    $singleType = 'string';
-                }
-                break;
-            case 'array':
-                if (in_array('array', $types) && in_array('object', $types)) {
-                    $singleType = isset($value[0]) || empty($value) ? 'array' : 'object';
-                } elseif (in_array('object', $types)) {
-                    $singleType = 'object';
-                } elseif (in_array('array', $types)) {
-                    $singleType = 'array';
-                }
-                break;
-            case 'NULL':
-                if (in_array('null', $types)) {
-                    $singleType = $this->validateSingleType($value, 'null', $field);
-                }
-                break;
-        }
-        if (!empty($singleType)) {
-            return $this->validateSingleType($value, $singleType, $field);
-        }
-
-        // Clone the validation field to collect errors.
-        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', '', $field->getOptions());
-
-        // Try and validate against each type.
-        foreach ($types as $type) {
-            $result = $this->validateSingleType($value, $type, $typeValidation);
-            if (Invalid::isValid($result)) {
-                return $result;
-            }
-        }
-
-        // Since we got here the value is invalid.
-        $field->merge($typeValidation->getValidation());
-        return Invalid::value();
-    }
-
-    /**
-     * Validate specific numeric validation properties.
-     *
-     * @param int|float $value The value to test.
-     * @param ValidationField $field Field information.
-     * @return int|float|Invalid Returns the number of invalid.
-     */
-    private function validateNumberProperties($value, ValidationField $field) {
-        $count = $field->getErrorCount();
-
-        if ($multipleOf = $field->val('multipleOf')) {
-            $divided = $value / $multipleOf;
-
-            if ($divided != round($divided)) {
-                $field->addError('multipleOf', ['messageCode' => 'The value must be a multiple of {multipleOf}.', 'multipleOf' => $multipleOf]);
-            }
-        }
-
-        if ($maximum = $field->val('maximum')) {
-            $exclusive = $field->val('exclusiveMaximum');
-
-            if ($value > $maximum || ($exclusive && $value == $maximum)) {
-                if ($exclusive) {
-                    $field->addError('maximum', ['messageCode' => 'The value must be less than {maximum}.', 'maximum' => $maximum]);
-                } else {
-                    $field->addError('maximum', ['messageCode' => 'The value must be less than or equal to {maximum}.', 'maximum' => $maximum]);
-                }
-            }
-        }
-
-        if ($minimum = $field->val('minimum')) {
-            $exclusive = $field->val('exclusiveMinimum');
-
-            if ($value < $minimum || ($exclusive && $value == $minimum)) {
-                if ($exclusive) {
-                    $field->addError('minimum', ['messageCode' => 'The value must be greater than {minimum}.', 'minimum' => $minimum]);
-                } else {
-                    $field->addError('minimum', ['messageCode' => 'The value must be greater than or equal to {minimum}.', 'minimum' => $minimum]);
-                }
-            }
-        }
-
-        return $field->getErrorCount() === $count ? $value : Invalid::value();
-    }
-
-    /**
-     * Parse a nested field name selector.
-     *
-     * Field selectors should be separated by "/" characters, but may currently be separated by "." characters which
-     * triggers a deprecated error.
-     *
-     * @param string $field The field selector.
-     * @return string Returns the field selector in the correct format.
-     */
-    private function parseFieldSelector(string $field): string {
-        if (strlen($field) === 0) {
-            return $field;
-        }
-
-        if (strpos($field, '.') !== false) {
-            if (strpos($field, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
-
-                $parts = explode('.', $field);
-                $parts = @array_map([$this, 'parseFieldSelector'], $parts); // silence because error triggered already.
-
-                $field = implode('/', $parts);
-            }
-        } elseif ($field === '[]') {
-            trigger_error('Field selectors with item selector "[]" must be converted to "items".', E_USER_DEPRECATED);
-            $field = 'items';
-        } elseif (strpos($field, '/') === false && !in_array($field, ['items', 'additionalProperties'], true)) {
-            trigger_error("Field selectors must specify full schema paths. ($field)", E_USER_DEPRECATED);
-            $field = "/properties/$field";
-        }
-
-        if (strpos($field, '[]') !== false) {
-            trigger_error('Field selectors with item selector "[]" must be converted to "/items".', E_USER_DEPRECATED);
-            $field = str_replace('[]', '/items', $field);
-        }
-
-        return ltrim($field, '/');
-    }
-
-    /**
-     * Lookup a schema based on a schema node.
-     *
-     * The node could be a schema array, `Schema` object, or a schema reference.
-     *
-     * @param mixed $schema The schema node to lookup with.
-     * @param string $schemaPath The current path of the schema.
-     * @return array Returns an array with two elements:
-     * - Schema|array|\ArrayAccess The schema that was found.
-     * - string The path of the schema. This is either the reference or the `$path` parameter for inline schemas.
-     * @throws RefNotFoundException Throws an exception when a reference could not be found.
-     */
-    private function lookupSchema($schema, string $schemaPath) {
-        if ($schema instanceof Schema) {
-            return [$schema, $schemaPath];
-        } else {
-            $lookup = $this->getRefLookup();
-            $visited = [];
-
-            while (!empty($schema['$ref'])) {
-                $schemaPath = $schema['$ref'];
-
-                if (isset($visited[$schemaPath])) {
-                    throw new RefNotFoundException("Cyclical reference cannot be resolved. ($schemaPath)", 508);
-                }
-                $visited[$schemaPath] = true;
-
-                try {
-                    $schema = call_user_func($lookup, $schemaPath);
-                } catch (\Exception $ex) {
-                    throw new RefNotFoundException($ex->getMessage(), $ex->getCode(), $ex);
-                }
-                if ($schema === null) {
-                    throw new RefNotFoundException("Schema reference could not be found. ($schemaPath)");
-                }
-            }
-            return [$schema, $schemaPath];
-        }
-    }
-
-    /**
-     * Get the function used to resolve `$ref` lookups.
-     *
-     * @return callable Returns the current `$ref` lookup.
-     */
-    public function getRefLookup(): callable {
-        return $this->refLookup;
-    }
-
-    /**
-     * Set the function used to resolve `$ref` lookups.
-     *
-     * The function should have the following signature:
-     *
-     * ```php
-     * function(string $ref): array|Schema|null {
-     *     ...
-     * }
-     * ```
-     * The function should take a string reference and return a schema array, `Schema` or **null**.
-     *
-     * @param callable $refLookup The new lookup function.
-     * @return $this
-     */
-    public function setRefLookup(callable $refLookup) {
-        $this->refLookup = $refLookup;
-        return $this;
-    }
-
-    /**
-     * Get factory used to create validation objects.
-     *
-     * @return callable Returns the current factory.
-     */
-    public function getValidationFactory(): callable {
-        return $this->validationFactory;
-    }
-
-    /**
-     * Set the factory used to create validation objects.
-     *
-     * @param callable $validationFactory The new factory.
-     * @return $this
-     */
-    public function setValidationFactory(callable $validationFactory) {
-        $this->validationFactory = $validationFactory;
-        $this->validationClass = null;
-        return $this;
-    }
-
-    /**
-     * Escape a JSON reference field.
-     *
-     * @param string $field The reference field to escape.
-     * @return string Returns an escaped reference.
-     */
-    public static function escapeRef(string $field): string {
-        return str_replace(['~', '/'], ['~0', '~1'], $field);
-    }
-
-    /**
-     * Unescape a JSON reference segment.
-     *
-     * @param string $str The segment to unescapeRef.
-     * @return string Returns the unescaped string.
-     */
-    public static function unescapeRef(string $str): string {
-        return str_replace(['~1', '~0'], ['/', '~'], $str);
-    }
-
-    /**
-     * Explode a references into its individual parts.
-     *
-     * @param string $ref A JSON reference.
-     * @return string[] The individual parts of the reference.
-     */
-    public static function explodeRef(string $ref): array {
-        return array_map([self::class, 'unescapeRef'], explode('/', $ref));
     }
 }
