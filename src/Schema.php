@@ -630,11 +630,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * If you are adding a filter to a deeply nested field then separate the path with dots.
      * @param callable $callback The callback to filter the field.
+     * @param bool $validate Whether or not the filter should also validate. If true default validation is skipped.
      * @return $this
      */
-    public function addFilter(string $fieldname, callable $callback) {
+    public function addFilter(string $fieldname, callable $callback, bool $validate = false) {
         $fieldname = $this->parseFieldSelector($fieldname);
-        $this->filters[$fieldname][] = $callback;
+        $this->filters[$fieldname][] = [$callback, $validate];
         return $this;
     }
 
@@ -779,9 +780,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
     protected function validateField($value, ValidationField $field) {
-        $result = $value = $this->filterField($value, $field);
+        $validated = false;
+        $result = $value = $this->filterField($value, $field, $validated);
 
-        if ($field->getField() instanceof Schema) {
+        if ($validated) {
+            return $result;
+        } elseif ($field->getField() instanceof Schema) {
             try {
                 $result = $field->getField()->validate($value, $field->getOptions());
             } catch (ValidationException $ex) {
@@ -1304,14 +1308,20 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param mixed $value The field value being filtered.
      * @param ValidationField $field The validation object.
+     * @param bool $validated Whether or not a filter validated the field.
      * @return mixed Returns the filtered value. If there are no filters for the field then the original value is returned.
      */
-    protected function callFilters($value, ValidationField $field) {
+    private function callFilters($value, ValidationField $field, bool &$validated = false) {
         // Strip array references in the name except for the last one.
         $key = $field->getSchemaPath();
         if (!empty($this->filters[$key])) {
-            foreach ($this->filters[$key] as $filter) {
+            foreach ($this->filters[$key] as list($filter, $validate)) {
                 $value = call_user_func($filter, $value, $field);
+                $validated |= $validate;
+
+                if (Invalid::isInvalid($value)) {
+                    return $value;
+                }
             }
         }
         return $value;
@@ -1323,7 +1333,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The field value being validated.
      * @param ValidationField $field The validation object to add errors.
      */
-    protected function callValidators($value, ValidationField $field) {
+    private function callValidators($value, ValidationField $field) {
         $valid = true;
 
         // Strip array references in the name except for the last one.
@@ -1401,7 +1411,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $alias The type alias or type name to lookup.
      * @return mixed
      */
-    protected function getType($alias) {
+    private function getType($alias) {
         if (isset(self::$types[$alias])) {
             return $alias;
         }
@@ -1542,9 +1552,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param mixed $value The original value of the field.
      * @param ValidationField $field The field information for the field.
+     * @param bool $validated Whether or not a filter validated the value.
      * @return mixed Returns the filtered field or the original field value if there are no filters.
      */
-    private function filterField($value, ValidationField $field) {
+    private function filterField($value, ValidationField $field, bool &$validated = false) {
         // Check for limited support for Open API style.
         if (!empty($field->val('style')) && is_string($value)) {
             $doFilter = true;
@@ -1569,7 +1580,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
         }
 
-        $value = $this->callFilters($value, $field);
+        $value = $this->callFilters($value, $field, $validated);
 
         return $value;
     }

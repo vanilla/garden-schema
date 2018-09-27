@@ -41,7 +41,7 @@ The following deprecations will throw deprecation notices, but still work in ver
 
 - The `timestamp` type has been removed and replaced with the standard `integer` type and a `timestamp` format. A short type of `ts` is still supported, but is now converted to the aforementioned type/format combination.
 
-- Paths in validation results are now seperated by `/` instead of `.` to more closely follow the JSON ref spec.
+- Paths in validation results are now separated by `/` instead of `.` to more closely follow the JSON ref spec.
 
 - When specifying paths with `Schema::addValidator()` and `Schema::addFilter()` you should separate paths with `/` instead of `.` and specify the full schema path you want to add your callback to. So for example: `foo.bar[]` would become `properties/foo/properties/bar/items`. Currently, the schema will attempt to fix some old format validators and trigger a deprecation error, but may not catch every edge case.
 
