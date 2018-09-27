@@ -16,6 +16,8 @@ With version 2, Garden Schema is moving away from JSON Schema and towards Open A
 - Support for the following validation properties has been added: `multipleOf`, `maximum`, `exclusiveMaximum`, `minimum`, `exclusiveMinimum`, `uniqueItems`, `maxProperties`, `minProperties`, `additionalProperties`.
 - Schemas now support references with the `$ref` attribute! To use references you can use `Schema::setRefLookup()` with the built in `ArrayRefLookup` class.
 - You can now create custom `Validation` instances by using a custom `Schema::setValidationFactory()` method. This is much more flexible than the deprecated `Schema::setValidationClass()` method.
+- Filters can now validate date too. Filters that validate completely override the default validation behaviour allowing a new level of control. You can add a validating filter using the `$validate` parameter with `Schema::addFilter()`.
+- You can add a global filter for all schemas with the same `format` property using `Schema::addFormatFilter()`. 
 
 ### Deprecations
 
@@ -41,7 +43,7 @@ The following deprecations will throw deprecation notices, but still work in ver
 
 - The `timestamp` type has been removed and replaced with the standard `integer` type and a `timestamp` format. A short type of `ts` is still supported, but is now converted to the aforementioned type/format combination.
 
-- Paths in validation results are now seperated by `/` instead of `.` to more closely follow the JSON ref spec.
+- Paths in validation results are now separated by `/` instead of `.` to more closely follow the JSON ref spec.
 
 - When specifying paths with `Schema::addValidator()` and `Schema::addFilter()` you should separate paths with `/` instead of `.` and specify the full schema path you want to add your callback to. So for example: `foo.bar[]` would become `properties/foo/properties/bar/items`. Currently, the schema will attempt to fix some old format validators and trigger a deprecation error, but may not catch every edge case.
 
