@@ -975,7 +975,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $doFilter = true;
             if ($field->hasType('boolean') && in_array($value, ['true', 'false', '0', '1'], true)) {
                 $doFilter = false;
-            } elseif ($field->hasType('integer') || $field->hasType('number') && is_numeric($value)) {
+            } elseif (($field->hasType('integer') || $field->hasType('number')) && is_numeric($value)) {
                 $doFilter = false;
             }
 
