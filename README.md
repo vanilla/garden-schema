@@ -307,6 +307,44 @@ You can pass an option of `['response' => true]` to specify that you are validat
 
 You can pass an option of `['sparse' => true]` to specify a sparse validation. When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
 
+## Custom Validation with addValidator()
+
+You can customize validation with `Schema::addValidator()`. This method lets you attach a callback to a schema path. The callback has the following form:
+
+```php
+function (mixed $value, ValidationField $field): bool {
+}
+```
+
+The callback should `true` if the value is valid or `false` otherwise. You can use the provided `ValidationField` to add custom error messages.
+
+## Filtering Data
+
+You can filter data before it is validating using `Schema::addFilter()`. This method lets you filter data at a schema path. The callback has the following form:
+
+```php
+function (mixed $value, ValidationField $field): mixed {
+}
+```
+
+The callback should return the filtered value. Filters are called before validation occurs so you can use them to clean up date you know may need some extra processing.
+
+The `Schema::addFilter()` also accepts  `$validate` parameter that allows your filter to validate the data and bypass default validation. If you are validating date in this way you can add custom errors to the `ValidationField` parameter and return `Invalid::value()` your validation fails.
+
+### Format Filters
+
+You can also filter all fields with a particular format using the `Schema::addFormatFilter()`. This method works similar to `Schema::addFilter()` but it applies to all fields that match the given `format`. You can even use format filters to override default format processing.
+
+```php
+$schema = new Schema([...]);
+
+// By default schema returns instances of DateTimeImmutable, instead return a string.
+$schema->addFormatFilter('date-time', function ($v) {
+    $dt = new \DateTime($v);
+    return $dt->format(\DateTime::RFC3339);
+}, true);
+```
+
 ## Overriding the Validation Class and Localization
 
 Since schemas generate error messages, localization may be an issue. Although the Garden Schema doesn't offer any localization capabilities itself, it is designed to be extended in order to add localization yourself. You do this by subclassing the **Validation** class and overriding its **translate()** method. Here is a basic example:

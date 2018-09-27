@@ -687,6 +687,28 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Add a custom filter for a schema format.
+     *
+     * Schemas can use the `format` property to specify a specific format on a field. Adding a filter for a format
+     * allows you to customize the behavior of that format.
+     *
+     * @param string $format The format to filter.
+     * @param callable $callback The callback used to filter values.
+     * @param bool $validate Whether or not the filter should also validate. If true default validation is skipped.
+     * @return $this
+     */
+    public function addFormatFilter(string $format, callable $callback, bool $validate = false) {
+        if (empty($format)) {
+            throw new \InvalidArgumentException('The filter format cannot be empty.', 500);
+        }
+
+        $filter = "/format/$format";
+        $this->filters[$filter][] = [$callback, $validate];
+
+        return $this;
+    }
+
+    /**
      * Require one of a given set of fields in the schema.
      *
      * @param array $required The field names to require.
@@ -1020,6 +1042,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 }
             }
         }
+        $key = '/format/'.$field->val('format');
+        if (!empty($this->filters[$key])) {
+            foreach ($this->filters[$key] as list($filter, $validate)) {
+                $value = call_user_func($filter, $value, $field);
+                $validated |= $validate;
+
+                if (Invalid::isInvalid($value)) {
+                    return $value;
+                }
+            }
+        }
+
         return $value;
     }
 
