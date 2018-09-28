@@ -858,6 +858,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $lookup = $this->getRefLookup();
             $visited = [];
 
+            // Resolve any references first.
             while (!empty($schema['$ref'])) {
                 $schemaPath = $schema['$ref'];
 
@@ -875,6 +876,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     throw new RefNotFoundException("Schema reference could not be found. ($schemaPath)");
                 }
             }
+
             return [$schema, $schemaPath];
         }
     }
@@ -963,15 +965,25 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif (($value === null || ($value === '' && !$field->hasType('string'))) && ($field->val('nullable') || $field->hasType('null'))) {
             $result = null;
         } else {
-            // Validate the field's type.
-            $type = $field->getType();
-            if (is_array($type)) {
-                $result = $this->validateMultipleTypes($value, $type, $field);
-            } else {
-                $result = $this->validateSingleType($value, $type, $field);
+            // Look for a discriminator.
+            if (!empty($field->val('discriminator'))) {
+                $field = $this->resolveDiscriminator($value, $field);
             }
-            if (Invalid::isValid($result)) {
-                $result = $this->validateEnum($result, $field);
+
+            if ($field !== null) {
+                // Validate the field's type.
+                $type = $field->getType();
+                if (is_array($type)) {
+                    $result = $this->validateMultipleTypes($value, $type, $field);
+                } else {
+                    $result = $this->validateSingleType($value, $type, $field);
+                }
+
+                if (Invalid::isValid($result)) {
+                    $result = $this->validateEnum($result, $field);
+                }
+            } else {
+                $result = Invalid::value();
             }
         }
 
@@ -1994,5 +2006,111 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function offsetUnset($offset) {
         unset($this->schema[$offset]);
+    }
+
+    /**
+     * Resolve the schema attached to a discriminator.
+     *
+     * @param mixed $value The value to search for the discriminator.
+     * @param ValidationField $field The current node's schema information.
+     * @return ValidationField|null Returns the resolved schema or **null** if it can't be resolved.
+     * @throws ParseException Throws an exception if the discriminator isn't a string.
+     */
+    private function resolveDiscriminator($value, ValidationField $field, array $visited = []) {
+        $propertyName = $field->val('discriminator')['propertyName'] ?? '';
+        if (empty($propertyName) || !is_string($propertyName)) {
+            throw new ParseException("Invalid propertyName for discriminator at {$field->getSchemaPath()}", 500);
+        }
+
+        $propertyFieldName = ltrim($field->getName().'/'.self::escapeRef($propertyName), '/');
+
+        // Do some basic validation checking to see if we can even look at the property.
+        if (!$this->isArray($value)) {
+            $field->addTypeError($value, 'object');
+            return null;
+        } elseif (empty($value[$propertyName])) {
+            $field->getValidation()->addError(
+                $propertyFieldName,
+                'required',
+                ['messageCode' => '{property} is required.', 'property' => $propertyName]
+            );
+            return null;
+        }
+
+        $propertyValue = $value[$propertyName];
+        if (!is_string($propertyValue)) {
+            $field->getValidation()->addError(
+                $propertyFieldName,
+                'type',
+                [
+                    'type' => 'string',
+                    'value' => is_scalar($value) ? $value : null,
+                    'messageCode' => is_scalar($value) ? "{value} is not a valid string." : "The value is not a valid string."
+                ]
+            );
+            return null;
+        }
+
+        $mapping = $field->val('discriminator')['mapping'] ?? '';
+        if (isset($mapping[$propertyValue])) {
+            $ref = $mapping[$propertyValue];
+
+            if (strpos($ref, '#') === false) {
+                $ref = '#/components/schemas/'.self::escapeRef($ref);
+            }
+        } else {
+            // Don't let a property value provide its own ref as that may pose a security concern..
+            $ref = '#/components/schemas/'.self::escapeRef($propertyValue);
+        }
+
+        // Validate the reference against the oneOf constraint.
+        $oneOf = $field->val('oneOf', []);
+        if (!empty($oneOf) && !in_array(['$ref' => $ref], $oneOf)) {
+            $field->getValidation()->addError(
+                $propertyFieldName,
+                'oneOf',
+                [
+                    'type' => 'string',
+                    'value' => is_scalar($propertyValue) ? $propertyValue : null,
+                    'messageCode' => is_scalar($propertyValue) ? "{value} is not a valid option." : "The value is not a valid option."
+                ]
+            );
+            return null;
+        }
+
+        try {
+            // Lookup the schema.
+            $visited[$field->getSchemaPath()] = true;
+
+            list($schema, $schemaPath) = $this->lookupSchema(['$ref' => $ref], $field->getSchemaPath());
+            if (isset($visited[$schemaPath])) {
+                throw new RefNotFoundException('Cyclical ref.', 508);
+            }
+
+            $result = new ValidationField(
+                $field->getValidation(),
+                $schema,
+                $field->getName(),
+                $schemaPath,
+                $field->getOptions()
+            );
+            if (!empty($schema['discriminator'])) {
+                return $this->resolveDiscriminator($value, $result, $visited);
+            } else {
+                return $result;
+            }
+        } catch (RefNotFoundException $ex) {
+            // Since this is a ref provided by the value it is technically a validation error.
+            $field->getValidation()->addError(
+                $propertyFieldName,
+                'propertyName',
+                [
+                    'type' => 'string',
+                    'value' => is_scalar($propertyValue) ? $propertyValue : null,
+                    'messageCode' => is_scalar($propertyValue) ? "{value} is not a valid option." : "The value is not a valid option."
+                ]
+            );
+            return null;
+        }
     }
 }
