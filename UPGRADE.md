@@ -17,7 +17,8 @@ With version 2, Garden Schema is moving away from JSON Schema and towards Open A
 - Schemas now support references with the `$ref` attribute! To use references you can use `Schema::setRefLookup()` with the built in `ArrayRefLookup` class.
 - You can now create custom `Validation` instances by using a custom `Schema::setValidationFactory()` method. This is much more flexible than the deprecated `Schema::setValidationClass()` method.
 - Filters can now validate date too. Filters that validate completely override the default validation behaviour allowing a new level of control. You can add a validating filter using the `$validate` parameter with `Schema::addFilter()`.
-- You can add a global filter for all schemas with the same `format` property using `Schema::addFormatFilter()`. 
+- You can add a global filter for all schemas with the same `format` property using `Schema::addFormatFilter()`.
+- You can now validate against a dynamic schema with the new `discriminator` property. 
 
 ### Deprecations
 

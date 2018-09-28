@@ -11,6 +11,9 @@ use Garden\Schema\Invalid;
 use Garden\Schema\Schema;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Tests for schema filters.
+ */
 class FilterTest extends TestCase {
     /**
      * A validating filter can make an invalid value, valid.
