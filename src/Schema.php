@@ -2063,8 +2063,23 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $ref = '#/components/schemas/'.self::escapeRef($propertyValue);
         }
 
-        // Lookup the schema.
+        // Validate the reference against the oneOf constraint.
+        $oneOf = $field->val('oneOf', []);
+        if (!empty($oneOf) && !in_array(['$ref' => $ref], $oneOf)) {
+            $field->getValidation()->addError(
+                $propertyFieldName,
+                'oneOf',
+                [
+                    'type' => 'string',
+                    'value' => is_scalar($propertyValue) ? $propertyValue : null,
+                    'messageCode' => is_scalar($propertyValue) ? "{value} is not a valid option." : "The value is not a valid option."
+                ]
+            );
+            return null;
+        }
+
         try {
+            // Lookup the schema.
             $visited[$field->getSchemaPath()] = true;
 
             list($schema, $schemaPath) = $this->lookupSchema(['$ref' => $ref], $field->getSchemaPath());

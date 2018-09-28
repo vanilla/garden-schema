@@ -61,6 +61,17 @@ class DiscriminatorTest extends TestCase {
                         ]
                     ],
                     'Bird' => [
+                        'oneOf' => [
+                            [
+                                '$ref' => '#/components/schemas/Penguin',
+                            ],
+                            [
+                                '$ref' => '#/components/schemas/Parrot',
+                            ],
+                            [
+                                '$ref' => '#/components/schemas/Pet',
+                            ],
+                        ],
                         'discriminator' => [
                             'propertyName' => 'subtype',
                         ]
@@ -216,5 +227,16 @@ class DiscriminatorTest extends TestCase {
      */
     public function testInvalidDiscriminator1() {
         $valid = $this->schema->validate(['type' => 'Invalid1']);
+    }
+
+    /**
+     * A discriminator has to respect the `oneOf` validation.
+     *
+     *
+     * @expectedException \Garden\Schema\ValidationException
+     * @expectedExceptionMessageRegExp `subtype: "Dog" is not a valid option.`
+     */
+    public function testOneOfRef() {
+        $valid = $this->schema->validate(['type' => 'Bird', 'subtype' => 'Dog']);
     }
 }

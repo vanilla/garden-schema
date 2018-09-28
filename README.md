@@ -291,6 +291,70 @@ $valid = $sch->validate(...);
 
 The references are resolved during validation so if there are any mistakes in your references then a `RefNotFoundException` is thrown during validation, not when you set your schema or ref lookup function.
 
+## Schema Polymorphism
+
+Schemas have some support for implementing schema polymorphism by letting you validate an object against different schemas depending on its value.
+
+### The `discriminator` Property
+
+The `discriminator` of a schema lets you specify an object property that specifies what type of object it is. That property is then used to reference a specific schema for the object. The discriminator has the following format:
+
+```json5
+{
+    "discriminator": {
+        "propertyName": "<string>", // Name of the property used to reference a schema.
+        "mapping": {
+          "<propertyValue1>": "<ref>", // Reference to a schema.
+          "<propertyValue>": "<alias>" // Map a value to another value.
+        }
+    }
+}
+```
+
+You can see above that the `propertyName` specifies which property is used as the discriminator. There is also an optional `mapping` property that lets you control how schemas are mapped to values. discriminators are resolved int he following way:
+
+1. The property value is mapped using the mapping property.
+2. If the value is a valid JSON reference then it is looked up. Only values in mappings can specify a JSON reference in this way.
+3. If the value is not a valid JSON reference then it is is prepended with `#/components/schemas/` to make a JSON reference. 
+
+Here is an example at work:
+
+```json5
+{
+  "discriminator": {
+    "propertyName": "petType",
+    "mapping": {
+      "dog": "#/components/schemas/Dog", // A direct reference.
+      "fido": "Dog" // An alias that will be turned into a reference.
+    }
+  }
+}
+```
+
+### The `oneOf` Property
+
+The `oneOf` property works in conjunction with the `discriminator` to limit the schemas that the object is allowed to validate against. If you don't specify `oneOf` then any schemas under `#/components/schemas` are fair game.
+
+To use the `oneOf` property you must specify `$ref` nodes like so:
+
+```json5
+{
+  "oneOf": [
+    { "$ref": "#/components/schemas/Dog" },
+    { "$ref": "#/components/schemas/Cat" },
+    { "$ref": "#/components/schemas/Mouse" },
+  ],
+  "discriminator": {
+    "propertyType": "species"
+  }
+}
+```
+
+In the above example the "species" property will be used to construct a reference to a schema. That reference must match one of the references in the `oneOf` property.
+
+*If you are familiar with with OpenAPI spec please note that inline schemas are not currently supported for oneOf in Garden Schema.*
+
+
 ## Validation Options
 
 Both **validate()** and **isValid()** can take an additional **$options** argument which modifies the behavior of the validation slightly, depending on the option.
@@ -398,7 +462,8 @@ The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OA
 | [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23) | any | Specify an array of valid values. |
 | [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25) | any | Specify a type of an array of types to validate a value. |
 | [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3) | object | Applies to a schema that is in an object property. |
-| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri. | 
+| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri. |
+| [oneOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.3) | object | Works with the `discriminator` property to validate against a dynamic schema. |
 
 ## OpenAPI Schema Support
 
@@ -409,4 +474,4 @@ OpenAPI defines some extended properties that are applied during validation.
 | nullable | boolean | If a field is nullable then it can also take the value **null**. |
 | readOnly | boolean | Relevant only for Schema "properties" definitions. Declares the property as "read only". This means that it MAY be sent as part of a response but SHOULD NOT be sent as part of the request. If the property is marked as readOnly being true and is in the required list, the required will take effect on the response only. |
 | writeOnly | boolean |  Relevant only for Schema "properties" definitions. Declares the property as "write only". Therefore, it MAY be sent as part of a request but SHOULD NOT be sent as part of the response. If the property is marked as writeOnly being true and is in the required list, the required will take effect on the request only. |
-| [discriminator](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#discriminatorObject) | object | Validate against a dynamic schema based on a property value. 
+| [discriminator](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#discriminatorObject) | object | Validate against a dynamic schema based on a property value. |
