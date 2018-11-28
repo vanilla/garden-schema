@@ -207,4 +207,86 @@ class OperationsTest extends AbstractSchemaTest {
         $valid = $sch3->validate($data);
         $this->assertEquals($data, $valid);
     }
+
+    /**
+     * Test a self referencing schema's JSON serialization.
+     */
+    public function testRecursiveJsonSerialize() {
+        $sch = new Schema([
+            'type' => 'object',
+            'properties' => [
+                'id' => ['type' => 'int'],
+            ]
+        ]);
+        $sch->setField('properties/child', $sch);
+
+        $data = $sch->jsonSerialize();
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'id' => ['type' => 'int'],
+                'child' => [
+                    '$ref' => '#/components/schemas/$no-id'
+                ]
+            ],
+        ], $data);
+    }
+
+    /**
+     * Test a self referencing schema's JSON serialization.
+     */
+    public function testRecursiveJsonSerializeID() {
+        $sch = new Schema([
+            'type' => 'object',
+            'properties' => [
+                'id' => ['type' => 'int'],
+            ],
+            'id' => 'Test'
+        ]);
+        $sch->setField('properties/child', $sch);
+
+        $data = $sch->jsonSerialize();
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'id' => ['type' => 'int'],
+                'child' => [
+                    '$ref' => '#/components/schemas/Test'
+                ]
+            ],
+            'id' => 'Test',
+        ], $data);
+    }
+
+    /**
+     * Test a recursive loop during JSON serialization.
+     */
+    public function testRecursiveLoopJsonSerialize() {
+        $sch1 = new Schema([
+            'type' => 'object',
+            'id' => 'Test1',
+            'properties' => [
+                'id' => ['type' => 'int'],
+                'child' => $sch2 = new Schema([
+                    'type' => 'array',
+                    'id' => 'Test2',
+                ])
+            ]
+        ]);
+        $sch2->setField('items', $sch1);
+
+        $data = $sch1->jsonSerialize();
+        $this->assertEquals([
+            'type' => 'object',
+            'id' => 'Test1',
+            'properties' => [
+                'id' => ['type' => 'int'],
+                'child' => [
+                    'type' => 'array',
+                    'id' => 'Test2',
+                    'items' => ['$ref' => '#/components/schemas/Test1'],
+                ],
+            ],
+        ], $data);
+    }
 }
