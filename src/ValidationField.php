@@ -167,6 +167,24 @@ class ValidationField {
     }
 
     /**
+     * Check if allOf is available
+     *
+     * @return bool
+     */
+    public function hasAllOf() {
+        return isset($this->field['allOf']);
+    }
+
+    /**
+     * Get allof tree
+     *
+     * @return array
+     */
+    public function getAllOf() {
+        return $this->field['allOf'] ?? [];
+    }
+
+    /**
      * Get the field type.
      *
      * @return string|string[] Returns a type string, array of type strings, or null if there isn't one.
