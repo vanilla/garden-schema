@@ -1467,12 +1467,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param ValidationField $field The validation results to add.
      * @return array Returns an array of merged specs.
+     * @throws ParseException Throws an exception if an invalid allof member is provided
      * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
      */
     protected function resolveAllOfTree(ValidationField $field) {
         $result = [];
 
         foreach($field->getAllOf() as $allof) {
+            if (!is_array($allof) || empty($allof)) {
+                throw new ParseException("Invalid allof member in {$field->getSchemaPath()}, array expected", 500);
+            }
+
             list ($items, $schemaPath) = $this->lookupSchema($allof, $field->getSchemaPath());
 
             $allOfValidation = new ValidationField(
