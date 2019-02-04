@@ -1818,9 +1818,28 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @link http://json-schema.org/
      */
     public function jsonSerialize() {
-        $fix = function ($schema) use (&$fix) {
+        $seen = [$this];
+        return $this->jsonSerializeInternal($seen);
+    }
+
+    /**
+     * Return the JSON data for serialization with massaging for Open API.
+     *
+     * - Swap data/time & timestamp types for Open API types.
+     * - Turn recursive schema pointers into references.
+     *
+     * @param Schema[] $seen Schemas that have been seen during traversal.
+     * @return array Returns an array of data that `json_encode()` will recognize.
+     */
+    private function jsonSerializeInternal(array $seen): array {
+        $fix = function ($schema) use (&$fix, $seen) {
             if ($schema instanceof Schema) {
-                return $schema->jsonSerialize();
+                if (in_array($schema, $seen, true)) {
+                    return ['$ref' => '#/components/schemas/'.($schema->getID() ?: '$no-id')];
+                } else {
+                    $seen[] = $schema;
+                    return $schema->jsonSerializeInternal($seen);
+                }
             }
 
             if (!empty($schema['type'])) {
