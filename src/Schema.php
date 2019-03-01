@@ -1368,7 +1368,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError(
                     'pattern',
                     [
-                        'messageCode' => $field->val('x-patternMessageCode', 'The value doesn\'t match the required pattern.'),
+                        'messageCode' => $field->val('x-patternMessageCode', 'The value doesn\'t match the required pattern {pattern}.'),
+                        'pattern' => $regex,
                     ]
                 );
             }
