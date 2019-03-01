@@ -1372,7 +1372,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError(
                     'pattern',
                     [
-                        'messageCode' => $field->val('x-patternMessageCode', 'The value doesn\'t match the required pattern '.$regex.'.'),
+                        'messageCode' => $field->val('x-patternMessageCode', 'The value doesn\'t match the required pattern.'),
                     ]
                 );
             }
@@ -1470,7 +1470,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws ParseException Throws an exception if an invalid allof member is provided
      * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
      */
-    protected function resolveAllOfTree(ValidationField $field) {
+    private function resolveAllOfTree(ValidationField $field) {
         $result = [];
 
         foreach($field->getAllOf() as $allof) {
@@ -1506,7 +1506,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array|Invalid Returns an array or invalid if validation fails.
      * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
      */
-    protected function validateAllOf($value, ValidationField $field) {
+    private function validateAllOf($value, ValidationField $field) {
         $allOfValidation = new ValidationField(
             $field->getValidation(),
             $this->resolveAllOfTree($field),
