@@ -971,16 +971,20 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
 
             if ($field !== null) {
-                // Validate the field's type.
-                $type = $field->getType();
-                if (is_array($type)) {
-                    $result = $this->validateMultipleTypes($value, $type, $field);
+                if($field->hasAllOf()) {
+                    $result = $this->validateAllOf($value, $field);
                 } else {
-                    $result = $this->validateSingleType($value, $type, $field);
-                }
+                    // Validate the field's type.
+                    $type = $field->getType();
+                    if (is_array($type)) {
+                        $result = $this->validateMultipleTypes($value, $type, $field);
+                    } else {
+                        $result = $this->validateSingleType($value, $type, $field);
+                    }
 
-                if (Invalid::isValid($result)) {
-                    $result = $this->validateEnum($result, $field);
+                    if (Invalid::isValid($result)) {
+                        $result = $this->validateEnum($result, $field);
+                    }
                 }
             } else {
                 $result = Invalid::value();
@@ -1456,6 +1460,62 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addTypeError($value, 'date/time');
         }
         return $value;
+    }
+
+    /**
+     * Recursively resolve allOf inheritance tree and return a merged resource specification
+     *
+     * @param ValidationField $field The validation results to add.
+     * @return array Returns an array of merged specs.
+     * @throws ParseException Throws an exception if an invalid allof member is provided
+     * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
+     */
+    private function resolveAllOfTree(ValidationField $field) {
+        $result = [];
+
+        foreach($field->getAllOf() as $allof) {
+            if (!is_array($allof) || empty($allof)) {
+                throw new ParseException("Invalid allof member in {$field->getSchemaPath()}, array expected", 500);
+            }
+
+            list ($items, $schemaPath) = $this->lookupSchema($allof, $field->getSchemaPath());
+
+            $allOfValidation = new ValidationField(
+                $field->getValidation(),
+                $items,
+                '',
+                $schemaPath,
+                $field->getOptions()
+            );
+
+            if($allOfValidation->hasAllOf()) {
+                $result = array_replace_recursive($result, $this->resolveAllOfTree($allOfValidation));
+            } else {
+                $result = array_replace_recursive($result, $items);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Validate allof tree
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return array|Invalid Returns an array or invalid if validation fails.
+     * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
+     */
+    private function validateAllOf($value, ValidationField $field) {
+        $allOfValidation = new ValidationField(
+            $field->getValidation(),
+            $this->resolveAllOfTree($field),
+            '',
+            $field->getSchemaPath(),
+            $field->getOptions()
+        );
+
+        return $this->validateField($value, $allOfValidation);
     }
 
     /**
