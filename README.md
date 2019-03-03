@@ -442,6 +442,7 @@ The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OA
 
 | Property | Applies To | Notes |
 | -------- | ---------- | ----------- |
+| [allOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.1) | Schema[] | An instance validates successfully against this keyword if it validates successfully against all schemas defined by this keyword's value. |
 | [multipleOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.1) | integer/number | A numeric instance is only valid if division by this keyword's value results in an integer. |
 | [maximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.2) | integer/number |  If the instance is a number, then this keyword validates only if the instance is less than or exactly equal to "maximum". |
 | [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum". |
