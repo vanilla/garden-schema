@@ -116,4 +116,19 @@ class RealWorldTest extends TestCase {
         $validatedData = $filteredSchema->validate($data);
         $this->assertEquals($expectedData, $validatedData);
     }
+
+    /**
+     * A nested schema object should have its default value respected.
+     */
+    public function testNestedDefaultRequired() {
+        $schema = Schema::parse([
+            'letter' => Schema::parse([
+                'default' => 'a',
+                'type' => 'string',
+            ])
+        ]);
+        $data = [];
+        $data = $schema->validate($data);
+        $this->assertEquals(['letter' => 'a'], $data);
+    }
 }
