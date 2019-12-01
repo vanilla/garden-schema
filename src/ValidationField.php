@@ -191,7 +191,7 @@ class ValidationField {
      * @return bool Returns **true** if the field has a key or **false** otherwise.
      */
     public function hasVal($key) {
-        return array_key_exists($key, $this->field);
+        return isset($this->field[$key]) || (is_array($this->field) && array_key_exists($key, $this->field));
     }
 
     /**
