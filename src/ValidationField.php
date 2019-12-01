@@ -80,13 +80,20 @@ class ValidationField {
     public function addTypeError($value, $type = '') {
         $type = $type ?: $this->getType();
 
+        if ($value === null) {
+            // Give a different message for null values.
+            $messageCode = "The value cannot be null.";
+        } else {
+            $messageCode = is_scalar($value) ? "{value} is not a valid $type." : "The value is not a valid $type.";
+        }
+
         $this->validation->addError(
             $this->getName(),
             'type',
             [
                 'type' => $type,
                 'value' => is_scalar($value) ? $value : null,
-                'messageCode' => is_scalar($value) ? "{value} is not a valid $type." : "The value is not a valid $type."
+                'messageCode' => $messageCode,
             ]
         );
 
