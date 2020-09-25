@@ -406,6 +406,27 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Grab the schema's sttribute.
+     *
+     * @param string $attr
+     * @return mixed
+     */
+    public function getSchemaAttribute(string $attr) {
+        return $this->schema[$attr] ?? null;
+    }
+
+    /**
+     * Set schema attribute
+     *
+     * @param string $attr
+     * @param $value
+     */
+    public function setSchemaAttribute(string $attr, $value) {
+        $this->schema[$attr] = $value;
+        return $this;
+    }
+
+    /**
      * Get the schema's title.
      *
      * @return string Returns the title.
