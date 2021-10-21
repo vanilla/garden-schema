@@ -22,10 +22,15 @@ class StringValidationTest extends AbstractSchemaTest {
      * @param string $str The string to test.
      * @param string $code The expected error code, if any.
      * @param int $minLength The min length to test.
+     * @param int $flags Flags to set on the schema.
+     *
      * @dataProvider provideMinLengthTests
      */
-    public function testMinLength($str, $code, $minLength = 3) {
+    public function testMinLength($str, $code, $minLength = 3, int $flags = null) {
         $schema = Schema::parse(['str:s' => ['minLength' => $minLength]]);
+        if ($flags) {
+            $schema->setFlags($flags);
+        }
 
         try {
             $schema->validate(['str' => $str]);
@@ -33,7 +38,8 @@ class StringValidationTest extends AbstractSchemaTest {
             if (!empty($code)) {
                 $this->fail("'$str' shouldn't validate against a min length of $minLength.");
             } else {
-                $this->assertGreaterThanOrEqual($minLength, strlen($str));
+                // Everything validated correctly.
+                $this->assertTrue(true);
             }
         } catch (ValidationException $ex) {
             $this->assertFieldHasError($ex->getValidation(), 'str', $code);
@@ -51,9 +57,11 @@ class StringValidationTest extends AbstractSchemaTest {
             'ab' => ['ab', 'minLength'],
             'abc' => ['abc', ''],
             'abcd' => ['abcd', ''],
-
             'empty 1' => ['', 'missingField', 1],
-            'empty 0' => ['', '', 0]
+            'empty 0' => ['', '', 0],
+            'unicode as bytes success' => ['😱', '', 4],
+            'unicode as unicode fail' => ['😱', 'minLength', 2, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
+            'unicode as unicode success' => ['😱', '', 1, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
         ];
 
         return $r;
@@ -65,16 +73,18 @@ class StringValidationTest extends AbstractSchemaTest {
      * @param string $str The string to test.
      * @param string $code The expected error code, if any.
      * @param int $maxLength The max length to test.
-     * @param int|null $maxByteLength The max byte length to test.
+     * @param int $flags Flags to set on the schema.
      *
      * @dataProvider provideMaxLengthTests
      */
-    public function testMaxLength($str, string $code = '', int $maxLength = 3, int $maxByteLength = null) {
-        $shorthand = ['maxLength' => $maxLength];
-        if ($maxByteLength) {
-            $shorthand['maxByteLength'] = $maxByteLength;
+    public function testMaxLength($str, string $code = '', int $maxLength = 3, int $flags = null) {
+        $schema = Schema::parse(['str:s?' => [
+            'maxLength' => $maxLength,
+        ]]);
+
+        if ($flags !== null) {
+            $schema->setFlags($flags);
         }
-        $schema = Schema::parse(['str:s?' => $shorthand]);
 
         try {
             $schema->validate(['str' => $str]);
@@ -82,7 +92,8 @@ class StringValidationTest extends AbstractSchemaTest {
             if (!empty($code)) {
                 $this->fail("'$str' shouldn't validate against a max length of $maxLength.");
             } else {
-                $this->assertLessThanOrEqual($maxLength, strlen($str));
+                // Everything validated correctly.
+                $this->assertTrue(true);
             }
         } catch (ValidationException $ex) {
             $this->assertFieldHasError($ex->getValidation(), 'str', $code);
@@ -100,8 +111,9 @@ class StringValidationTest extends AbstractSchemaTest {
             'ab' => ['ab'],
             'abc' => ['abc'],
             'abcd' => ['abcd', 'maxLength'],
-            'multibyte short' => ['😱', '', 4, 4],
-            'multibyte long' => ['😱😱', 'maxByteLength', 4, 4],
+            'long multibyte with unicode length' => ['😱', '', 2, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
+            'long multibyte with byte length' => ['😱', 'maxLength', 2],
+            'exact amount multibyte with byte length' => ['😱', '', 4],
         ];
 
         return $r;

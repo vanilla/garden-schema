@@ -22,6 +22,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     const VALIDATE_EXTRA_PROPERTY_EXCEPTION = 0x2;
 
     /**
+     * Validate string lengths as unicode characters instead of bytes.
+     */
+    const VALIDATE_STRING_LENGTH_AS_UNICODE = 0x4;
+
+    /**
      * @var array All the known types.
      *
      * If this is ever given some sort of public access then remove the static.
@@ -1006,7 +1011,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         $errorCount = $field->getErrorCount();
-        if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
+        $strFn = $this->hasFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE) ? "mb_strlen" : "strlen";
+        $strLen = $strFn($value);
+        if (($minLength = $field->val('minLength', 0)) > 0 && $strLen < $minLength) {
             if (!empty($field->getName()) && $minLength === 1) {
                 $field->addError('missingField', ['messageCode' => '{field} is required.', 'status' => 422]);
             } else {
@@ -1020,13 +1027,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 );
             }
         }
-        if (($maxLength = $field->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
+        if (($maxLength = $field->val('maxLength', 0)) > 0 && $strLen > $maxLength) {
             $field->addError(
                 'maxLength',
                 [
                     'messageCode' => '{field} is {overflow} {overflow,plural,characters} too long.',
                     'maxLength' => $maxLength,
-                    'overflow' => mb_strlen($value) - $maxLength,
+                    'overflow' => $strLen - $maxLength,
                     'status' => 422
                 ]
             );
