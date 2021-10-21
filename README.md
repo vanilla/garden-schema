@@ -371,6 +371,44 @@ You can pass an option of `['response' => true]` to specify that you are validat
 
 You can pass an option of `['sparse' => true]` to specify a sparse validation. When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
 
+## Flags
+
+Flags can be applied a schema to change it's inherit validation.
+
+```php
+use Garden\Schema\Schema;
+$schema = Schema::parse([]);
+
+// Enable a flag.
+$schema->setFlag(Schema::VALIDATE_STRING_LENGTH_AS_UNICODE, true);
+
+// Disable a flag.
+$schema->setFlag(Schema::VALIDATE_STRING_LENGTH_AS_UNICODE, false);
+
+// Set all flags together.
+$schema->setFlags(Schema::VALIDATE_STRING_LENGTH_AS_UNICODE & Schema::VALIDATE_EXTRA_PROPERTY_NOTICE);
+
+// Check if a flag is set.
+$schema->hasFlag(Schema::VALIDATE_STRING_LENGTH_AS_UNICODE); // true
+```
+
+### `VALIDATE_STRING_LENGTH_AS_UNICODE`
+
+By default, schema's validate str lengths in terms of bytes. This is useful because this is the common
+unit of storage for things like databases.
+
+Some unicode characters take more than 1 byte. An emoji like 😱 takes 4 bytes for example.
+
+Enable this flag to validate unicode character length instead of byte length.
+
+### `VALIDATE_EXTRA_PROPERTY_NOTICE`
+
+Set this flag to trigger notices whenever a validated object has properties not defined in the schema.
+
+### `VALIDATE_EXTRA_PROPERTY_EXCEPTION`
+
+Set this flag to throw an exception whenever a validated object has properties not defined in the schema.
+
 ## Custom Validation with addValidator()
 
 You can customize validation with `Schema::addValidator()`. This method lets you attach a callback to a schema path. The callback has the following form:
@@ -449,7 +487,6 @@ The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OA
 | [minimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.4) | integer/number |  If the instance is a number, then this keyword validates only if the instance is greater than or exactly equal to "minimum". |
 | [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
 | [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the unicode character length of a string. |
-| maxByteLength | string | Limit the byte length of a string. ***Note this is a custom property and part of the normal JSON schema spec.*** |
 | [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
 | [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimiters. You can add a custom error message with the `x-patternMessageCode` field. |
 | [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9) | array | Ony supports a single schema. |

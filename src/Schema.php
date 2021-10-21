@@ -22,6 +22,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     const VALIDATE_EXTRA_PROPERTY_EXCEPTION = 0x2;
 
     /**
+     * Validate string lengths as unicode characters instead of bytes.
+     */
+    const VALIDATE_STRING_LENGTH_AS_UNICODE = 0x4;
+
+    /**
      * @var array All the known types.
      *
      * If this is ever given some sort of public access then remove the static.
@@ -1346,7 +1351,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return Invalid::value();
         }
 
-        if (($minLength = $field->val('minLength', 0)) > 0 && mb_strlen($value) < $minLength) {
+        $strFn = $this->hasFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE) ? "mb_strlen" : "strlen";
+        $strLen = $strFn($value);
+        if (($minLength = $field->val('minLength', 0)) > 0 && $strLen < $minLength) {
             $field->addError(
                 'minLength',
                 [
@@ -1355,23 +1362,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 ]
             );
         }
-        if (($maxLength = $field->val('maxLength', 0)) > 0 && mb_strlen($value) > $maxLength) {
+
+        if (($maxLength = $field->val('maxLength', 0)) > 0 && $strLen > $maxLength) {
             $field->addError(
                 'maxLength',
                 [
                     'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
                     'maxLength' => $maxLength,
-                    'overflow' => mb_strlen($value) - $maxLength,
-                ]
-            );
-        }
-        if (($maxByteLength = $field->val('maxByteLength', 0)) > 0 && strlen($value) > $maxLength) {
-            $field->addError(
-                'maxByteLength',
-                [
-                    'messageCode' => 'The value is {overflow} {overflow,plural,byte,bytes} too long.',
-                    'maxLength' => $maxLength,
-                    'overflow' => strlen($value) - $maxLength,
+                    'overflow' => $strLen - $maxLength,
                 ]
             );
         }
