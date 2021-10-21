@@ -1365,6 +1365,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 ]
             );
         }
+        if (($maxByteLength = $field->val('maxByteLength', 0)) > 0 && strlen($value) > $maxLength) {
+            $field->addError(
+                'maxByteLength',
+                [
+                    'messageCode' => 'The value is {overflow} {overflow,plural,byte,bytes} too long.',
+                    'maxLength' => $maxLength,
+                    'overflow' => strlen($value) - $maxLength,
+                ]
+            );
+        }
         if ($pattern = $field->val('pattern')) {
             $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
 
