@@ -58,7 +58,7 @@ In the above example a **Schema** object is created with the schema definition p
 The **Schema** class is instantiated with an array defining the schema. The array can be in [JSON Schema](http://json-schema.org/) format or it can be in custom short format which is much quicker to write. The short format will be described in this section.
 
 By default the schema is an array where each element of the array defines an object property. By "object" we mean javascript object or PHP array with string keys. There are several ways a property can be defined:
- 
+
 ```php
 [
     '<property>', // basic property, can be any type
@@ -67,7 +67,7 @@ By default the schema is an array where each element of the array defines an obj
 
     '<property>:<type>?' => 'Description', // optional, typed property with description
     '<property>?' => ['type' => '<type'>, 'description' => '...'], // longer format
-    
+
     '<property>:o' => [ // object property with nested schema
         '<property>:<type>' => '...',
         ...
@@ -83,7 +83,7 @@ By default the schema is an array where each element of the array defines an obj
 You can quickly define an object schema by giving just as much information as you need. You can create a schema that is nested as deeply as you want in order to validate very complex data. This short schema is converted into a JSON schema compatible array internally and you can see this array with the **jsonSerialize()** method.
 
 We provide first-class support for descriptions because we believe in writing readable code right off the bat. If you don't like this you can just leave the descriptions out and they will be left empty in the schema.
- 
+
 ### Types and Short Types
 
 The **Schema** class supports the following types. Each type has a short-form and a long-form. Usually you use the short-form when defining a schema in code and it gets converted to the long-form internally, including when used in errors.
@@ -107,7 +107,7 @@ The array and object types are a bit special as they contain several elements ra
 $schema = Schema::parse([
     'items:a', // array of any type
     'tags:a' => 's', // array of strings
-    
+
     'attributes:o', // object of any type
     'user:o' => [ // an object with specific properties
         'name:s',
@@ -131,7 +131,7 @@ $schema = Schema::parse([
 ```
 
 This schema would apply to something like the following data:
- 
+
 ```php
 [
     ['id' => 1, 'name' => 'George', 'birthday' => '1732-02-22'],
@@ -150,15 +150,15 @@ If you want a property to allow null values you can specify the **allowNull** at
 [
     // You can specify allowNull as a property attribute.
     'opt1:s?' => ['allowNull' => true],
-    
+
     // You can specify null as an optional type in the declaration.
     'opt2:s|n?' => 'Another optional property.'
-] 
+]
 ```
 
 ### Multiple Types
 
-The type property of the schema can accept an array of types. An array of types means that the data must be any one of the types. 
+The type property of the schema can accept an array of types. An array of types means that the data must be any one of the types.
 
 ### Default Values
 
@@ -177,11 +177,11 @@ $schema = Schema::parse(['id:i', 'name:s']);
 try {
     // $u1 will be ['id' => 123, 'name' => 'John']
     $u1 = $schema->validate(['id' => '123', 'name' => 'John']);
-    
+
     // This will thow an exception.
     $u2 = $schema->validate(['id' => 'foo']);
 } catch (ValidationException $ex) {
-    // $ex->getMessage() will be: 'id is not a valid integer. name is required.'  
+    // $ex->getMessage() will be: 'id is not a valid integer. name is required.'
 }
 ```
 
@@ -203,7 +203,7 @@ if ($schema->isValid(['page' => 2, 'count' => 'many']) {
 
 When you call **validate()** and validation fails a **ValidationException** is thrown. This exception contains a property that is a **Validation** object which contains more information about the fields that have failed.
 
-If you are writing an API, you can **json_encode()** the **ValidationException** and it should provide a rich set of data that will help any consumer figure out exactly what they did wrong. You can also use various properties of the **Validation** property to help render the error output appropriately. 
+If you are writing an API, you can **json_encode()** the **ValidationException** and it should provide a rich set of data that will help any consumer figure out exactly what they did wrong. You can also use various properties of the **Validation** property to help render the error output appropriately.
 
 ### Sparse Validation
 
@@ -249,7 +249,7 @@ The **Schema** object is a wrapper for a [JSON Schema](http://json-schema.org/) 
 | [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum". |
 | [minimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.4) | integer/number |  If the instance is a number, then this keyword validates only if the instance is greater than or exactly equal to "minimum". |
 | [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
-| [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the length of a string. |
+| [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the unicode character length of a string. |
 | [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
 | [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimeters. |
 | [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9) | array | Ony supports a single schema. |
@@ -260,4 +260,4 @@ The **Schema** object is a wrapper for a [JSON Schema](http://json-schema.org/) 
 | [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23) | any | Specify an array of valid values. |
 | [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25) | any | Specify a type of an array of types to validate a value. |
 | [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3) | object | Applies to a schema that is in an object property. |
-| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri. | 
+| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri. |

@@ -65,10 +65,16 @@ class StringValidationTest extends AbstractSchemaTest {
      * @param string $str The string to test.
      * @param string $code The expected error code, if any.
      * @param int $maxLength The max length to test.
+     * @param int|null $maxByteLength The max byte length to test.
+     *
      * @dataProvider provideMaxLengthTests
      */
-    public function testMaxLength($str, $code = '', $maxLength = 3) {
-        $schema = Schema::parse(['str:s?' => ['maxLength' => $maxLength]]);
+    public function testMaxLength($str, string $code = '', int $maxLength = 3, int $maxByteLength = null) {
+        $shorthand = ['maxLength' => $maxLength];
+        if ($maxByteLength) {
+            $shorthand['maxByteLength'] = $maxByteLength;
+        }
+        $schema = Schema::parse(['str:s?' => $shorthand]);
 
         try {
             $schema->validate(['str' => $str]);
@@ -94,6 +100,8 @@ class StringValidationTest extends AbstractSchemaTest {
             'ab' => ['ab'],
             'abc' => ['abc'],
             'abcd' => ['abcd', 'maxLength'],
+            'multibyte short' => ['😱', '', 4, 4],
+            'multibyte long' => ['😱😱', 'maxByteLength', 4, 4],
         ];
 
         return $r;
