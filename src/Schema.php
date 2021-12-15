@@ -1011,30 +1011,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return Invalid::value();
         }
 
-//        $mbStrLen = mb_strlen($value);
-//        if (($minLength = $field->val('minLength', 0)) > 0 && $mbStrLen < $minLength) {
-//            $field->addError(
-//                'minLength',
-//                [
-//                    'messageCode' => 'The value should be at least {minLength} {minLength,plural,character,characters} long.',
-//                    'minLength' => $minLength,
-//                ]
-//            );
-//        }
-//
-//        if (($maxLength = $field->val('maxLength', 0)) > 0 && $mbStrLen > $maxLength) {
-//            $field->addError(
-//                'maxLength',
-//                [
-//                    'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
-//                    'maxLength' => $maxLength,
-//                    'overflow' => $mbStrLen - $maxLength,
-//                ]
-//            );
-//        }
-//
-
-
         $mbStrLen = mb_strlen($value);
         if (($minLength = $field->val('minLength', 0)) > 0 && $mbStrLen < $minLength) {
             if (!empty($field->getName()) && $minLength === 1) {
