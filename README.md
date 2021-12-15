@@ -478,31 +478,32 @@ There are a few things to note in the above example:
 
 The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
 
-| Property | Applies To | Notes |
-| -------- | ---------- | ----------- |
-| [allOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.1) | Schema[] | An instance validates successfully against this keyword if it validates successfully against all schemas defined by this keyword's value. |
-| [multipleOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.1) | integer/number | A numeric instance is only valid if division by this keyword's value results in an integer. |
-| [maximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.2) | integer/number |  If the instance is a number, then this keyword validates only if the instance is less than or exactly equal to "maximum". |
-| [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum". |
-| [minimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.4) | integer/number |  If the instance is a number, then this keyword validates only if the instance is greater than or exactly equal to "minimum". |
-| [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
-| [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the unicode character length of a string. |
-| [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
-| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimiters. You can add a custom error message with the `x-patternMessageCode` field. |
-| [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9) | array | Ony supports a single schema. |
-| [maxItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.11) | array | Limit the number of items in an array. |
-| [minItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.12) | array | Minimum number of items in an array. |
-| [uniqueItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.4.5) | array | All items must be unique. |
-| [maxProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.1) | object | Limit the number of properties on an object. |
-| [minProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.2) | object | Minimum number of properties on an object.  |
-| [additionalProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.6) | object | Validate additional properties against a schema. Can also be **true** to always validate. |
-| [required](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.17) | object | Names of required object properties. |
-| [properties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.18) | object | Specify schemas for object properties. |
-| [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23) | any | Specify an array of valid values. |
-| [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25) | any | Specify a type of an array of types to validate a value. |
-| [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3) | object | Applies to a schema that is in an object property. |
-| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri. |
-| [oneOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.3) | object | Works with the `discriminator` property to validate against a dynamic schema. |
+| Property                                                                                            | Applies To | Notes                                                                                                                                     |
+|-----------------------------------------------------------------------------------------------------| ---------- |-------------------------------------------------------------------------------------------------------------------------------------------|
+| [allOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.1)                | Schema[] | An instance validates successfully against this keyword if it validates successfully against all schemas defined by this keyword's value. |
+| [multipleOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.1)           | integer/number | A numeric instance is only valid if division by this keyword's value results in an integer.                                               |
+| [maximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.2)              | integer/number | If the instance is a number, then this keyword validates only if the instance is less than or exactly equal to "maximum".                 |
+| [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3)     | integer/number | If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum".      |
+| [minimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.4)              | integer/number | If the instance is a number, then this keyword validates only if the instance is greater than or exactly equal to "minimum".              |
+| [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5)     | integer/number | If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum".   |
+| [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6)              | string | Limit the unicode character length of a string.                                                                                           |
+| [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7)              | string | Minimum length of a string.                                                                                                               |
+| maxByteLength                                                                                       | string | Maximum byte length of the the property.                                                                                                  |
+| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8)                | string | A regular expression without delimiters. You can add a custom error message with the `x-patternMessageCode` field.                        |
+| [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9)                  | array | Ony supports a single schema.                                                                                                             |
+| [maxItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.11)              | array | Limit the number of items in an array.                                                                                                    |
+| [minItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.12)              | array | Minimum number of items in an array.                                                                                                      |
+| [uniqueItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.4.5)          | array | All items must be unique.                                                                                                                 |
+| [maxProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.1)        | object | Limit the number of properties on an object.                                                                                              |
+| [minProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.2)        | object | Minimum number of properties on an object.                                                                                                |
+| [additionalProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.6) | object | Validate additional properties against a schema. Can also be **true** to always validate.                                                 |
+| [required](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.17)              | object | Names of required object properties.                                                                                                      |
+| [properties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.18)            | object | Specify schemas for object properties.                                                                                                    |
+| [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23)                  | any | Specify an array of valid values.                                                                                                         |
+| [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25)                  | any | Specify a type of an array of types to validate a value.                                                                                  |
+| [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3)                | object | Applies to a schema that is in an object property.                                                                                        |
+| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3)                 | string | Support for date-time, email, ipv4, ipv6, ip, uri.                                                                                        |
+| [oneOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.3)                | object | Works with the `discriminator` property to validate against a dynamic schema.                                                             |
 
 ## OpenAPI Schema Support
 

@@ -98,6 +98,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 string $_) {
                 return null;
             };
+
+        $this->setFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE, true);
     }
 
     /**
@@ -1341,6 +1343,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     protected function validateString($value, ValidationField $field) {
         if ($field->val('format') === 'date-time') {
             $result = $this->validateDatetime($value, $field);
+
             return $result;
         }
 
@@ -1348,12 +1351,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $value = $result = (string)$value;
         } else {
             $field->addTypeError($value, 'string');
+
             return Invalid::value();
         }
 
-        $strFn = $this->hasFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE) ? "mb_strlen" : "strlen";
-        $strLen = $strFn($value);
-        if (($minLength = $field->val('minLength', 0)) > 0 && $strLen < $minLength) {
+        $mbStrLen = mb_strlen($value);
+        if (($minLength = $field->val('minLength', 0)) > 0 && $mbStrLen < $minLength) {
             $field->addError(
                 'minLength',
                 [
@@ -1363,16 +1366,33 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             );
         }
 
-        if (($maxLength = $field->val('maxLength', 0)) > 0 && $strLen > $maxLength) {
+        if (($maxLength = $field->val('maxLength', 0)) > 0 && $mbStrLen > $maxLength) {
             $field->addError(
                 'maxLength',
                 [
                     'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
                     'maxLength' => $maxLength,
-                    'overflow' => $strLen - $maxLength,
+                    'overflow' => $mbStrLen - $maxLength,
                 ]
             );
         }
+
+        $useLengthAsByteLength = !$this->hasFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE);
+        $maxByteLength = $field->val('maxByteLength') ?? ($useLengthAsByteLength ? $maxLength : null);
+        if ($maxByteLength !== null && $maxByteLength > 0) {
+            $byteStrLen = strlen($value);
+            if ($byteStrLen > $maxByteLength) {
+                $field->addError(
+                    'maxByteLength',
+                    [
+                        'messageCode' => 'The value is {overflow} {overflow,plural,byte,bytes} too long.',
+                        'maxLength' => $maxLength,
+                        'overflow' => $byteStrLen - $maxByteLength,
+                    ]
+                );
+            }
+        }
+
         if ($pattern = $field->val('pattern')) {
             $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
 
