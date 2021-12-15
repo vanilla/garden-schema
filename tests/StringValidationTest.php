@@ -161,15 +161,15 @@ class StringValidationTest extends AbstractSchemaTest {
         return [
             'maxLength - short' => [['justLength' => '😱']],
             'maxLength - equal' => [['justLength' => '😱😱😱😱']],
-            'maxLength - long' => [['justLength' => '😱😱😱😱😱'], '1 character too long'],
+            'maxLength - long' => [['justLength' => '😱😱😱😱😱'], '1 characters too long'],
             'byteLength - short' => [['justByteLength' => '😱']],
             'byteLength - equal' => [['justByteLength' => '😱😱']],
             'byteLength - long' => [['justByteLength' => '😱😱a'], '1 byte too long'],
             'mixedLengths - short' => [['mixedLengths' => '😱']],
             'mixedLengths - equal' => [['mixedLengths' => '😱aa']],
             'mixedLengths - long bytes' => [['mixedLengths' => '😱😱'], '2 bytes too long'],
-            'mixedLengths - long chars' => [['mixedLengths' => 'aaaaa'], '1 character too long'],
-            'mixedLengths - long chars - long bytes' => [['mixedLengths' => '😱😱😱😱😱'], ["1 character too long", "14 bytes too long."]],
+            'mixedLengths - long chars' => [['mixedLengths' => 'aaaaa'], '1 characters too long'],
+            'mixedLengths - long chars - long bytes' => [['mixedLengths' => '😱😱😱😱😱'], ["1 characters too long", "14 bytes too long."]],
             'byteLength flag - short' => [['justLength' => '😱'], null, true],
             'byteLength flag - long' => [['justLength' => '😱😱😱😱'], '12 bytes too long', true],
             'byteLength property is preferred over byte length flag' => [['mixedLengths' => '😱😱'], '2 bytes too long', true]

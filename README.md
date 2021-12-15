@@ -6,35 +6,35 @@
 ![MIT License](https://img.shields.io/packagist/l/vanilla/garden-schema.svg?style=flat)
 [![CLA](https://cla-assistant.io/readme/badge/vanilla/garden-schema)](https://cla-assistant.io/vanilla/garden-schema)
 
-The Garden Schema is a simple data validation and cleaning library based on [OpenAPI 3.0 Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject).
+The Garden Schema is a simple data validation and cleaning library based on [JSON Schema](http://json-schema.org/).
 
 ## Features
 
-- Define the data structures of PHP arrays of any depth, and validate them.
+-   Define the data structures of PHP arrays of any depth, and validate them.
 
-- Validated data is cleaned and coerced into appropriate types.
+-   Validated data is cleaned and coerced into appropriate types.
 
-- The schema defines a whitelist of allowed data and strips out all extraneous data.
+-   The schema defines a whitelist of allowed data and strips out all extraneous data.
 
-- The **Schema** class understands a subset of data in [OpenAPI Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) format. We will add more support for the built-in JSON schema validation as time goes on.
+-   The **Schema** class understands data in [JSON Schema](http://json-schema.org/) format. We will add more support for the built-in JSON schema validation as time goes on.
 
-- Developers can use a shorter schema format in order to define schemas in code rapidly. We built this class to be as easy to use as possible. Avoid developer groans as they lock down their data.
+-   Developers can use a shorter schema format in order to define schemas in code rapidly. We built this class to be as easy to use as possible. Avoid developer groans as they lock down their data.
 
-- Add custom validator callbacks to support practically any validation scenario.
+-   Add custom validator callbacks to support practically any validation scenario.
 
-- Override the validation class in order to customize the way errors are displayed for your own application.
+-   Override the validation class in order to customize the way errors are displayed for your own application.
 
 ## Uses
 
 Garden Schema is meant to be a generic wrapper for data validation. It should be valuable when you want to bullet-proof your code against user-submitted data. Here are some example uses:
 
-- Check the data being submitted to your API endpoints. Define the schema at the beginning of your endpoint and validate the data before doing anything else. In this way you can be sure that you are using clean data and avoid a bunch of spaghetti checks later in your code. This was the original reason why we developed the Garden Schema.
+-   Check the data being submitted to your API endpoints. Define the schema at the beginning of your endpoint and validate the data before doing anything else. In this way you can be sure that you are using clean data and avoid a bunch of spaghetti checks later in your code. This was the original reason why we developed the Garden Schema.
 
-- Clean user input. The Schema object will cast data to appropriate types and gracefully handle common use-cases (ex. converting the string "true" to true for booleans). This allows you to use more "===" checks in your code which helps avoid bugs in the longer term.
+-   Clean user input. The Schema object will cast data to appropriate types and gracefully handle common use-cases (ex. converting the string "true" to true for booleans). This allows you to use more "===" checks in your code which helps avoid bugs in the longer term.
 
-- Validate data before passing it to the database in order to present human-readable errors rather than cryptic database generated errors.
+-   Validate data before passing it to the database in order to present human-readable errors rather than cryptic database generated errors.
 
-- Clean output before returning it. A lot of database drivers return data as strings even though it's defined as different types. The Schema will clean the data appropriately which is especially important for consumption by the non-PHP world.
+-   Clean output before returning it. A lot of database drivers return data as strings even though it's defined as different types. The Schema will clean the data appropriately which is especially important for consumption by the non-PHP world.
 
 ## Basic Usage
 
@@ -55,7 +55,7 @@ In the above example a **Schema** object is created with the schema definition p
 
 ## Defining Schemas
 
-The **Schema** class is instantiated with an array defining the schema. The array can be in [OpenAPI 3.0 Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) format or it can be in custom short format. It is recommended you define your schemas in the OpenAPI format, but the short format is good for those wanting to write quick prototypes. The short format will be described in this section.
+The **Schema** class is instantiated with an array defining the schema. The array can be in [JSON Schema](http://json-schema.org/) format or it can be in custom short format which is much quicker to write. The short format will be described in this section.
 
 By default the schema is an array where each element of the array defines an object property. By "object" we mean javascript object or PHP array with string keys. There are several ways a property can be defined:
 
@@ -78,7 +78,7 @@ By default the schema is an array where each element of the array defines an obj
         ...
     ]
 ]
- ```
+```
 
 You can quickly define an object schema by giving just as much information as you need. You can create a schema that is nested as deeply as you want in order to validate very complex data. This short schema is converted into a JSON schema compatible array internally and you can see this array with the **jsonSerialize()** method.
 
@@ -86,16 +86,18 @@ We provide first-class support for descriptions because we believe in writing re
 
 ### Types and Short Types
 
-The **Schema** class supports the following types. Each type has one or more aliases. You can use an alias for brevity when defining a schema in code and it gets converted to the proper type internally, including when used in errors.
+The **Schema** class supports the following types. Each type has a short-form and a long-form. Usually you use the short-form when defining a schema in code and it gets converted to the long-form internally, including when used in errors.
 
-Type        | Aliases       | Notes |
-----        | -------       | ----- |
-boolean     | b, bool       |
-string      | s, str, dt    | The "dt" alias adds a format of "date-time" and validates to `DateTimeInterface` instances |
-integer     | i, int, ts    | The "ts" alias adds a format of "timestamp" and will convert date strings into integer timestamps on validation. |
-number      | f, float      |
-array       | a             |
-object      | o             |
+| Type      | Short-form |
+| --------- | ---------- |
+| boolean   | b, bool    |
+| string    | s, str     |
+| integer   | i, int     |
+| number    | f, float   |
+| timestamp | ts         |
+| datetime  | dt         |
+| array     | a          |
+| object    | o          |
 
 ### Arrays and Objects
 
@@ -138,25 +140,29 @@ This schema would apply to something like the following data:
 ]
 ```
 
-### Optional Properties and Nullable Properties
+### Optional Properties and Allow Null
 
-When defining an object schema you can use a "?" to say that the property is optional. This means that the property can be completely omitted during validation. This is not the same a providing a **null** value for the property which is considered invalid for optional properties.
+When defining an object schema you can use a "?" to say that the property is optional. This means that the property can be completely omitted during validation. This is not the same a providing a null value for the property which is considered invalid for optional properties.
 
-If you want a property to allow null values you can specify the `nullable` attribute on the property. There are two ways to do this:
+If you want a property to allow null values you can specify the **allowNull** attribute on the property. There are two ways to do this:
 
 ```php
 [
-    // You can specify nullable as a property attribute.
-    'opt1:s?' => ['nullable' => true],
+    // You can specify allowNull as a property attribute.
+    'opt1:s?' => ['allowNull' => true],
 
     // You can specify null as an optional type in the declaration.
-    'opt2:s|n?' => 'Another nullable, optional property.'
+    'opt2:s|n?' => 'Another optional property.'
 ]
 ```
 
+### Multiple Types
+
+The type property of the schema can accept an array of types. An array of types means that the data must be any one of the types.
+
 ### Default Values
 
-You can specify a default value with the `default` attribute. If the value is omitted during validation then the default value will be used. Note that default values are not applied during sparse validation.
+You can specify a default value on object properties. If the property is omitted during validation then the default value will be used. Note that default values are not applied during sparse validation.
 
 ## Validating Data
 
@@ -199,177 +205,11 @@ When you call **validate()** and validation fails a **ValidationException** is t
 
 If you are writing an API, you can **json_encode()** the **ValidationException** and it should provide a rich set of data that will help any consumer figure out exactly what they did wrong. You can also use various properties of the **Validation** property to help render the error output appropriately.
 
-#### The Validation JSON Format
+### Sparse Validation
 
-The `Validation` object and `ValidationException` both encode to a [specific format]('./open-api.json'). Here is an example:
+Both **validate()** and **isValid()** can take an additional **$sparse** parameter which does a sparse validation if set to true.
 
-```js
-ValidationError = {
-    "message": "string", // Main error message.
-    "code": "integer", // HTTP-style status code.
-    "errors": { // Specific field errors.
-        "<fieldRef>": [ // Each key is a JSON reference field name.
-            {
-                "message": "string", // Field error message.
-                "error": "string", // Specific error code, usually a schema attribute.
-                "code": "integer" // Optional field error code.
-            }
-        ]
-    }
-}
-```
-
-This format is optimized for helping present errors to user interfaces. You can loop through the specific `errors` collection and line up errors with their inputs on a user interface. For deeply nested objects, the field name is a JSON reference.
-
-## Schema References
-
-OpenAPI allows for schemas to be accessed with references using the `$ref` attribute. Using references allows you to define commonly used schemas in one place and then reference them from many locations.
-
-To use references you must:
-
-1. Define the schema you want to reference somewhere.
-2. Reference the schema with a `$ref` attribute.
-3. Add a schema lookup function to your main schema with `Schema::setRefLookp()`
-
-### Defining a Reusable Schema
-
-The OpenAPI specification places all reusable schemas under `/components/schemas`. If you are defining everything in a big array that is a good place to put them.
-
-```php
-$components = [
-    'components' => [
-        'schemas' => [
-            'User' => [
-                'type' => 'object',
-                'properties' => [
-                    'id' => [
-                        'type' => 'integer'
-                    ],
-                    'username' => [
-                        'type' => 'string'
-                    ]
-                ]
-            ]
-        ]
-    ]
-]
-```
-
-### Referencing Schemas With `$ref`
-
-Reference the schema's path with keys separated by `/` characters.
-
-```php
-$userArray = [
-    'type' => 'array',
-    'items' => [
-        '$ref' => '#/components/schemas/User'
-    ]
-]
-```
-
-### Using `Schema::setRefLookup()` to Resolve References
-
-The `Schema` class has a `setRefLookup()` method that lets you add a callable that is use to resolve references. The callable should have the following signature:
-
-```php
-function(string $ref): array|Schema|null {
-   ...
-}
-```
-
-The function takes the string from the `$ref` attribute and returns a schema array, `Schema` object, or **null** if the schema cannot be found. Garden Schema has a default implementation of a ref lookup in the `ArrayRefLookup` class that can resolve references from a static array. This should be good enough for most uses, but you are always free to define your own.
-
-You can put everything together like this:
-
-```php
-$sch = new Schema($userArray);
-$sch->setRefLookup(new ArrayRefLookup($components));
-
-$valid = $sch->validate(...);
-```
-
-The references are resolved during validation so if there are any mistakes in your references then a `RefNotFoundException` is thrown during validation, not when you set your schema or ref lookup function.
-
-## Schema Polymorphism
-
-Schemas have some support for implementing schema polymorphism by letting you validate an object against different schemas depending on its value.
-
-### The `discriminator` Property
-
-The `discriminator` of a schema lets you specify an object property that specifies what type of object it is. That property is then used to reference a specific schema for the object. The discriminator has the following format:
-
-```json5
-{
-    "discriminator": {
-        "propertyName": "<string>", // Name of the property used to reference a schema.
-        "mapping": {
-          "<propertyValue1>": "<ref>", // Reference to a schema.
-          "<propertyValue>": "<alias>" // Map a value to another value.
-        }
-    }
-}
-```
-
-You can see above that the `propertyName` specifies which property is used as the discriminator. There is also an optional `mapping` property that lets you control how schemas are mapped to values. discriminators are resolved int he following way:
-
-1. The property value is mapped using the mapping property.
-2. If the value is a valid JSON reference then it is looked up. Only values in mappings can specify a JSON reference in this way.
-3. If the value is not a valid JSON reference then it is is prepended with `#/components/schemas/` to make a JSON reference.
-
-Here is an example at work:
-
-```json5
-{
-  "discriminator": {
-    "propertyName": "petType",
-    "mapping": {
-      "dog": "#/components/schemas/Dog", // A direct reference.
-      "fido": "Dog" // An alias that will be turned into a reference.
-    }
-  }
-}
-```
-
-### The `oneOf` Property
-
-The `oneOf` property works in conjunction with the `discriminator` to limit the schemas that the object is allowed to validate against. If you don't specify `oneOf` then any schemas under `#/components/schemas` are fair game.
-
-To use the `oneOf` property you must specify `$ref` nodes like so:
-
-```json5
-{
-  "oneOf": [
-    { "$ref": "#/components/schemas/Dog" },
-    { "$ref": "#/components/schemas/Cat" },
-    { "$ref": "#/components/schemas/Mouse" },
-  ],
-  "discriminator": {
-    "propertyType": "species"
-  }
-}
-```
-
-In the above example the "species" property will be used to construct a reference to a schema. That reference must match one of the references in the `oneOf` property.
-
-*If you are familiar with with OpenAPI spec please note that inline schemas are not currently supported for oneOf in Garden Schema.*
-
-
-## Validation Options
-
-Both **validate()** and **isValid()** can take an additional **$options** argument which modifies the behavior of the validation slightly, depending on the option.
-
-### The `request` Option
-
-You can pass an option of `['request' => true]` to specify that you are validating request data. When validating request data, properties that have been marked as `readOnly: true` will be treated as if they don't exist, even if they are marked as required.
-
-### The `response` Option
-
-You can pass an option of `['response' => true]` to specify that you are validating response data. When validating response data, properties that have been marked as `writeOnly: true` will be treated as if they don't exist, even if they are marked as required.
-
-### The `sparse` Option
-
-You can pass an option of `['sparse' => true]` to specify a sparse validation. When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
+When you do a sparse validation, missing properties do not give errors and the sparse data is returned. Sparse validation allows you to use the same schema for inserting vs. updating records. This is common in databases or APIs with POST vs. PATCH requests.
 
 ## Flags
 
@@ -409,44 +249,6 @@ Set this flag to trigger notices whenever a validated object has properties not 
 
 Set this flag to throw an exception whenever a validated object has properties not defined in the schema.
 
-## Custom Validation with addValidator()
-
-You can customize validation with `Schema::addValidator()`. This method lets you attach a callback to a schema path. The callback has the following form:
-
-```php
-function (mixed $value, ValidationField $field): bool {
-}
-```
-
-The callback should `true` if the value is valid or `false` otherwise. You can use the provided `ValidationField` to add custom error messages.
-
-## Filtering Data
-
-You can filter data before it is validating using `Schema::addFilter()`. This method lets you filter data at a schema path. The callback has the following form:
-
-```php
-function (mixed $value, ValidationField $field): mixed {
-}
-```
-
-The callback should return the filtered value. Filters are called before validation occurs so you can use them to clean up date you know may need some extra processing.
-
-The `Schema::addFilter()` also accepts  `$validate` parameter that allows your filter to validate the data and bypass default validation. If you are validating date in this way you can add custom errors to the `ValidationField` parameter and return `Invalid::value()` your validation fails.
-
-### Format Filters
-
-You can also filter all fields with a particular format using the `Schema::addFormatFilter()`. This method works similar to `Schema::addFilter()` but it applies to all fields that match the given `format`. You can even use format filters to override default format processing.
-
-```php
-$schema = new Schema([...]);
-
-// By default schema returns instances of DateTimeImmutable, instead return a string.
-$schema->addFormatFilter('date-time', function ($v) {
-    $dt = new \DateTime($v);
-    return $dt->format(\DateTime::RFC3339);
-}, true);
-```
-
 ## Overriding the Validation Class and Localization
 
 Since schemas generate error messages, localization may be an issue. Although the Garden Schema doesn't offer any localization capabilities itself, it is designed to be extended in order to add localization yourself. You do this by subclassing the **Validation** class and overriding its **translate()** method. Here is a basic example:
@@ -470,47 +272,30 @@ $schema->setValidationClass(LocalizedValidation::class);
 
 There are a few things to note in the above example:
 
-- When overriding **translate()** be sure to handle the case where a string starts with the '@' character. Such strings should not be translated and have the character removed.
+-   When overriding **translate()** be sure to handle the case where a string starts with the '@' character. Such strings should not be translated and have the character removed.
 
-- You tell a **Schema** object to use your specific **Validation** subclass with the **setValidationClass()**. This method takes either a class name or an object instance. If you pass an object it will be cloned every time a validation object is needed. This is good when you want to use dependency injection and your class needs more sophisticated instantiation.
+-   You tell a **Schema** object to use your specific **Validation** subclass with the **setValidationClass()**. This method takes either a class name or an object instance. If you pass an object it will be cloned every time a validation object is needed. This is good when you want to use dependency injection and your class needs more sophisticated instantiation.
 
 ## JSON Schema Support
 
-The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#schemaObject) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
+The **Schema** object is a wrapper for a [JSON Schema](http://json-schema.org/) array. This means that you can pass a valid JSON schema to Schema's constructor. The table below lists the JSON Schema properties that are supported.
 
-| Property | Applies To | Notes |
-| -------- | ---------- | ----------- |
-| [allOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.1) | Schema[] | An instance validates successfully against this keyword if it validates successfully against all schemas defined by this keyword's value. |
-| [multipleOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.1) | integer/number | A numeric instance is only valid if division by this keyword's value results in an integer. |
-| [maximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.2) | integer/number |  If the instance is a number, then this keyword validates only if the instance is less than or exactly equal to "maximum". |
-| [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum". |
-| [minimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.4) | integer/number |  If the instance is a number, then this keyword validates only if the instance is greater than or exactly equal to "minimum". |
-| [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number |  If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
-| [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6) | string | Limit the unicode character length of a string. |
-| [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7) | string | Minimum length of a string. |
-| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8) | string | A regular expression without delimiters. You can add a custom error message with the `x-patternMessageCode` field. |
-| [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9) | array | Ony supports a single schema. |
-| [maxItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.11) | array | Limit the number of items in an array. |
-| [minItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.12) | array | Minimum number of items in an array. |
-| [uniqueItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.4.5) | array | All items must be unique. |
-| [maxProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.1) | object | Limit the number of properties on an object. |
-| [minProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.2) | object | Minimum number of properties on an object.  |
-| [additionalProperties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.5.6) | object | Validate additional properties against a schema. Can also be **true** to always validate. |
-| [required](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.17) | object | Names of required object properties. |
-| [properties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.18) | object | Specify schemas for object properties. |
-| [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23) | any | Specify an array of valid values. |
-| [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25) | any | Specify a type of an array of types to validate a value. |
-| [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3) | object | Applies to a schema that is in an object property. |
-| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3) | string | Support for date-time, email, ipv4, ipv6, ip, uri. |
-| [oneOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.3) | object | Works with the `discriminator` property to validate against a dynamic schema. |
-
-## OpenAPI Schema Support
-
-OpenAPI defines some extended properties that are applied during validation.
-
-| Property | Type | Notes |
-| -------- | ---- | ----- |
-| nullable | boolean | If a field is nullable then it can also take the value **null**. |
-| readOnly | boolean | Relevant only for Schema "properties" definitions. Declares the property as "read only". This means that it MAY be sent as part of a response but SHOULD NOT be sent as part of the request. If the property is marked as readOnly being true and is in the required list, the required will take effect on the response only. |
-| writeOnly | boolean |  Relevant only for Schema "properties" definitions. Declares the property as "write only". Therefore, it MAY be sent as part of a request but SHOULD NOT be sent as part of the response. If the property is marked as writeOnly being true and is in the required list, the required will take effect on the request only. |
-| [discriminator](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#discriminatorObject) | object | Validate against a dynamic schema based on a property value. |
+| Property                                                                                        | Type           | Notes                                                                                                                                   |
+| ----------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [multipleOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.1)       | integer/number | A numeric instance is only valid if division by this keyword's value results in an integer.                                             |
+| [maximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.2)          | integer/number | If the instance is a number, then this keyword validates only if the instance is less than or exactly equal to "maximum".               |
+| [exclusiveMaximum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.3) | integer/number | If the instance is a number, then the instance is valid only if it has a value strictly less than (not equal to) "exclusiveMaximum".    |
+| [minimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.4)          | integer/number | If the instance is a number, then this keyword validates only if the instance is greater than or exactly equal to "minimum".            |
+| [exclusiveMinimum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.2.5) | integer/number | If the instance is a number, then the instance is valid only if it has a value strictly greater than (not equal to) "exclusiveMinimum". |
+| [maxLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.6)          | string         | Limit the unicode character length of a string.                                                                                         |
+| [minLength](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7)          | string         | Minimum length of a string.                                                                                                             |
+| [pattern](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.8)            | string         | A regular expression without delimeters.                                                                                                |
+| [items](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.9)              | array          | Ony supports a single schema.                                                                                                           |
+| [maxItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.11)          | array          | Limit the number of items in an array.                                                                                                  |
+| [minItems](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.12)          | array          | Minimum number of items in an array.                                                                                                    |
+| [required](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.17)          | object         | Names of required object properties.                                                                                                    |
+| [properties](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.18)        | object         | Specify schemas for object properties.                                                                                                  |
+| [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23)              | any            | Specify an array of valid values.                                                                                                       |
+| [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25)              | any            | Specify a type of an array of types to validate a value.                                                                                |
+| [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3)            | object         | Applies to a schema that is in an object property.                                                                                      |
+| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3)             | string         | Support for date-time, email, ipv4, ipv6, ip, uri.                                                                                      |
