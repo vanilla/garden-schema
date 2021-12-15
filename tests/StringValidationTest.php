@@ -59,7 +59,7 @@ class StringValidationTest extends AbstractSchemaTest {
             'abcd' => ['abcd', ''],
             'empty 1' => ['', 'minLength', 1],
             'empty 0' => ['', '', 0],
-            'unicode as bytes success' => ['😱', '', 4],
+            'unicode as bytes success' => ['😱', 'minLength', 4],
             'unicode as unicode fail' => ['😱', 'minLength', 2, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
             'unicode as unicode success' => ['😱', '', 1, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
 
@@ -74,18 +74,13 @@ class StringValidationTest extends AbstractSchemaTest {
      * @param string $str The string to test.
      * @param string $code The expected error code, if any.
      * @param int $maxLength The max length to test.
-     * @param int $flags Flags to set on the schema.
      *
      * @dataProvider provideMaxLengthTests
      */
-    public function testMaxLength($str, string $code = '', int $maxLength = 3, int $flags = null) {
+    public function testMaxLength($str, string $code = '', int $maxLength = 3) {
         $schema = Schema::parse(['str:s?' => [
             'maxLength' => $maxLength,
         ]]);
-
-        if ($flags !== null) {
-            $schema->setFlags($flags);
-        }
 
         try {
             $schema->validate(['str' => $str]);
@@ -112,12 +107,74 @@ class StringValidationTest extends AbstractSchemaTest {
             'ab' => ['ab'],
             'abc' => ['abc'],
             'abcd' => ['abcd', 'maxLength'],
-            'long multibyte with unicode length' => ['😱', '', 2, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
-            'long multibyte with byte length' => ['😱', 'maxLength', 2],
-            'exact amount multibyte with byte length' => ['😱', '', 4],
         ];
 
         return $r;
+    }
+
+    /**
+     * Test byte length validation.
+     *
+     * @param array $value
+     * @param string|array|null $exceptionMessages Null, an expected exception message, or multiple expected exception messages.
+     * @param bool $forceByteLength Set this to true to force all maxLengths to be byte length.
+     *
+     * @dataProvider provideByteLengths
+     */
+    public function testByteLengthValidation(array $value, $exceptionMessages = null, bool $forceByteLength = false) {
+        $schema = Schema::parse([
+            'justLength:s?' => [
+                'maxLength' => 4,
+            ],
+            'justByteLength:s?' => [
+                'maxByteLength' => 8,
+            ],
+            'mixedLengths:s?' => [
+                'maxLength' => 4,
+                'maxByteLength' => 6
+            ],
+        ]);
+        if ($forceByteLength) {
+            $schema->setFlag(Schema::VALIDATE_STRING_LENGTH_AS_UNICODE, false);
+        }
+
+        try {
+            $schema->validate($value);
+            // We were expecting success.
+            $this->assertTrue(true);
+        } catch (ValidationException $e) {
+            if ($exceptionMessages !== null) {
+                $actual = $e->getMessage();
+                $exceptionMessages = is_array($exceptionMessages) ? $exceptionMessages : [$exceptionMessages];
+                foreach ($exceptionMessages as $expected) {
+                    $this->assertContains($expected, $actual);
+                }
+            } else {
+                throw $e;
+            }
+        }
+    }
+
+    /**
+     * @return array
+     */
+    public function provideByteLengths() {
+        return [
+            'maxLength - short' => [['justLength' => '😱']],
+            'maxLength - equal' => [['justLength' => '😱😱😱😱']],
+            'maxLength - long' => [['justLength' => '😱😱😱😱😱'], '1 character too long'],
+            'byteLength - short' => [['justByteLength' => '😱']],
+            'byteLength - equal' => [['justByteLength' => '😱😱']],
+            'byteLength - long' => [['justByteLength' => '😱😱a'], '1 byte too long'],
+            'mixedLengths - short' => [['mixedLengths' => '😱']],
+            'mixedLengths - equal' => [['mixedLengths' => '😱aa']],
+            'mixedLengths - long bytes' => [['mixedLengths' => '😱😱'], '2 bytes too long'],
+            'mixedLengths - long chars' => [['mixedLengths' => 'aaaaa'], '1 character too long'],
+            'mixedLengths - long chars - long bytes' => [['mixedLengths' => '😱😱😱😱😱'], ["1 character too long", "14 bytes too long."]],
+            'byteLength flag - short' => [['justLength' => '😱'], null, true],
+            'byteLength flag - long' => [['justLength' => '😱😱😱😱'], '12 bytes too long', true],
+            'byteLength property is preferred over byte length flag' => [['mixedLengths' => '😱😱'], '2 bytes too long', true]
+        ];
     }
 
     /**
