@@ -26,6 +26,7 @@ class PropertyTest extends TestCase {
         $this->assertSame('foo', $schema->jsonSerialize()['description']);
         $this->assertSame('foo', $schema['description']);
 
+        $schema->setFlag(Schema::VALIDATE_STRING_LENGTH_AS_UNICODE, false);
         $this->assertSame(0, $schema->getFlags());
         $behaviors = [
             Schema::VALIDATE_EXTRA_PROPERTY_NOTICE,
