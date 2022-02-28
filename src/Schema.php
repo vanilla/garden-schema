@@ -1688,7 +1688,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $isRequest = $field->isRequest();
         $isResponse = $field->isResponse();
 
-        if (is_array($data)) {
+        if (is_array($data) || $data instanceof \ArrayAccess) {
             $keys = array_keys($data);
             $clean = [];
         } else {
