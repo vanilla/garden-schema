@@ -1,7 +1,7 @@
 <?php
 /**
  * @author Todd Burry <todd@vanillaforums.com>
- * @copyright 2009-2018 Vanilla Forums Inc.
+ * @copyright 2009-2022 Vanilla Forums Inc.
  * @license MIT
  */
 
@@ -1906,7 +1906,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
      * @link http://json-schema.org/
      */
-    public function jsonSerialize() {
+    public function jsonSerialize(): mixed {
         $seen = [$this];
         return $this->jsonSerializeInternal($seen);
     }
@@ -2080,7 +2080,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return boolean true on success or false on failure.
      * @link http://php.net/manual/en/arrayaccess.offsetexists.php
      */
-    public function offsetExists($offset) {
+    public function offsetExists(mixed $offset): bool {
         return isset($this->schema[$offset]);
     }
 
@@ -2091,7 +2091,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return mixed Can return all value types.
      * @link http://php.net/manual/en/arrayaccess.offsetget.php
      */
-    public function offsetGet($offset) {
+    public function offsetGet(mixed $offset): mixed {
         return isset($this->schema[$offset]) ? $this->schema[$offset] : null;
     }
 
@@ -2102,7 +2102,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to set.
      * @link http://php.net/manual/en/arrayaccess.offsetset.php
      */
-    public function offsetSet($offset, $value) {
+    public function offsetSet(mixed $offset, mixed $value): void {
         $this->schema[$offset] = $value;
     }
 
@@ -2112,7 +2112,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $offset The offset to unset.
      * @link http://php.net/manual/en/arrayaccess.offsetunset.php
      */
-    public function offsetUnset($offset) {
+    public function offsetUnset($offset): void {
         unset($this->schema[$offset]);
     }
 
