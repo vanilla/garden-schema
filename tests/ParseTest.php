@@ -7,6 +7,7 @@
 
 namespace Garden\Schema\Tests;
 
+use Garden\Schema\ParseException;
 use Garden\Schema\Schema;
 use Garden\Schema\Tests\Fixtures\ExtendedSchema;
 
@@ -279,10 +280,9 @@ class ParseTest extends AbstractSchemaTest {
 
     /**
      * Unknown types should throw an exception when parsing.
-     *
-     * @expectedException \Garden\Schema\ParseException
      */
     public function testInvalidTypeError() {
+        $this->expectException(ParseException::class);
         $sch = Schema::parse(['foo:dd']);
     }
 }

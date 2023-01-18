@@ -26,7 +26,7 @@ class CustomArray implements \ArrayAccess, \IteratorAggregate {
      * The return value will be casted to boolean if non-boolean was returned.
      * @since 5.0.0
      */
-    public function offsetExists($offset) {
+    public function offsetExists($offset): bool {
         return isset($this->arr[$offset]);
     }
 
@@ -39,6 +39,7 @@ class CustomArray implements \ArrayAccess, \IteratorAggregate {
      * @return mixed Can return all value types.
      * @since 5.0.0
      */
+    #[\ReturnTypeWillChange]
     public function offsetGet($offset) {
         return $this->arr[$offset];
     }
@@ -55,7 +56,7 @@ class CustomArray implements \ArrayAccess, \IteratorAggregate {
      * @return void
      * @since 5.0.0
      */
-    public function offsetSet($offset, $value) {
+    public function offsetSet($offset, $value): void {
         if ($offset === null) {
             $this->arr[] = $value;
         } else {
@@ -72,7 +73,7 @@ class CustomArray implements \ArrayAccess, \IteratorAggregate {
      * @return void
      * @since 5.0.0
      */
-    public function offsetUnset($offset) {
+    public function offsetUnset($offset): void {
         unset($this->arr[$offset]);
     }
 
@@ -87,7 +88,7 @@ class CustomArray implements \ArrayAccess, \IteratorAggregate {
      * <b>Traversable</b>
      * @since 5.0.0
      */
-    public function getIterator() {
+    public function getIterator(): Traversable {
         return new \ArrayIterator($this->arr);
     }
 }

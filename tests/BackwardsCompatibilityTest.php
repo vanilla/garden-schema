@@ -25,7 +25,7 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
      * @dataProvider provideFieldSelectorConversionTests
      */
     public function testFieldSelectorConversion(string $old, string $new) {
-        $this->expectErrorNumber(E_USER_DEPRECATED, false);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED, false);
         $this->assertFieldSelectorConversion($old, $new);
     }
 
@@ -86,7 +86,7 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
             ],
         ]);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $type = $sch->getField('properties.foo.type');
         $this->assertEquals('integer', $type);
     }
@@ -104,7 +104,7 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
             ],
         ]);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $sch->setField('properties.foo.type', 'string');
         $type = $sch->getField('properties/foo/type');
         $this->assertEquals('string', $type);
@@ -132,10 +132,10 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
      */
     public function testDifferentValidationClass() {
         $schema = Schema::parse([':i']);
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $schema->setValidationClass(TestValidation::class);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $this->assertSame(TestValidation::class, $schema->getValidationClass());
 
         try {
@@ -145,7 +145,7 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
         }
 
         $validation = new TestValidation();
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $schema->setValidationClass($validation);
         try {
             $schema->validate('aaa');

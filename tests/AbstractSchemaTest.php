@@ -24,7 +24,7 @@ abstract class AbstractSchemaTest extends TestCase {
     /**
      * Clear out the errors array.
      */
-    protected function setUp() {
+    protected function setUp(): void {
         $this->expectedErrors = [];
         set_error_handler([$this, "errorHandler"]);
     }
@@ -77,9 +77,9 @@ abstract class AbstractSchemaTest extends TestCase {
      *
      * @param string $errstr The desired error string.
      * @param int $errno The desired error number.
-     * @param bool $unset Whether or not to unset the error when it is encountered.
+     * @param bool $unset Whether to unset the error when it is encountered.
      */
-    public function expectError(string $errstr, int $errno, bool $unset = true) {
+    public function expectErrorToOccur(string $errstr, int $errno, bool $unset = true) {
         $this->expectedErrors[] = [$errno, $errstr, $unset];
     }
 
@@ -87,10 +87,10 @@ abstract class AbstractSchemaTest extends TestCase {
      * Assert than an error has occurred.
      *
      * @param int $errno The desired error number.
-     * @param bool $unset Whether or not to unset the error when it is encountered.
+     * @param bool $unset Whether to unset the error when it is encountered.
      */
-    public function expectErrorNumber(int $errno, bool $unset = true) {
-        $this->expectError('', $errno, $unset);
+    public function expectErrorNumberToOccur(int $errno, bool $unset = true) {
+        $this->expectErrorToOccur('', $errno, $unset);
     }
 
 

@@ -61,11 +61,10 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
     /**
      * Verify field names in nested schema error messages appear as expected.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessage false is not a valid integer.
      */
     public function testNestedInvalidMessage() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("false is not a valid integer.");
         $sch = $this->getNestedSchema();
         $result = $sch->validate([
             'id' => 1,
@@ -150,8 +149,8 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
         $valid = $schema->validate($data);
 
-        $this->assertInternalType('int', $valid['rows'][2]['id']);
-        $this->assertInternalType('string', $valid['rows'][2]['name']);
+        $this->assertIsInt($valid['rows'][2]['id']);
+        $this->assertIsString($valid['rows'][2]['name']);
     }
 
     /**
@@ -200,10 +199,9 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
     /**
      * Test throwing an exception when removing unexpected parameters from validated data.
-     *
-     * @expectedException \Garden\Schema\ValidationException
      */
     public function testValidateException() {
+        $this->expectException(ValidationException::class);
         $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
     }
 
@@ -239,10 +237,9 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
     /**
      * Test triggering a notice when removing unexpected parameters from validated data.
-     *
-     * @expectedException \PHPUnit_Framework_Error_Notice
      */
     public function testValidateNotice() {
+        $this->expectNotice();
         $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE);
     }
 

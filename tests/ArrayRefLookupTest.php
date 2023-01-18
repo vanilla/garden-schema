@@ -22,7 +22,7 @@ class ArrayRefLookupTest extends TestCase {
     /**
      * Create test object for each test.
      */
-    public function setUp() {
+    public function setUp(): void {
         parent::setUp();
 
         $this->lookup = new ArrayRefLookup([
@@ -99,37 +99,33 @@ class ArrayRefLookupTest extends TestCase {
 
     /**
      * The array lookup does not support hosts.
-     *
-     * @expectedException \InvalidArgumentException
      */
     public function testHostLookup() {
+        $this->expectException(\InvalidArgumentException::class);
         $this->assertRefLookup('http://example.com#/foo', null);
     }
 
     /**
      * The array lookup does not support paths.
-     *
-     * @expectedException \InvalidArgumentException
      */
     public function testPathLookup() {
+        $this->expectException(\InvalidArgumentException::class);
         $this->assertRefLookup('/foo#/foo', null);
     }
 
     /**
      * The array lookup does not support relative references.
-     *
-     * @expectedException \InvalidArgumentException
      */
     public function testRelativeReference() {
+        $this->expectException(\InvalidArgumentException::class);
         $this->assertRefLookup('#foo', null);
     }
 
     /**
      * The array lookup does not support relative references.
-     *
-     * @expectedException \InvalidArgumentException
      */
     public function testEmptyReference() {
+        $this->expectException(\InvalidArgumentException::class);
         $this->assertRefLookup('#', null);
     }
 

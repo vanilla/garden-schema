@@ -26,7 +26,7 @@ class InputOutputTest extends AbstractSchemaTest {
     /**
      * Create some test data for each test.
      */
-    public function setUp() {
+    public function setUp(): void {
         parent::setUp();
 
         $this->schema = new Schema([

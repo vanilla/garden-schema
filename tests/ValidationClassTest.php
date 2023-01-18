@@ -34,10 +34,8 @@ class ValidationClassTest extends TestCase {
         $vld->addError('foo/bar', 'error');
         $error = $vld->getErrors()[0];
 
-        $this->assertArraySubset(
-            ['field' => 'foo/bar', 'error' => 'error'],
-            $error
-        );
+        $this->assertEquals("foo/bar", $error['field']);
+        $this->assertEquals("error", $error['error']);
     }
 
     /**
@@ -124,10 +122,9 @@ class ValidationClassTest extends TestCase {
 
     /**
      * The error code cannot be empty.
-     *
-     * @expectedException \InvalidArgumentException
      */
     public function testEmptyError() {
+        $this->expectException(\InvalidArgumentException::class);
         $vld = new Validation();
         $vld->addError('foo', '');
     }

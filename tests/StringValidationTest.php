@@ -147,7 +147,7 @@ class StringValidationTest extends AbstractSchemaTest {
                 $actual = $e->getMessage();
                 $exceptionMessages = is_array($exceptionMessages) ? $exceptionMessages : [$exceptionMessages];
                 foreach ($exceptionMessages as $expected) {
-                    $this->assertContains($expected, $actual);
+                    $this->assertStringContainsString($expected, $actual);
                 }
             } else {
                 throw $e;
@@ -219,12 +219,11 @@ class StringValidationTest extends AbstractSchemaTest {
 
     /**
      * Test the enum constraint.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessage value must be one of: one, two, three, null.
-     * @expectedExceptionCode 400
      */
     public function testEnum() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("value must be one of: one, two, three, null.");
+        $this->expectExceptionCode(400);
         $enum = ['one', 'two', 'three', null];
         $schema = Schema::parse([':s|n' => ['enum' => $enum]]);
 
@@ -246,7 +245,7 @@ class StringValidationTest extends AbstractSchemaTest {
         $emptyData = ['col' => ''];
         $valid = $schema->validate($emptyData);
         $this->assertEmpty($valid['col']);
-        $this->assertInternalType('string', $valid['col']);
+        $this->assertIsString($valid['col']);
 
         $nullData = ['col' => null];
         $isValid = $schema->isValid($nullData);
