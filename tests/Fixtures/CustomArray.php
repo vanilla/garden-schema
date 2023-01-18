@@ -38,6 +38,7 @@ class CustomArray implements \ArrayAccess, \IteratorAggregate {
      * </p>
      * @return mixed Can return all value types.
      * @since 5.0.0
+     * #[\ReturnTypeWillChange]
      */
     public function offsetGet($offset) {
         return $this->arr[$offset];
