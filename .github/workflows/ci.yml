@@ -30,4 +30,4 @@ jobs:
             - name: Composer Install
               run: composer install -o
             - name: PHPUnit
-              run: ./vendor/bin/phpunit -c ./tests/phpunit.xml.dist
+              run: ./vendor/bin/phpunit -c ./phpunit.xml.dist
