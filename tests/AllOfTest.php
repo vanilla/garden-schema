@@ -8,7 +8,9 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\ArrayRefLookup;
+use Garden\Schema\ParseException;
 use Garden\Schema\Schema;
+use Garden\Schema\ValidationException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -21,7 +23,7 @@ class AllOfTest extends TestCase {
      */
     private $lookup;
 
-    public function setUp() {
+    public function setUp(): void {
         parent::setUp();
 
         $arr = [
@@ -110,11 +112,10 @@ class AllOfTest extends TestCase {
 
     /**
      * Fail if an invalid value is provided
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `Unexpected property: notExists.`
      */
     public function testInvalidProperty() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessageMatches("/Unexpected property: notExists/");
         $schema = new Schema(['$ref' => '#/components/schemas/Puppy'], $this->lookup);
         $schema->setFlags(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
         $schema->validate(['name' => 'roger', 'isGoodBoy' => true, 'notExists' => true]);
@@ -122,10 +123,9 @@ class AllOfTest extends TestCase {
 
     /**
      * Allof members must be array
-     *
-     * @expectedException \Garden\Schema\ParseException
      */
     public function testInvalidAllOf() {
+        $this->expectException(ParseException::class);
         $schema = new Schema(['$ref' => '#/components/schemas/Invalid1'], $this->lookup);
         $valid = $schema->validate(['type' => 'Invalid1']);
     }

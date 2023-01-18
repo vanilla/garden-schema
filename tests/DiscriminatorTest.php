@@ -8,7 +8,9 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\ArrayRefLookup;
+use Garden\Schema\ParseException;
 use Garden\Schema\Schema;
+use Garden\Schema\ValidationException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -21,7 +23,7 @@ class DiscriminatorTest extends TestCase {
      */
     private $schema;
 
-    public function setUp() {
+    public function setUp(): void {
         parent::setUp();
 
         $arr = [
@@ -153,21 +155,19 @@ class DiscriminatorTest extends TestCase {
 
     /**
      * A discriminator value that is not found should make validation fail.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `type: "Foo" is not a valid option.`
      */
     public function testDiscriminatorTypeNotFound() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("type: \"Foo\" is not a valid option.");
         $valid = $this->schema->validate(['type' => 'Foo']);
     }
 
     /**
      * A discriminators should fail if the discriminate to themselves.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `type: "Pet" is not a valid option.`
      */
     public function testDiscriminatorCyclicalRef() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("type: \"Pet\" is not a valid option.");
         $valid = $this->schema->validate(['type' => 'Pet']);
     }
 
@@ -181,62 +181,55 @@ class DiscriminatorTest extends TestCase {
     }
 
     /**
-     * A discriminators should fail if the discriminate to themselves.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `subtype: "Pet" is not a valid option.`
+     * A discriminators should fail if they discriminate to themselves.
      */
     public function testDiscriminatorInfiniteRecursion() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("type: \"Pet\" is not a valid option.");
         $valid = $this->schema->validate(['type' => 'Bird', 'subtype' => 'Pet']);
     }
 
     /**
-     * A discriminators should fail if the discriminate to themselves.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `type: The value is not a valid string.`
+     * A discriminators should fail if they discriminate to themselves.
      */
     public function testDiscriminatorTypeError() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("type: The value is not a valid string.");
         $valid = $this->schema->validate(['type' => ['hey!!!']]);
     }
 
     /**
      * A discriminators should fail if the discriminate to themselves.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `type: type is required.`
      */
     public function testEmptyDiscriminator() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("type: type is required.");
         $valid = $this->schema->validate([]);
     }
 
     /**
-     * A discriminators should fail if the discriminate to themselves.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `"foo" is not a valid object.`
+     * A discriminators should fail if they discriminate to themselves.
      */
     public function testDiscriminatorNonObject() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("\"foo\" is not a valid object.");
         $valid = $this->schema->validate('foo');
     }
 
     /**
      * The property name for a discriminator must be a string.
-     *
-     * @expectedException \Garden\Schema\ParseException
      */
     public function testInvalidDiscriminator1() {
+        $this->expectException(ParseException::class);
         $valid = $this->schema->validate(['type' => 'Invalid1']);
     }
 
     /**
      * A discriminator has to respect the `oneOf` validation.
-     *
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessageRegExp `subtype: "Dog" is not a valid option.`
      */
     public function testOneOfRef() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('subtype: "Dog" is not a valid option.');
         $valid = $this->schema->validate(['type' => 'Bird', 'subtype' => 'Dog']);
     }
 }

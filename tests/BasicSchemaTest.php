@@ -299,10 +299,9 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
     /**
      * Require one of on an empty array should fail.
-     *
-     * @expectedException \Garden\Schema\ValidationException
      */
     public function testRequireOneOfEmpty() {
+        $this->expectException(\Garden\Schema\ValidationException::class);
         $schema = Schema::parse(['a:i?', 'b:i?', 'c:i?'])->requireOneOf(['a', 'b', 'c'], '', 2);
 
         $r = $schema->validate([]);
@@ -315,7 +314,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         $schema = Schema::parse(['a:i?', 'b:i?', 'c:i?'])->requireOneOf(['a', 'b', 'c'], '', 2);
 
         $data = [];
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $result = $schema->validate($data, true);
         $this->assertSame($data, $result);
 
@@ -398,12 +397,11 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
     /**
      * Test throwing an exception when removing unexpected parameters from validated data.
-     *
-     * @expectedException \Garden\Schema\ValidationException
-     * @expectedExceptionMessage Unexpected properties: admin, role.
-     * @expectedExceptionCode 400
      */
     public function testValidateException() {
+        $this->expectException(\Garden\Schema\ValidationException::class);
+        $this->expectExceptionCode(400);
+        $this->expectExceptionMessage("Unexpected properties: admin, role.");
         try {
             $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION);
         } catch (\Exception $ex) {
@@ -414,10 +412,9 @@ class BasicSchemaTest extends AbstractSchemaTest {
 
     /**
      * Test triggering a notice when removing unexpected parameters from validated data.
-     *
-     * @expectedException \PHPUnit_Framework_Error_Notice
      */
     public function testValidateNotice() {
+        $this->expectNotice();
         $this->doValidationBehavior(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE);
     }
 

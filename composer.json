@@ -9,13 +9,8 @@
 			"email": "todd@vanillaforums.com"
 		}
 	],
-	"config": {
-		"platform": {
-			"php": "7.0"
-		}
-	},
 	"require": {
-		"php": ">=7.0"
+		"php": ">=7.4"
 	},
 	"autoload": {
 		"psr-4": {
@@ -28,6 +23,6 @@
 		}
 	},
 	"require-dev": {
-		"phpunit/phpunit": "^6"
+		"phpunit/phpunit": "^9.0"
 	}
 }

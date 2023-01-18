@@ -20,10 +20,10 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
     public function testMainStatusToNumber() {
         $vld = new Validation();
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $vld->setMainStatus(123);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $this->assertSame($vld->getMainCode(), $vld->getMainStatus());
     }
 
@@ -34,10 +34,10 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
     public function testStatusToNumber() {
         $vld = new Validation();
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $vld->setMainStatus(123);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $this->assertSame($vld->getCode(), $vld->getStatus());
     }
 
@@ -47,20 +47,18 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
      */
     public function testIntOptions() {
         $vld = new Validation();
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $vld->addError('foo', 'bar', 123);
         $this->assertSame(123, $vld->getCode());
     }
 
     /**
      * Options must be an integer or array.
-     *
-     * @expectedException \InvalidArgumentException
-     * @deprecated
      */
     public function testInvalidOptions() {
         $vld = new Validation();
 
+        $this->expectException(\InvalidArgumentException::class);
         $vld->addError('foo', 'bar', 'invalid');
     }
 
@@ -70,7 +68,7 @@ class ValidationClassDeprecationTest extends AbstractSchemaTest {
     public function testStatusToNumberOptions() {
         $vld = new Validation();
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $vld->addError('foo', 'bar', ['status' => 456]);
         $this->assertSame(456, $vld->getCode());
     }

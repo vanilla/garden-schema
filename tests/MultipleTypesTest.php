@@ -60,7 +60,7 @@ class MultipleTypesTest extends AbstractSchemaTest {
 
         $expected = $expected === null ? $value : $expected;
 
-        $this->expectErrorNumber(E_USER_DEPRECATED, false);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED, false);
         $valid = $sch->validate($value);
         if (is_array($expected) || $expected instanceof \DateTimeInterface) {
             $this->assertEquals($expected, $valid);
@@ -94,7 +94,7 @@ class MultipleTypesTest extends AbstractSchemaTest {
             ]
         ]);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED, false);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED, false);
         $valid = $sch->validate($value);
         $this->assertSame($value, $valid);
 
@@ -124,17 +124,16 @@ class MultipleTypesTest extends AbstractSchemaTest {
             ]
         ]);
 
-        $this->expectErrorNumber(E_USER_DEPRECATED);
+        $this->expectErrorNumberToOccur(E_USER_DEPRECATED);
         $valid = $sch->validate($value);
         $this->assertSame($expected, $valid);
     }
 
     /**
      * Multiple types should have a deprecation notice.
-     *
-     * @expectedException PHPUnit\Framework\Error\Notice
      */
     public function testDeprecationNotice() {
+        $this->expectNotice();
         $sch = Schema::parse(['a:i|s']);
     }
 

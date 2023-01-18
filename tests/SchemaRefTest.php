@@ -10,6 +10,8 @@ namespace Garden\Schema\Tests;
 use Garden\Schema\ArrayRefLookup;
 use Garden\Schema\RefNotFoundException;
 use Garden\Schema\Schema;
+use Garden\Schema\Validation;
+use Garden\Schema\ValidationException;
 use PHPUnit\Framework\TestCase;
 
 class SchemaRefTest extends TestCase {
@@ -26,7 +28,7 @@ class SchemaRefTest extends TestCase {
     /**
      * Create test data with every test.
      */
-    public function setUp() {
+    public function setUp(): void {
         parent::setUp();
 
         $this->sch = [
@@ -139,11 +141,10 @@ class SchemaRefTest extends TestCase {
 
     /**
      * Cyclical references should result in an exception and not a critical error.
-     *
-     * @expectedException \Garden\Schema\RefNotFoundException
-     * @expectedExceptionCode 508
      */
     public function testCyclicalRef() {
+        $this->expectException(RefNotFoundException::class);
+        $this->expectExceptionCode(508);
         $sch = $this->schema('cycle');
 
         $valid = $sch->validate(123);
@@ -161,22 +162,20 @@ class SchemaRefTest extends TestCase {
 
     /**
      * References that cannot be found should throw an exception when validating.
-     *
-     * @expectedException \Garden\Schema\RefNotFoundException
-     * @expectedExceptionCode 404
      */
     public function testRefNotFound() {
+        $this->expectException(RefNotFoundException::class);
+        $this->expectExceptionCode(404);
         $sch = $this->schema('nowhere');
         $valid = $sch->validate('foo');
     }
 
     /**
      * Exceptions from reference lookups should be re-thrown.
-     *
-     * @expectedException \Garden\Schema\RefNotFoundException
-     * @expectedExceptionCode 400
      */
     public function testRefException() {
+        $this->expectException(RefNotFoundException::class);
+        $this->expectExceptionCode(400);
         $sch = $this->schema('local-ref');
         $valid = $sch->validate('foo');
     }
@@ -195,10 +194,10 @@ class SchemaRefTest extends TestCase {
 
     /**
      * Validators work when added to the location of a reference.
-     *
-     * @expectedException \Garden\Schema\ValidationException
      */
     public function testRefValidator() {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionCode(400);
         $sch = $this->schema('ref')->addValidator('#/schemas/value', function ($v) {
             return $v < 10;
         });
@@ -221,10 +220,9 @@ class SchemaRefTest extends TestCase {
 
     /**
      * By default references should not be found.
-     *
-     * @expectedException \Garden\Schema\RefNotFoundException
      */
     public function testDefaultRefNotFound() {
+        $this->expectException(RefNotFoundException::class);
         $sch = new Schema(['$ref' => '#/foo']);
 
         $valid = $sch->validate(123);

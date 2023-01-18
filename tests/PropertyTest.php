@@ -69,10 +69,9 @@ class PropertyTest extends TestCase {
 
     /**
      * The validation behavior should be an appropriate constant.
-     *
-     * @expectedException \TypeError
      */
     public function testInvalidBehavior() {
+        $this->expectException(\TypeError::class);
         $schema = Schema::parse([]);
         $schema->setFlags('foo');
     }
