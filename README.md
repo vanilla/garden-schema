@@ -1,7 +1,5 @@
 # Garden Schema
 
-[![Build Status](https://img.shields.io/travis/vanilla/garden-schema.svg?style=flat)](https://travis-ci.org/vanilla/garden-schema)
-[![Coverage](https://img.shields.io/scrutinizer/coverage/g/vanilla/garden-schema.svg?style=flat)](https://scrutinizer-ci.com/g/vanilla/garden-schema/)
 [![Packagist Version](https://img.shields.io/packagist/v/vanilla/garden-schema.svg?style=flat)](https://packagist.org/packages/vanilla/garden-schema)
 ![MIT License](https://img.shields.io/packagist/l/vanilla/garden-schema.svg?style=flat)
 [![CLA](https://cla-assistant.io/readme/badge/vanilla/garden-schema)](https://cla-assistant.io/vanilla/garden-schema)
