@@ -10,7 +10,8 @@ namespace Garden\Schema;
 /**
  * An class for collecting validation errors.
  */
-class Validation implements \JsonSerializable {
+class Validation implements \JsonSerializable
+{
     /**
      * @var array
      */
@@ -19,7 +20,7 @@ class Validation implements \JsonSerializable {
     /**
      * @var string
      */
-    private $mainMessage = '';
+    private $mainMessage = "";
 
     /**
      * @var int
@@ -38,7 +39,8 @@ class Validation implements \JsonSerializable {
      *
      * @return Validation Returns a new instance.
      */
-    public static function createValidation() {
+    public static function createValidation()
+    {
         return new static();
     }
 
@@ -50,8 +52,12 @@ class Validation implements \JsonSerializable {
      * @return int Returns the current status code.
      * @deprecated
      */
-    public function getStatus(): int {
-        trigger_error("Validation::getStatus() is deprecated. Use Validation::getCode() instead.", E_USER_DEPRECATED);
+    public function getStatus(): int
+    {
+        trigger_error(
+            "Validation::getStatus() is deprecated. Use Validation::getCode() instead.",
+            E_USER_DEPRECATED
+        );
         return $this->getCode();
     }
 
@@ -62,7 +68,8 @@ class Validation implements \JsonSerializable {
      *
      * @return int Returns an error code.
      */
-    public function getCode(): int {
+    public function getCode(): int
+    {
         if ($status = $this->getMainCode()) {
             return $status;
         }
@@ -74,8 +81,8 @@ class Validation implements \JsonSerializable {
         // There was no status so loop through the errors and look for the highest one.
         $max = 0;
         foreach ($this->getRawErrors() as $error) {
-            if (isset($error['code']) && $error['code'] > $max) {
-                $max = $error['code'];
+            if (isset($error["code"]) && $error["code"] > $max) {
+                $max = $error["code"];
             }
         }
 
@@ -87,7 +94,8 @@ class Validation implements \JsonSerializable {
      *
      * @return int Returns an HTTP response code or zero to indicate it should be calculated.
      */
-    public function getMainCode(): int {
+    public function getMainCode(): int
+    {
         return $this->mainCode;
     }
 
@@ -97,7 +105,8 @@ class Validation implements \JsonSerializable {
      * @param int $status An HTTP response code or zero.
      * @return $this
      */
-    public function setMainCode(int $status) {
+    public function setMainCode(int $status)
+    {
         $this->mainCode = $status;
         return $this;
     }
@@ -107,7 +116,8 @@ class Validation implements \JsonSerializable {
      *
      * @return bool Returns true if there are no errors, false otherwise.
      */
-    public function isValid(): bool {
+    public function isValid(): bool
+    {
         return empty($this->errors);
     }
 
@@ -118,7 +128,8 @@ class Validation implements \JsonSerializable {
      *
      * @return \Traversable Returns all of the errors.
      */
-    protected function getRawErrors() {
+    protected function getRawErrors()
+    {
         foreach ($this->errors as $field => $errors) {
             foreach ($errors as $error) {
                 yield $field => $error;
@@ -131,7 +142,8 @@ class Validation implements \JsonSerializable {
      *
      * @return string Returns the exception message.
      */
-    public function getMessage(): string {
+    public function getMessage(): string
+    {
         return $this->getFullMessage();
     }
 
@@ -140,21 +152,22 @@ class Validation implements \JsonSerializable {
      *
      * @return string Returns the error message.
      */
-    public function getFullMessage(): string {
+    public function getFullMessage(): string
+    {
         $paras = [];
 
         if (!empty($this->getMainMessage())) {
             $paras[] = $this->getMainMessage();
         } elseif ($this->getErrorCount() === 0) {
-            return '';
+            return "";
         }
 
-        if (isset($this->errors[''])) {
-            $paras[] = $this->formatErrorList('', $this->errors['']);
+        if (isset($this->errors[""])) {
+            $paras[] = $this->formatErrorList("", $this->errors[""]);
         }
 
         foreach ($this->errors as $field => $errors) {
-            if ($field === '') {
+            if ($field === "") {
                 continue;
             }
             $paras[] = $this->formatErrorList($field, $errors);
@@ -172,7 +185,8 @@ class Validation implements \JsonSerializable {
      *
      * @return string Returns the main message.
      */
-    public function getMainMessage() {
+    public function getMainMessage()
+    {
         return $this->mainMessage;
     }
 
@@ -183,7 +197,8 @@ class Validation implements \JsonSerializable {
      * @param bool $translate Whether or not to translate the message.
      * @return $this
      */
-    public function setMainMessage(string $message, bool $translate = true) {
+    public function setMainMessage(string $message, bool $translate = true)
+    {
         $this->mainMessage = $translate ? $this->translate($message) : $message;
         return $this;
     }
@@ -194,7 +209,8 @@ class Validation implements \JsonSerializable {
      * @param string|null $field The name of a field or an empty string for all errors.
      * @return int Returns the error count.
      */
-    public function getErrorCount($field = null) {
+    public function getErrorCount($field = null)
+    {
         if ($field === null) {
             return iterator_count($this->getRawErrors());
         } elseif (empty($this->errors[$field])) {
@@ -211,17 +227,18 @@ class Validation implements \JsonSerializable {
      * @param array $errors The field's errors.
      * @return string Returns the error messages, translated and formatted.
      */
-    private function formatErrorList(string $field, array $errors) {
+    private function formatErrorList(string $field, array $errors)
+    {
         if (empty($field)) {
-            $fieldName = '';
-            $colon = '%s%s';
+            $fieldName = "";
+            $colon = "%s%s";
             $sep = "\n";
         } else {
             $fieldName = $this->formatFieldName($field);
-            $colon = $this->translate('%s: %s');
+            $colon = $this->translate("%s: %s");
             $sep = "\n  ";
             if (count($errors) > 1) {
-                $colon = rtrim(sprintf($colon, '%s', "")).$sep.'%s';
+                $colon = rtrim(sprintf($colon, "%s", "")) . $sep . "%s";
             }
         }
 
@@ -236,7 +253,8 @@ class Validation implements \JsonSerializable {
      * @param string $field The field name to format.
      * @return string Returns the formatted field name.
      */
-    protected function formatFieldName(string $field): string {
+    protected function formatFieldName(string $field): string
+    {
         if ($this->getTranslateFieldNames()) {
             return $this->translate($field);
         } else {
@@ -253,8 +271,9 @@ class Validation implements \JsonSerializable {
      * @param string $str The string to translate.
      * @return string Returns the translated string.
      */
-    protected function translate(string $str): string {
-        if (substr($str, 0, 1) === '@') {
+    protected function translate(string $str): string
+    {
+        if (substr($str, 0, 1) === "@") {
             // This is a literal string that bypasses translation.
             return substr($str, 1);
         } else {
@@ -269,11 +288,14 @@ class Validation implements \JsonSerializable {
      * @param array $errors The errors array from a field.
      * @return array Returns the error array.
      */
-    private function errorMessages(string $field, array $errors): array {
+    private function errorMessages(string $field, array $errors): array
+    {
         $messages = [];
 
         foreach ($errors as $error) {
-            $messages[] = $this->formatErrorMessage($error + ['field' => $field]);
+            $messages[] = $this->formatErrorMessage(
+                $error + ["field" => $field]
+            );
         }
         return $messages;
     }
@@ -283,7 +305,8 @@ class Validation implements \JsonSerializable {
      *
      * @return bool Returns **true** if field names are translated or **false** otherwise.
      */
-    public function getTranslateFieldNames() {
+    public function getTranslateFieldNames()
+    {
         return $this->translateFieldNames;
     }
 
@@ -293,7 +316,8 @@ class Validation implements \JsonSerializable {
      * @param bool $translate Whether or not fields should be translated.
      * @return $this
      */
-    public function setTranslateFieldNames($translate) {
+    public function setTranslateFieldNames($translate)
+    {
         $this->translateFieldNames = $translate;
         return $this;
     }
@@ -304,13 +328,14 @@ class Validation implements \JsonSerializable {
      * @param array $error The error row.
      * @return string Returns a formatted/translated error message.
      */
-    private function formatErrorMessage(array $error) {
-        if (isset($error['messageCode'])) {
-            $messageCode = $error['messageCode'];
-        } elseif (isset($error['message'])) {
-            return $error['message'];
+    private function formatErrorMessage(array $error)
+    {
+        if (isset($error["messageCode"])) {
+            $messageCode = $error["messageCode"];
+        } elseif (isset($error["message"])) {
+            return $error["message"];
         } else {
-            $messageCode = $error['error'];
+            $messageCode = $error["error"];
         }
 
         // Massage the field name for better formatting.
@@ -325,23 +350,33 @@ class Validation implements \JsonSerializable {
      * @param array $context The context arguments to apply to the message.
      * @return string Returns a formatted string.
      */
-    private function formatMessage($format, $context = []) {
+    private function formatMessage($format, $context = [])
+    {
         $format = $this->translate($format);
 
-        $msg = preg_replace_callback('`({[^{}]+})`', function ($m) use ($context) {
-            $args = array_filter(array_map('trim', explode(',', trim($m[1], '{}'))));
-            $field = array_shift($args);
+        $msg = preg_replace_callback(
+            "`({[^{}]+})`",
+            function ($m) use ($context) {
+                $args = array_filter(
+                    array_map("trim", explode(",", trim($m[1], "{}")))
+                );
+                $field = array_shift($args);
 
-            switch ($field) {
-                case 'value':
-                    return $this->formatValue($context[$field] ?? null);
-                case 'field':
-                    $field = $context['field'] ?: 'value';
-                    return $this->formatFieldName($field);
-                default:
-                    return $this->formatField(isset($context[$field]) ? $context[$field] : null, $args);
-            }
-        }, $format);
+                switch ($field) {
+                    case "value":
+                        return $this->formatValue($context[$field] ?? null);
+                    case "field":
+                        $field = $context["field"] ?: "value";
+                        return $this->formatFieldName($field);
+                    default:
+                        return $this->formatField(
+                            isset($context[$field]) ? $context[$field] : null,
+                            $args
+                        );
+                }
+            },
+            $format
+        );
         return $msg;
     }
 
@@ -351,15 +386,16 @@ class Validation implements \JsonSerializable {
      * @param mixed $value The value to format.
      * @return string Returns the formatted value.
      */
-    protected function formatValue($value): string {
+    protected function formatValue($value): string
+    {
         if (is_string($value) && mb_strlen($value) > 20) {
-            $value = mb_substr($value, 0, 20).'…';
+            $value = mb_substr($value, 0, 20) . "…";
         }
 
         if (is_scalar($value)) {
             return json_encode($value);
         } else {
-            return $this->translate('value');
+            return $this->translate("value");
         }
     }
 
@@ -370,37 +406,38 @@ class Validation implements \JsonSerializable {
      * @param array $args Formatting arguments.
      * @return string Returns the translated string.
      */
-    private function formatField($value, array $args = []) {
+    private function formatField($value, array $args = [])
+    {
         if ($value === null) {
-            $r = $this->translate('null');
+            $r = $this->translate("null");
         } elseif ($value === true) {
-            $r = $this->translate('true');
+            $r = $this->translate("true");
         } elseif ($value === false) {
-            $r = $this->translate('false');
+            $r = $this->translate("false");
         } elseif (is_string($value)) {
             $r = $this->translate($value);
         } elseif (is_numeric($value)) {
             $r = $value;
         } elseif (is_array($value)) {
-            $argArray = array_map([$this, 'formatField'], $value);
-            $r = implode(', ', $argArray);
+            $argArray = array_map([$this, "formatField"], $value);
+            $r = implode(", ", $argArray);
         } elseif ($value instanceof \DateTimeInterface) {
-            $r = $value->format('c');
+            $r = $value->format("c");
         } else {
             $r = $value;
         }
 
         $format = array_shift($args);
         switch ($format) {
-            case 'plural':
+            case "plural":
                 $singular = array_shift($args);
-                $plural = array_shift($args) ?: $singular.'s';
+                $plural = array_shift($args) ?: $singular . "s";
                 $count = is_array($value) ? count($value) : $value;
                 $r = $count == 1 ? $singular : $plural;
                 break;
         }
 
-        return (string)$r;
+        return (string) $r;
     }
 
     /**
@@ -410,10 +447,11 @@ class Validation implements \JsonSerializable {
      *
      * @return array Returns all of the errors.
      */
-    public function getErrors(): array {
+    public function getErrors(): array
+    {
         $result = [];
         foreach ($this->getRawErrors() as $field => $error) {
-            $result[] = $this->pluckError(['field' => $field] + $error);
+            $result[] = $this->pluckError(["field" => $field] + $error);
         }
         return $result;
     }
@@ -424,13 +462,15 @@ class Validation implements \JsonSerializable {
      * @param array $error The error to format.
      * @return array Returns the error stripped of default values.
      */
-    private function pluckError(array $error) {
-        $row = array_intersect_key(
-            $error,
-            ['field' => 1, 'error' => 1, 'code' => 1]
-        );
+    private function pluckError(array $error)
+    {
+        $row = array_intersect_key($error, [
+            "field" => 1,
+            "error" => 1,
+            "code" => 1,
+        ]);
 
-        $row['message'] = $this->formatErrorMessage($error);
+        $row["message"] = $this->formatErrorMessage($error);
         return $row;
     }
 
@@ -440,13 +480,14 @@ class Validation implements \JsonSerializable {
      * @param string $field The full path to the field.
      * @return array Returns an array of errors.
      */
-    public function getFieldErrors(string $field): array {
+    public function getFieldErrors(string $field): array
+    {
         if (empty($this->errors[$field])) {
             return [];
         } else {
             $result = [];
             foreach ($this->errors[$field] as $error) {
-                $result[] = $this->pluckError($error + ['field' => $field]);
+                $result[] = $this->pluckError($error + ["field" => $field]);
             }
             return $result;
         }
@@ -458,7 +499,8 @@ class Validation implements \JsonSerializable {
      * @param string $field The name of the field to check for validity.
      * @return bool Returns true if the field has no errors, false otherwise.
      */
-    public function isValidField(string $field): bool {
+    public function isValidField(string $field): bool
+    {
         $result = empty($this->errors[$field]);
         return $result;
     }
@@ -470,19 +512,20 @@ class Validation implements \JsonSerializable {
      * @param string $name The path to merge to. Use this parameter when the validation object is meant to be a subset of this one.
      * @return $this
      */
-    public function merge(Validation $validation, $name = '') {
+    public function merge(Validation $validation, $name = "")
+    {
         $paths = $validation->errors;
 
         foreach ($paths as $path => $errors) {
             foreach ($errors as $error) {
                 if (strlen($name) > 0) {
                     // We are merging a sub-schema error that did not occur on a particular property of the sub-schema.
-                    if ($path === '') {
+                    if ($path === "") {
                         $fullPath = $name;
                     } else {
                         $fullPath = "{$name}/{$path}";
                     }
-                    $this->addError($fullPath, $error['error'], $error);
+                    $this->addError($fullPath, $error["error"], $error);
                 }
             }
         }
@@ -501,22 +544,35 @@ class Validation implements \JsonSerializable {
      * - Error specific fields can be added to format a custom error message.
      * @return $this
      */
-    public function addError(string $field, string $error, $options = []) {
+    public function addError(string $field, string $error, $options = [])
+    {
         if (empty($error)) {
-            throw new \InvalidArgumentException('The error code cannot be empty.', 500);
-        } elseif (!in_array(gettype($options), ['integer', 'array'], true)) {
-            throw new \InvalidArgumentException('$options must be an integer or array.', 500);
+            throw new \InvalidArgumentException(
+                "The error code cannot be empty.",
+                500
+            );
+        } elseif (!in_array(gettype($options), ["integer", "array"], true)) {
+            throw new \InvalidArgumentException(
+                '$options must be an integer or array.',
+                500
+            );
         }
         if (is_int($options)) {
-            trigger_error('Passing an integer for $options in Validation::addError() is deprecated.', E_USER_DEPRECATED);
-            $options = ['code' => $options];
-        } elseif (isset($options['status'])) {
-            trigger_error('Validation::addError() expects $options[\'number\'], not $options[\'status\'].', E_USER_DEPRECATED);
-            $options['code'] = $options['status'];
-            unset($options['status']);
+            trigger_error(
+                'Passing an integer for $options in Validation::addError() is deprecated.',
+                E_USER_DEPRECATED
+            );
+            $options = ["code" => $options];
+        } elseif (isset($options["status"])) {
+            trigger_error(
+                'Validation::addError() expects $options[\'number\'], not $options[\'status\'].',
+                E_USER_DEPRECATED
+            );
+            $options["code"] = $options["status"];
+            unset($options["status"]);
         }
 
-        $row = ['error' => $error] + $options;
+        $row = ["error" => $error] + $options;
         $this->errors[$field][] = $row;
 
         return $this;
@@ -528,8 +584,12 @@ class Validation implements \JsonSerializable {
      * @return int Returns an HTTP response code or zero to indicate it should be calculated.
      * @deprecated
      */
-    public function getMainStatus(): int {
-        trigger_error("Validation::getMainStatus() is deprecated. Use Validation::getMainCode() instead.", E_USER_DEPRECATED);
+    public function getMainStatus(): int
+    {
+        trigger_error(
+            "Validation::getMainStatus() is deprecated. Use Validation::getMainCode() instead.",
+            E_USER_DEPRECATED
+        );
         return $this->mainCode;
     }
 
@@ -540,8 +600,12 @@ class Validation implements \JsonSerializable {
      * @return $this
      * @deprecated
      */
-    public function setMainStatus(int $status) {
-        trigger_error("Validation::setMainStatus() is deprecated. Use Validation::getMainCode() instead.", E_USER_DEPRECATED);
+    public function setMainStatus(int $status)
+    {
+        trigger_error(
+            "Validation::setMainStatus() is deprecated. Use Validation::getMainCode() instead.",
+            E_USER_DEPRECATED
+        );
         $this->mainCode = $status;
         return $this;
     }
@@ -554,15 +618,22 @@ class Validation implements \JsonSerializable {
      * @param bool $punctuate Whether or not to automatically add punctuation to errors if they don't have it already.
      * @return string Returns an error message.
      */
-    public function getConcatMessage($field = null, string $sep = ' ', bool $punctuate = true): string {
-        $sentence = $this->translate('%s.');
+    public function getConcatMessage(
+        $field = null,
+        string $sep = " ",
+        bool $punctuate = true
+    ): string {
+        $sentence = $this->translate("%s.");
 
-        $errors = $field === null ? $this->getRawErrors() : ($this->errors[$field] ?? []);
+        $errors =
+            $field === null
+                ? $this->getRawErrors()
+                : $this->errors[$field] ?? [];
 
         // Generate the message by concatenating all of the errors together.
         $messages = [];
         foreach ($errors as $field => $error) {
-            $message = $this->formatErrorMessage($error + ['field' => $field]);
+            $message = $this->formatErrorMessage($error + ["field" => $field]);
             if ($punctuate && preg_match('`\PP$`u', $message)) {
                 $message = sprintf($sentence, $message);
             }
@@ -578,20 +649,21 @@ class Validation implements \JsonSerializable {
      * which is a value of any type other than a resource.
      * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
      */
-    public function jsonSerialize() {
+    public function jsonSerialize(): mixed
+    {
         $errors = [];
 
         foreach ($this->getRawErrors() as $field => $error) {
             $errors[$field][] = array_intersect_key(
-                $this->pluckError($error + ['field' => $field]),
-                ['error' => 1, 'message' => 1, 'code' => 1]
+                $this->pluckError($error + ["field" => $field]),
+                ["error" => 1, "message" => 1, "code" => 1]
             );
         }
 
         $result = [
-            'message' => $this->getSummaryMessage(),
-            'code' => $this->getCode(),
-            'errors' => $errors,
+            "message" => $this->getSummaryMessage(),
+            "code" => $this->getCode(),
+            "errors" => $errors,
         ];
         return $result;
     }
@@ -601,13 +673,14 @@ class Validation implements \JsonSerializable {
      *
      * @return string Returns the message.
      */
-    public function getSummaryMessage(): string {
+    public function getSummaryMessage(): string
+    {
         if ($main = $this->getMainMessage()) {
             return $main;
         } elseif ($this->isValid()) {
-            return $this->translate('Validation succeeded.');
+            return $this->translate("Validation succeeded.");
         } else {
-            return $this->translate('Validation failed.');
+            return $this->translate("Validation failed.");
         }
     }
 }

@@ -15,7 +15,8 @@ use Garden\Schema\ValidationException;
 /**
  * Test string validation properties.
  */
-class StringValidationTest extends AbstractSchemaTest {
+class StringValidationTest extends AbstractSchemaTest
+{
     /**
      * Test string min length constraints.
      *
@@ -26,23 +27,30 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @dataProvider provideMinLengthTests
      */
-    public function testMinLength($str, $code, $minLength = 3, int $flags = null) {
-        $schema = Schema::parse(['str:s' => ['minLength' => $minLength]]);
+    public function testMinLength(
+        $str,
+        $code,
+        $minLength = 3,
+        int $flags = null
+    ) {
+        $schema = Schema::parse(["str:s" => ["minLength" => $minLength]]);
         if ($flags) {
             $schema->setFlags($flags);
         }
 
         try {
-            $schema->validate(['str' => $str]);
+            $schema->validate(["str" => $str]);
 
             if (!empty($code)) {
-                $this->fail("'$str' shouldn't validate against a min length of $minLength.");
+                $this->fail(
+                    "'$str' shouldn't validate against a min length of $minLength."
+                );
             } else {
                 // Everything validated correctly.
                 $this->assertTrue(true);
             }
         } catch (ValidationException $ex) {
-            $this->assertFieldHasError($ex->getValidation(), 'str', $code);
+            $this->assertFieldHasError($ex->getValidation(), "str", $code);
         }
     }
 
@@ -51,18 +59,28 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @return array Returns a data provider array.
      */
-    public function provideMinLengthTests() {
+    public function provideMinLengthTests()
+    {
         $r = [
-            'empty' => ['', 'minLength'],
-            'ab' => ['ab', 'minLength'],
-            'abc' => ['abc', ''],
-            'abcd' => ['abcd', ''],
-            'empty 1' => ['', 'minLength', 1],
-            'empty 0' => ['', '', 0],
-            'unicode as bytes success' => ['😱', 'minLength', 4],
-            'unicode as unicode fail' => ['😱', 'minLength', 2, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
-            'unicode as unicode success' => ['😱', '', 1, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
-
+            "empty" => ["", "minLength"],
+            "ab" => ["ab", "minLength"],
+            "abc" => ["abc", ""],
+            "abcd" => ["abcd", ""],
+            "empty 1" => ["", "minLength", 1],
+            "empty 0" => ["", "", 0],
+            "unicode as bytes success" => ["😱", "minLength", 4],
+            "unicode as unicode fail" => [
+                "😱",
+                "minLength",
+                2,
+                Schema::VALIDATE_STRING_LENGTH_AS_UNICODE,
+            ],
+            "unicode as unicode success" => [
+                "😱",
+                "",
+                1,
+                Schema::VALIDATE_STRING_LENGTH_AS_UNICODE,
+            ],
         ];
 
         return $r;
@@ -77,22 +95,27 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @dataProvider provideMaxLengthTests
      */
-    public function testMaxLength($str, string $code = '', int $maxLength = 3) {
-        $schema = Schema::parse(['str:s?' => [
-            'maxLength' => $maxLength,
-        ]]);
+    public function testMaxLength($str, string $code = "", int $maxLength = 3)
+    {
+        $schema = Schema::parse([
+            "str:s?" => [
+                "maxLength" => $maxLength,
+            ],
+        ]);
 
         try {
-            $schema->validate(['str' => $str]);
+            $schema->validate(["str" => $str]);
 
             if (!empty($code)) {
-                $this->fail("'$str' shouldn't validate against a max length of $maxLength.");
+                $this->fail(
+                    "'$str' shouldn't validate against a max length of $maxLength."
+                );
             } else {
                 // Everything validated correctly.
                 $this->assertTrue(true);
             }
         } catch (ValidationException $ex) {
-            $this->assertFieldHasError($ex->getValidation(), 'str', $code);
+            $this->assertFieldHasError($ex->getValidation(), "str", $code);
         }
     }
 
@@ -101,12 +124,13 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @return array Returns a data provider array.
      */
-    public function provideMaxLengthTests() {
+    public function provideMaxLengthTests()
+    {
         $r = [
-            'empty' => [''],
-            'ab' => ['ab'],
-            'abc' => ['abc'],
-            'abcd' => ['abcd', 'maxLength'],
+            "empty" => [""],
+            "ab" => ["ab"],
+            "abc" => ["abc"],
+            "abcd" => ["abcd", "maxLength"],
         ];
 
         return $r;
@@ -121,17 +145,21 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @dataProvider provideByteLengths
      */
-    public function testByteLengthValidation(array $value, $exceptionMessages = null, bool $forceByteLength = false) {
+    public function testByteLengthValidation(
+        array $value,
+        $exceptionMessages = null,
+        bool $forceByteLength = false
+    ) {
         $schema = Schema::parse([
-            'justLength:s?' => [
-                'maxLength' => 4,
+            "justLength:s?" => [
+                "maxLength" => 4,
             ],
-            'justByteLength:s?' => [
-                'maxByteLength' => 8,
+            "justByteLength:s?" => [
+                "maxByteLength" => 8,
             ],
-            'mixedLengths:s?' => [
-                'maxLength' => 4,
-                'maxByteLength' => 6
+            "mixedLengths:s?" => [
+                "maxLength" => 4,
+                "maxByteLength" => 6,
             ],
         ]);
         if ($forceByteLength) {
@@ -145,7 +173,9 @@ class StringValidationTest extends AbstractSchemaTest {
         } catch (ValidationException $e) {
             if ($exceptionMessages !== null) {
                 $actual = $e->getMessage();
-                $exceptionMessages = is_array($exceptionMessages) ? $exceptionMessages : [$exceptionMessages];
+                $exceptionMessages = is_array($exceptionMessages)
+                    ? $exceptionMessages
+                    : [$exceptionMessages];
                 foreach ($exceptionMessages as $expected) {
                     $this->assertStringContainsString($expected, $actual);
                 }
@@ -158,22 +188,46 @@ class StringValidationTest extends AbstractSchemaTest {
     /**
      * @return array
      */
-    public function provideByteLengths() {
+    public function provideByteLengths()
+    {
         return [
-            'maxLength - short' => [['justLength' => '😱']],
-            'maxLength - equal' => [['justLength' => '😱😱😱😱']],
-            'maxLength - long' => [['justLength' => '😱😱😱😱😱'], '1 character too long'],
-            'byteLength - short' => [['justByteLength' => '😱']],
-            'byteLength - equal' => [['justByteLength' => '😱😱']],
-            'byteLength - long' => [['justByteLength' => '😱😱a'], '1 byte too long'],
-            'mixedLengths - short' => [['mixedLengths' => '😱']],
-            'mixedLengths - equal' => [['mixedLengths' => '😱aa']],
-            'mixedLengths - long bytes' => [['mixedLengths' => '😱😱'], '2 bytes too long'],
-            'mixedLengths - long chars' => [['mixedLengths' => 'aaaaa'], '1 character too long'],
-            'mixedLengths - long chars - long bytes' => [['mixedLengths' => '😱😱😱😱😱'], ["1 character too long", "14 bytes too long."]],
-            'byteLength flag - short' => [['justLength' => '😱'], null, true],
-            'byteLength flag - long' => [['justLength' => '😱😱😱😱'], '12 bytes too long', true],
-            'byteLength property is preferred over byte length flag' => [['mixedLengths' => '😱😱'], '2 bytes too long', true]
+            "maxLength - short" => [["justLength" => "😱"]],
+            "maxLength - equal" => [["justLength" => "😱😱😱😱"]],
+            "maxLength - long" => [
+                ["justLength" => "😱😱😱😱😱"],
+                "1 character too long",
+            ],
+            "byteLength - short" => [["justByteLength" => "😱"]],
+            "byteLength - equal" => [["justByteLength" => "😱😱"]],
+            "byteLength - long" => [
+                ["justByteLength" => "😱😱a"],
+                "1 byte too long",
+            ],
+            "mixedLengths - short" => [["mixedLengths" => "😱"]],
+            "mixedLengths - equal" => [["mixedLengths" => "😱aa"]],
+            "mixedLengths - long bytes" => [
+                ["mixedLengths" => "😱😱"],
+                "2 bytes too long",
+            ],
+            "mixedLengths - long chars" => [
+                ["mixedLengths" => "aaaaa"],
+                "1 character too long",
+            ],
+            "mixedLengths - long chars - long bytes" => [
+                ["mixedLengths" => "😱😱😱😱😱"],
+                ["1 character too long", "14 bytes too long."],
+            ],
+            "byteLength flag - short" => [["justLength" => "😱"], null, true],
+            "byteLength flag - long" => [
+                ["justLength" => "😱😱😱😱"],
+                "12 bytes too long",
+                true,
+            ],
+            "byteLength property is preferred over byte length flag" => [
+                ["mixedLengths" => "😱😱"],
+                "2 bytes too long",
+                true,
+            ],
         ];
     }
 
@@ -185,19 +239,22 @@ class StringValidationTest extends AbstractSchemaTest {
      * @param string $pattern The pattern to test.
      * @dataProvider providePatternTests
      */
-    public function testPattern($str, $code = '', $pattern = '^[a-z]o+$') {
-        $schema = Schema::parse(['str:s?' => ['pattern' => $pattern]]);
+    public function testPattern($str, $code = "", $pattern = '^[a-z]o+$')
+    {
+        $schema = Schema::parse(["str:s?" => ["pattern" => $pattern]]);
 
         try {
-            $schema->validate(['str' => $str]);
+            $schema->validate(["str" => $str]);
 
             if (!empty($code)) {
-                $this->fail("'$str' shouldn't validate against a pattern of $pattern.");
+                $this->fail(
+                    "'$str' shouldn't validate against a pattern of $pattern."
+                );
             } else {
-                $this->assertRegExp("/{$pattern}/", $str);
+                $this->assertMatchesRegularExpression("/{$pattern}/", $str);
             }
         } catch (ValidationException $ex) {
-            $this->assertFieldHasError($ex->getValidation(), 'str', $code);
+            $this->assertFieldHasError($ex->getValidation(), "str", $code);
         }
     }
 
@@ -206,12 +263,13 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @return array Returns a data provider array.
      */
-    public function providePatternTests() {
+    public function providePatternTests()
+    {
         $r = [
-            'empty' => ['', 'pattern'],
-            'fo' => ['fo', ''],
-            'foo' => ['foooooooooo', ''],
-            'abcd' => ['abcd', 'pattern'],
+            "empty" => ["", "pattern"],
+            "fo" => ["fo", ""],
+            "foo" => ["foooooooooo", ""],
+            "abcd" => ["abcd", "pattern"],
         ];
 
         return $r;
@@ -220,34 +278,38 @@ class StringValidationTest extends AbstractSchemaTest {
     /**
      * Test the enum constraint.
      */
-    public function testEnum() {
+    public function testEnum()
+    {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("value must be one of: one, two, three, null.");
+        $this->expectExceptionMessage(
+            "value must be one of: one, two, three, null."
+        );
         $this->expectExceptionCode(400);
-        $enum = ['one', 'two', 'three', null];
-        $schema = Schema::parse([':s|n' => ['enum' => $enum]]);
+        $enum = ["one", "two", "three", null];
+        $schema = Schema::parse([":s|n" => ["enum" => $enum]]);
 
         foreach ($enum as $str) {
             $this->assertTrue($schema->isValid($str));
         }
 
-        $schema->validate('four');
+        $schema->validate("four");
     }
 
     /**
      * Test a required empty string with a min length of 0.
      */
-    public function testRequiredEmptyString() {
+    public function testRequiredEmptyString()
+    {
         $schema = Schema::parse([
-            'col:s' => ['minLength' => 0]
+            "col:s" => ["minLength" => 0],
         ]);
 
-        $emptyData = ['col' => ''];
+        $emptyData = ["col" => ""];
         $valid = $schema->validate($emptyData);
-        $this->assertEmpty($valid['col']);
-        $this->assertIsString($valid['col']);
+        $this->assertEmpty($valid["col"]);
+        $this->assertIsString($valid["col"]);
 
-        $nullData = ['col' => null];
+        $nullData = ["col" => null];
         $isValid = $schema->isValid($nullData);
         $this->assertFalse($isValid);
 
@@ -263,8 +325,9 @@ class StringValidationTest extends AbstractSchemaTest {
      * @param string $expected The expected datetime.
      * @dataProvider provideDateTimeFormatTests
      */
-    public function testDateTimeFormat($value, $expected) {
-        $schema = Schema::parse([':s' => ['format' => 'date-time']]);
+    public function testDateTimeFormat($value, $expected)
+    {
+        $schema = Schema::parse([":s" => ["format" => "date-time"]]);
 
         $valid = $schema->validate($value);
         $this->assertEquals($expected, $valid);
@@ -275,8 +338,9 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @return array Returns a data provider array.
      */
-    public function provideDateTimeFormatTests() {
-        $dt = new \DateTimeImmutable('1:23pm');
+    public function provideDateTimeFormatTests()
+    {
+        $dt = new \DateTimeImmutable("1:23pm");
 
         $r = [
             $dt->format(DateTime::ATOM),
@@ -297,46 +361,54 @@ class StringValidationTest extends AbstractSchemaTest {
     /**
      * Test the email string format.
      */
-    public function testEmailFormat() {
-        $schema = Schema::parse([':s' => ['format' => 'email']]);
+    public function testEmailFormat()
+    {
+        $schema = Schema::parse([":s" => ["format" => "email"]]);
 
-        $this->assertTrue($schema->isValid('todd@example.com'));
-        $this->assertTrue($schema->isValid('todd+foo@example.com'));
-        $this->assertFalse($schema->isValid('todd@example'));
+        $this->assertTrue($schema->isValid("todd@example.com"));
+        $this->assertTrue($schema->isValid("todd+foo@example.com"));
+        $this->assertFalse($schema->isValid("todd@example"));
     }
 
     /**
      * Test the IPv4 format.
      */
-    public function testIPv4Format() {
-        $schema = Schema::parse([':s' => ['format' => 'ipv4']]);
+    public function testIPv4Format()
+    {
+        $schema = Schema::parse([":s" => ["format" => "ipv4"]]);
 
-        $this->assertTrue($schema->isValid('127.0.0.1'));
-        $this->assertTrue($schema->isValid('192.168.5.5'));
-        $this->assertFalse($schema->isValid('todd@example'));
+        $this->assertTrue($schema->isValid("127.0.0.1"));
+        $this->assertTrue($schema->isValid("192.168.5.5"));
+        $this->assertFalse($schema->isValid("todd@example"));
     }
 
     /**
      * Test the IPv6 format.
      */
-    public function testIPv6Format() {
-        $schema = Schema::parse([':s' => ['format' => 'ipv6']]);
+    public function testIPv6Format()
+    {
+        $schema = Schema::parse([":s" => ["format" => "ipv6"]]);
 
-        $this->assertTrue($schema->isValid('2001:0db8:0a0b:12f0:0000:0000:0000:0001'));
-        $this->assertTrue($schema->isValid('2001:db8::1'));
-        $this->assertFalse($schema->isValid('127.0.0.1'));
+        $this->assertTrue(
+            $schema->isValid("2001:0db8:0a0b:12f0:0000:0000:0000:0001")
+        );
+        $this->assertTrue($schema->isValid("2001:db8::1"));
+        $this->assertFalse($schema->isValid("127.0.0.1"));
     }
 
     /**
      * Test the IPv6 format.
      */
-    public function testIPFormat() {
-        $schema = Schema::parse([':s' => ['format' => 'ip']]);
+    public function testIPFormat()
+    {
+        $schema = Schema::parse([":s" => ["format" => "ip"]]);
 
-        $this->assertTrue($schema->isValid('2001:0db8:0a0b:12f0:0000:0000:0000:0001'));
-        $this->assertTrue($schema->isValid('2001:db8::1'));
-        $this->assertTrue($schema->isValid('127.0.0.1'));
-        $this->assertFalse($schema->isValid('todd@example'));
+        $this->assertTrue(
+            $schema->isValid("2001:0db8:0a0b:12f0:0000:0000:0000:0001")
+        );
+        $this->assertTrue($schema->isValid("2001:db8::1"));
+        $this->assertTrue($schema->isValid("127.0.0.1"));
+        $this->assertFalse($schema->isValid("todd@example"));
     }
 
     /**
@@ -346,8 +418,9 @@ class StringValidationTest extends AbstractSchemaTest {
      * @param bool $valid Whether the URI should be valid or invalid.
      * @dataProvider provideUris
      */
-    public function testUriFormat($uri, $valid = true) {
-        $schema = Schema::parse([':s' => ['format' => 'uri']]);
+    public function testUriFormat($uri, $valid = true)
+    {
+        $schema = Schema::parse([":s" => ["format" => "uri"]]);
 
         if ($valid) {
             $this->assertTrue($schema->isValid($uri));
@@ -361,15 +434,16 @@ class StringValidationTest extends AbstractSchemaTest {
      *
      * @return array Returns a data provider.
      */
-    public function provideUris() {
+    public function provideUris()
+    {
         $r = [
-            ['ftp://ftp.is.co.za/rfc/rfc1808.txt1'],
-            ['http://www.ietf.org/rfc/rfc2396.txt'],
-            ['ldap://[2001:db8::7]/c=GB?objectClass?one'],
-            ['mailto:John.Doe@example.com'],
-            ['news:comp.infosystems.www.servers.unix'],
-            ['telnet://192.0.2.16:80/'],
-            ['aaa', false]
+            ["ftp://ftp.is.co.za/rfc/rfc1808.txt1"],
+            ["http://www.ietf.org/rfc/rfc2396.txt"],
+            ["ldap://[2001:db8::7]/c=GB?objectClass?one"],
+            ["mailto:John.Doe@example.com"],
+            ["news:comp.infosystems.www.servers.unix"],
+            ["telnet://192.0.2.16:80/"],
+            ["aaa", false],
         ];
 
         return array_column($r, null, 0);

@@ -10,7 +10,8 @@ namespace Garden\Schema;
 /**
  * A class for defining and validating data schemas.
  */
-class Schema implements \JsonSerializable, \ArrayAccess {
+class Schema implements \JsonSerializable, \ArrayAccess
+{
     /**
      * Trigger a notice when extraneous properties are encountered during validation.
      */
@@ -32,23 +33,23 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * If this is ever given some sort of public access then remove the static.
      */
     private static $types = [
-        'array' => ['a'],
-        'object' => ['o'],
-        'integer' => ['i', 'int'],
-        'string' => ['s', 'str'],
-        'number' => ['f', 'float'],
-        'boolean' => ['b', 'bool'],
+        "array" => ["a"],
+        "object" => ["o"],
+        "integer" => ["i", "int"],
+        "string" => ["s", "str"],
+        "number" => ["f", "float"],
+        "boolean" => ["b", "bool"],
 
         // Psuedo-types
-        'timestamp' => ['ts'], // type: integer, format: timestamp
-        'datetime' => ['dt'], // type: string, format: date-time
-        'null' => ['n'], // Adds nullable: true
+        "timestamp" => ["ts"], // type: integer, format: timestamp
+        "datetime" => ["dt"], // type: string, format: date-time
+        "null" => ["n"], // Adds nullable: true
     ];
 
     /**
      * @var string The regular expression to strictly determine if a string is a date.
      */
-    private static $DATE_REGEX = '`^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?`i';
+    private static $DATE_REGEX = "`^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?`i";
 
     private $schema = [];
 
@@ -76,7 +77,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     /**
      * @var callable A callback is used to create validation objects.
      */
-    private $validationFactory = [Validation::class, 'createValidation'];
+    private $validationFactory = [Validation::class, "createValidation"];
 
     /**
      * @var callable
@@ -91,11 +92,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param array $schema The array schema to validate against.
      * @param callable $refLookup The function used to lookup references.
      */
-    public function __construct(array $schema = [], callable $refLookup = null) {
+    public function __construct(array $schema = [], callable $refLookup = null)
+    {
         $this->schema = $schema;
 
-        $this->refLookup = $refLookup ?? function (/** @scrutinizer ignore-unused */
-                string $_) {
+        $this->refLookup =
+            $refLookup ??
+            function (/** @scrutinizer ignore-unused */ string $_) {
                 return null;
             };
 
@@ -109,7 +112,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed[] $args Constructor arguments for the schema instance.
      * @return static Returns a new schema.
      */
-    public static function parse(array $arr, ...$args) {
+    public static function parse(array $arr, ...$args)
+    {
         $schema = new static([], ...$args);
         $schema->schema = $schema->parseInternal($arr);
         return $schema;
@@ -122,11 +126,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array The full schema array.
      * @throws ParseException Throws an exception when an item in the schema is invalid.
      */
-    protected function parseInternal(array $arr): array {
+    protected function parseInternal(array $arr): array
+    {
         if (empty($arr)) {
             // An empty schema validates to anything.
             return [];
-        } elseif (isset($arr['type'])) {
+        } elseif (isset($arr["type"])) {
             // This is a long form schema and can be parsed as the root.
             return $this->parseNode($arr);
         } else {
@@ -137,7 +142,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $key = $value;
                 $value = null;
             }
-            list ($name, $param) = $this->parseShortParam($key, $value);
+            list($name, $param) = $this->parseShortParam($key, $value);
             if (empty($name)) {
                 return $this->parseNode($param, $value);
             }
@@ -147,9 +152,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         list($properties, $required) = $this->parseProperties($arr);
 
         $result = [
-            'type' => 'object',
-            'properties' => $properties,
-            'required' => $required
+            "type" => "object",
+            "properties" => $properties,
+            "required" => $required,
         ];
 
         return array_filter($result);
@@ -163,30 +168,39 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array|\ArrayAccess Returns a JSON schema compatible node.
      * @throws ParseException Throws an exception if there was a problem parsing the schema node.
      */
-    private function parseNode($node, $value = null) {
+    private function parseNode($node, $value = null)
+    {
         if (is_array($value)) {
-            if (is_array($node['type'])) {
-                trigger_error('Schemas with multiple types are deprecated.', E_USER_DEPRECATED);
+            if (is_array($node["type"])) {
+                trigger_error(
+                    "Schemas with multiple types are deprecated.",
+                    E_USER_DEPRECATED
+                );
             }
 
             // The value describes a bit more about the schema.
-            switch ($node['type']) {
-                case 'array':
-                    if (isset($value['items'])) {
+            switch ($node["type"]) {
+                case "array":
+                    if (isset($value["items"])) {
                         // The value includes array schema information.
                         $node = array_replace($node, $value);
                     } else {
-                        $node['items'] = $this->parseInternal($value);
+                        $node["items"] = $this->parseInternal($value);
                     }
                     break;
-                case 'object':
+                case "object":
                     // The value is a schema of the object.
-                    if (isset($value['properties'])) {
-                        list($node['properties']) = $this->parseProperties($value['properties']);
+                    if (isset($value["properties"])) {
+                        list($node["properties"]) = $this->parseProperties(
+                            $value["properties"]
+                        );
                     } else {
-                        list($node['properties'], $required) = $this->parseProperties($value);
+                        list(
+                            $node["properties"],
+                            $required,
+                        ) = $this->parseProperties($value);
                         if (!empty($required)) {
-                            $node['required'] = $required;
+                            $node["required"] = $required;
                         }
                     }
                     break;
@@ -195,29 +209,37 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     break;
             }
         } elseif (is_string($value)) {
-            if ($node['type'] === 'array' && $arrType = $this->getType($value)) {
-                $node['items'] = ['type' => $arrType];
+            if (
+                $node["type"] === "array" &&
+                ($arrType = $this->getType($value))
+            ) {
+                $node["items"] = ["type" => $arrType];
             } elseif (!empty($value)) {
-                $node['description'] = $value;
+                $node["description"] = $value;
             }
         } elseif ($value === null) {
             // Parse child elements.
-            if ($node['type'] === 'array' && isset($node['items'])) {
+            if ($node["type"] === "array" && isset($node["items"])) {
                 // The value includes array schema information.
-                $node['items'] = $this->parseInternal($node['items']);
-            } elseif ($node['type'] === 'object' && isset($node['properties'])) {
-                list($node['properties']) = $this->parseProperties($node['properties']);
+                $node["items"] = $this->parseInternal($node["items"]);
+            } elseif (
+                $node["type"] === "object" &&
+                isset($node["properties"])
+            ) {
+                list($node["properties"]) = $this->parseProperties(
+                    $node["properties"]
+                );
             }
         }
 
         if (is_array($node)) {
-            if (!empty($node['allowNull'])) {
-                $node['nullable'] = true;
+            if (!empty($node["allowNull"])) {
+                $node["nullable"] = true;
             }
-            unset($node['allowNull']);
+            unset($node["allowNull"]);
 
-            if ($node['type'] === null || $node['type'] === []) {
-                unset($node['type']);
+            if ($node["type"] === null || $node["type"] === []) {
+                unset($node["type"]);
             }
         }
 
@@ -231,7 +253,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array Returns a schema array suitable to be placed in the **properties** key of a schema.
      * @throws ParseException Throws an exception if a property name cannot be determined for an array item.
      */
-    private function parseProperties(array $arr): array {
+    private function parseProperties(array $arr): array
+    {
         $properties = [];
         $requiredProperties = [];
         foreach ($arr as $key => $value) {
@@ -239,14 +262,20 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             if (is_int($key)) {
                 if (is_string($value)) {
                     $key = $value;
-                    $value = '';
+                    $value = "";
                 } else {
-                    throw new ParseException("Schema at position $key is not a valid parameter.", 500);
+                    throw new ParseException(
+                        "Schema at position $key is not a valid parameter.",
+                        500
+                    );
                 }
             }
 
             // The parameter is defined in the key.
-            list($name, $param, $required) = $this->parseShortParam($key, $value);
+            list($name, $param, $required) = $this->parseShortParam(
+                $key,
+                $value
+            );
 
             $node = $this->parseNode($param, $value);
 
@@ -266,9 +295,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array Returns an array in the form `[string name, array param, bool required]`.
      * @throws ParseException Throws an exception if the short param is not in the correct format.
      */
-    public function parseShortParam(string $key, $value = []): array {
+    public function parseShortParam(string $key, $value = []): array
+    {
         // Is the parameter optional?
-        if (substr($key, -1) === '?') {
+        if (substr($key, -1) === "?") {
             $required = false;
             $key = substr($key, 0, -1);
         } else {
@@ -276,35 +306,35 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         // Check for a type.
-        if (false !== ($pos = strrpos($key, ':'))) {
+        if (false !== ($pos = strrpos($key, ":"))) {
             $name = substr($key, 0, $pos);
             $typeStr = substr($key, $pos + 1);
 
             // Kludge for names with colons that are not specifying an array of a type.
-            if (isset($value['type']) && 'array' !== $this->getType($typeStr)) {
+            if (isset($value["type"]) && "array" !== $this->getType($typeStr)) {
                 $name = $key;
-                $typeStr = '';
+                $typeStr = "";
             }
         } else {
             $name = $key;
-            $typeStr = '';
+            $typeStr = "";
         }
         $types = [];
         $param = [];
 
         if (!empty($typeStr)) {
-            $shortTypes = explode('|', $typeStr);
+            $shortTypes = explode("|", $typeStr);
             foreach ($shortTypes as $alias) {
                 $found = $this->getType($alias);
                 if ($found === null) {
                     throw new ParseException("Unknown type '$alias'.", 500);
-                } elseif ($found === 'datetime') {
-                    $param['format'] = 'date-time';
-                    $types[] = 'string';
-                } elseif ($found === 'timestamp') {
-                    $param['format'] = 'timestamp';
-                    $types[] = 'integer';
-                } elseif ($found === 'null') {
+                } elseif ($found === "datetime") {
+                    $param["format"] = "date-time";
+                    $types[] = "string";
+                } elseif ($found === "timestamp") {
+                    $param["format"] = "timestamp";
+                    $types[] = "integer";
+                } elseif ($found === "null") {
                     $nullable = true;
                 } else {
                     $types[] = $found;
@@ -313,42 +343,56 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         if ($value instanceof Schema) {
-            if (count($types) === 1 && $types[0] === 'array') {
-                $param += ['type' => $types[0], 'items' => $value];
+            if (count($types) === 1 && $types[0] === "array") {
+                $param += ["type" => $types[0], "items" => $value];
             } else {
                 $param = $value;
             }
-        } elseif (isset($value['type'])) {
+        } elseif (isset($value["type"])) {
             $param = $value + $param;
 
-            if (!empty($types) && $types !== (array)$param['type']) {
-                $typesStr = implode('|', $types);
-                $paramTypesStr = implode('|', (array)$param['type']);
+            if (!empty($types) && $types !== (array) $param["type"]) {
+                $typesStr = implode("|", $types);
+                $paramTypesStr = implode("|", (array) $param["type"]);
 
-                throw new ParseException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
+                throw new ParseException(
+                    "Type mismatch between $typesStr and {$paramTypesStr} for field $name.",
+                    500
+                );
             }
         } else {
             if (empty($types) && !empty($parts[1])) {
-                throw new ParseException("Invalid type {$parts[1]} for field $name.", 500);
+                throw new ParseException(
+                    "Invalid type {$parts[1]} for field $name.",
+                    500
+                );
             }
             if (empty($types)) {
-                $param += ['type' => null];
+                $param += ["type" => null];
             } else {
-                $param += ['type' => count($types) === 1 ? $types[0] : $types];
+                $param += ["type" => count($types) === 1 ? $types[0] : $types];
             }
 
             // Parsed required strings have a minimum length of 1.
-            if (in_array('string', $types) && !empty($name) && $required && (!isset($value['default']) || $value['default'] !== '')) {
-                $param['minLength'] = 1;
+            if (
+                in_array("string", $types) &&
+                !empty($name) &&
+                $required &&
+                (!isset($value["default"]) || $value["default"] !== "")
+            ) {
+                $param["minLength"] = 1;
             }
         }
 
         if (!empty($nullable)) {
-            $param['nullable'] = true;
+            $param["nullable"] = true;
         }
 
-        if (is_array($param['type'])) {
-            trigger_error('Schemas with multiple types is deprecated.', E_USER_DEPRECATED);
+        if (is_array($param["type"])) {
+            trigger_error(
+                "Schemas with multiple types is deprecated.",
+                E_USER_DEPRECATED
+            );
         }
 
         return [$name, $param, $required];
@@ -360,7 +404,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $alias The type alias or type name to lookup.
      * @return mixed
      */
-    private function getType($alias) {
+    private function getType($alias)
+    {
         if (isset(self::$types[$alias])) {
             return $alias;
         }
@@ -378,8 +423,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $str The segment to unescapeRef.
      * @return string Returns the unescaped string.
      */
-    public static function unescapeRef(string $str): string {
-        return str_replace(['~1', '~0'], ['/', '~'], $str);
+    public static function unescapeRef(string $str): string
+    {
+        return str_replace(["~1", "~0"], ["/", "~"], $str);
     }
 
     /**
@@ -388,8 +434,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $ref A JSON reference.
      * @return string[] The individual parts of the reference.
      */
-    public static function explodeRef(string $ref): array {
-        return array_map([self::class, 'unescapeRef'], explode('/', $ref));
+    public static function explodeRef(string $ref): array
+    {
+        return array_map([self::class, "unescapeRef"], explode("/", $ref));
     }
 
     /**
@@ -397,8 +444,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return string
      */
-    public function getDescription(): string {
-        return $this->schema['description'] ?? '';
+    public function getDescription(): string
+    {
+        return $this->schema["description"] ?? "";
     }
 
     /**
@@ -407,8 +455,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $description The new description.
      * @return $this
      */
-    public function setDescription(string $description) {
-        $this->schema['description'] = $description;
+    public function setDescription(string $description)
+    {
+        $this->schema["description"] = $description;
         return $this;
     }
 
@@ -417,8 +466,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return string Returns the title.
      */
-    public function getTitle(): string {
-        return $this->schema['title'] ?? '';
+    public function getTitle(): string
+    {
+        return $this->schema["title"] ?? "";
     }
 
     /**
@@ -426,8 +476,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @param string $title The new title.
      */
-    public function setTitle(string $title) {
-        $this->schema['title'] = $title;
+    public function setTitle(string $title)
+    {
+        $this->schema["title"] = $title;
     }
 
     /**
@@ -437,13 +488,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $default The value to return if the field isn't found.
      * @return mixed Returns the field value or `$default`.
      */
-    public function getField($path, $default = null) {
+    public function getField($path, $default = null)
+    {
         if (is_string($path)) {
-            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
-                $path = explode('.', $path);
+            if (strpos($path, ".") !== false && strpos($path, "/") === false) {
+                trigger_error(
+                    'Field selectors must be separated by "/" instead of "."',
+                    E_USER_DEPRECATED
+                );
+                $path = explode(".", $path);
             } else {
-                $path = explode('/', $path);
+                $path = explode("/", $path);
             }
         }
 
@@ -467,13 +522,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The new value.
      * @return $this
      */
-    public function setField($path, $value) {
+    public function setField($path, $value)
+    {
         if (is_string($path)) {
-            if (strpos($path, '.') !== false && strpos($path, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
-                $path = explode('.', $path);
+            if (strpos($path, ".") !== false && strpos($path, "/") === false) {
+                trigger_error(
+                    'Field selectors must be separated by "/" instead of "."',
+                    E_USER_DEPRECATED
+                );
+                $path = explode(".", $path);
             } else {
-                $path = explode('/', $path);
+                $path = explode("/", $path);
             }
         }
 
@@ -501,7 +560,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return int Returns a bitwise combination of flags.
      */
-    public function getFlags(): int {
+    public function getFlags(): int
+    {
         return $this->flags;
     }
 
@@ -511,7 +571,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param int $flags One or more of the **Schema::FLAG_*** constants.
      * @return Schema Returns the current instance for fluent calls.
      */
-    public function setFlags(int $flags) {
+    public function setFlags(int $flags)
+    {
         $this->flags = $flags;
 
         return $this;
@@ -524,7 +585,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $value Either true or false.
      * @return $this
      */
-    public function setFlag(int $flag, bool $value) {
+    public function setFlag(int $flag, bool $value)
+    {
         if ($value) {
             $this->flags = $this->flags | $flag;
         } else {
@@ -539,8 +601,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param Schema $schema A scheme instance. Its parameters will be merged into the current instance.
      * @return $this
      */
-    public function merge(Schema $schema) {
-        $this->mergeInternal($this->schema, $schema->getSchemaArray(), true, true);
+    public function merge(Schema $schema)
+    {
+        $this->mergeInternal(
+            $this->schema,
+            $schema->getSchemaArray(),
+            true,
+            true
+        );
         return $this;
     }
 
@@ -553,32 +621,59 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $addProperties Whether or not to add object properties to the target.
      * @return array
      */
-    private function mergeInternal(array &$target, array $source, $overwrite = true, $addProperties = true) {
+    private function mergeInternal(
+        array &$target,
+        array $source,
+        $overwrite = true,
+        $addProperties = true
+    ) {
         // We need to do a fix for required properties here.
-        if (isset($target['properties']) && !empty($source['required'])) {
-            $required = isset($target['required']) ? $target['required'] : [];
+        if (isset($target["properties"]) && !empty($source["required"])) {
+            $required = isset($target["required"]) ? $target["required"] : [];
 
-            if (isset($source['required']) && $addProperties) {
-                $newProperties = array_diff(array_keys($source['properties']), array_keys($target['properties']));
-                $newRequired = array_intersect($source['required'], $newProperties);
+            if (isset($source["required"]) && $addProperties) {
+                $newProperties = array_diff(
+                    array_keys($source["properties"]),
+                    array_keys($target["properties"])
+                );
+                $newRequired = array_intersect(
+                    $source["required"],
+                    $newProperties
+                );
 
                 $required = array_merge($required, $newRequired);
             }
         }
 
-
         foreach ($source as $key => $val) {
-            if (is_array($val) && array_key_exists($key, $target) && is_array($target[$key])) {
-                if ($key === 'properties' && !$addProperties) {
+            if (
+                is_array($val) &&
+                array_key_exists($key, $target) &&
+                is_array($target[$key])
+            ) {
+                if ($key === "properties" && !$addProperties) {
                     // We just want to merge the properties that exist in the destination.
                     foreach ($val as $name => $prop) {
                         if (isset($target[$key][$name])) {
                             $targetProp = &$target[$key][$name];
 
                             if (is_array($targetProp) && is_array($prop)) {
-                                $this->mergeInternal($targetProp, $prop, $overwrite, $addProperties);
-                            } elseif (is_array($targetProp) && $prop instanceof Schema) {
-                                $this->mergeInternal($targetProp, $prop->getSchemaArray(), $overwrite, $addProperties);
+                                $this->mergeInternal(
+                                    $targetProp,
+                                    $prop,
+                                    $overwrite,
+                                    $addProperties
+                                );
+                            } elseif (
+                                is_array($targetProp) &&
+                                $prop instanceof Schema
+                            ) {
+                                $this->mergeInternal(
+                                    $targetProp,
+                                    $prop->getSchemaArray(),
+                                    $overwrite,
+                                    $addProperties
+                                );
                             } elseif ($overwrite) {
                                 $targetProp = $prop;
                             }
@@ -594,9 +689,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                         $target[$key] = $merged;
                     }
                 } else {
-                    $target[$key] = $this->mergeInternal($target[$key], $val, $overwrite, $addProperties);
+                    $target[$key] = $this->mergeInternal(
+                        $target[$key],
+                        $val,
+                        $overwrite,
+                        $addProperties
+                    );
                 }
-            } elseif (!$overwrite && array_key_exists($key, $target) && !is_array($val)) {
+            } elseif (
+                !$overwrite &&
+                array_key_exists($key, $target) &&
+                !is_array($val)
+            ) {
                 // Do nothing, we aren't replacing.
             } else {
                 $target[$key] = $val;
@@ -605,9 +709,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (isset($required)) {
             if (empty($required)) {
-                unset($target['required']);
+                unset($target["required"]);
             } else {
-                $target['required'] = $required;
+                $target["required"] = $required;
             }
         }
 
@@ -620,7 +724,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array
      * @see Schema::jsonSerialize()
      */
-    public function getSchemaArray(): array {
+    public function getSchemaArray(): array
+    {
         return $this->schema;
     }
 
@@ -633,8 +738,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $addProperties Whether to add properties that don't exist in this schema.
      * @return $this
      */
-    public function add(Schema $schema, $addProperties = false) {
-        $this->mergeInternal($this->schema, $schema->getSchemaArray(), false, $addProperties);
+    public function add(Schema $schema, $addProperties = false)
+    {
+        $this->mergeInternal(
+            $this->schema,
+            $schema->getSchemaArray(),
+            false,
+            $addProperties
+        );
         return $this;
     }
 
@@ -648,7 +759,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $validate Whether or not the filter should also validate. If true default validation is skipped.
      * @return $this
      */
-    public function addFilter(string $fieldname, callable $callback, bool $validate = false) {
+    public function addFilter(
+        string $fieldname,
+        callable $callback,
+        bool $validate = false
+    ) {
         $fieldname = $this->parseFieldSelector($fieldname);
         $this->filters[$fieldname][] = [$callback, $validate];
         return $this;
@@ -663,34 +778,50 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $field The field selector.
      * @return string Returns the field selector in the correct format.
      */
-    private function parseFieldSelector(string $field): string {
+    private function parseFieldSelector(string $field): string
+    {
         if (strlen($field) === 0) {
             return $field;
         }
 
-        if (strpos($field, '.') !== false) {
-            if (strpos($field, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
+        if (strpos($field, ".") !== false) {
+            if (strpos($field, "/") === false) {
+                trigger_error(
+                    'Field selectors must be separated by "/" instead of "."',
+                    E_USER_DEPRECATED
+                );
 
-                $parts = explode('.', $field);
-                $parts = @array_map([$this, 'parseFieldSelector'], $parts); // silence because error triggered already.
+                $parts = explode(".", $field);
+                $parts = @array_map([$this, "parseFieldSelector"], $parts); // silence because error triggered already.
 
-                $field = implode('/', $parts);
+                $field = implode("/", $parts);
             }
-        } elseif ($field === '[]') {
-            trigger_error('Field selectors with item selector "[]" must be converted to "items".', E_USER_DEPRECATED);
-            $field = 'items';
-        } elseif (strpos($field, '/') === false && !in_array($field, ['items', 'additionalProperties'], true)) {
-            trigger_error("Field selectors must specify full schema paths. ($field)", E_USER_DEPRECATED);
+        } elseif ($field === "[]") {
+            trigger_error(
+                'Field selectors with item selector "[]" must be converted to "items".',
+                E_USER_DEPRECATED
+            );
+            $field = "items";
+        } elseif (
+            strpos($field, "/") === false &&
+            !in_array($field, ["items", "additionalProperties"], true)
+        ) {
+            trigger_error(
+                "Field selectors must specify full schema paths. ($field)",
+                E_USER_DEPRECATED
+            );
             $field = "/properties/$field";
         }
 
-        if (strpos($field, '[]') !== false) {
-            trigger_error('Field selectors with item selector "[]" must be converted to "/items".', E_USER_DEPRECATED);
-            $field = str_replace('[]', '/items', $field);
+        if (strpos($field, "[]") !== false) {
+            trigger_error(
+                'Field selectors with item selector "[]" must be converted to "/items".',
+                E_USER_DEPRECATED
+            );
+            $field = str_replace("[]", "/items", $field);
         }
 
-        return ltrim($field, '/');
+        return ltrim($field, "/");
     }
 
     /**
@@ -704,9 +835,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $validate Whether or not the filter should also validate. If true default validation is skipped.
      * @return $this
      */
-    public function addFormatFilter(string $format, callable $callback, bool $validate = false) {
+    public function addFormatFilter(
+        string $format,
+        callable $callback,
+        bool $validate = false
+    ) {
         if (empty($format)) {
-            throw new \InvalidArgumentException('The filter format cannot be empty.', 500);
+            throw new \InvalidArgumentException(
+                "The filter format cannot be empty.",
+                500
+            );
         }
 
         $filter = "/format/$format";
@@ -723,57 +861,61 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param int $count The count of required items.
      * @return Schema Returns `$this` for fluent calls.
      */
-    public function requireOneOf(array $required, string $fieldname = '', int $count = 1) {
-        $result = $this->addValidator(
-            $fieldname,
-            function ($data, ValidationField $field) use ($required, $count) {
-                // This validator does not apply to sparse validation.
-                if ($field->isSparse()) {
-                    return true;
-                }
+    public function requireOneOf(
+        array $required,
+        string $fieldname = "",
+        int $count = 1
+    ) {
+        $result = $this->addValidator($fieldname, function (
+            $data,
+            ValidationField $field
+        ) use ($required, $count) {
+            // This validator does not apply to sparse validation.
+            if ($field->isSparse()) {
+                return true;
+            }
 
-                $hasCount = 0;
-                $flattened = [];
+            $hasCount = 0;
+            $flattened = [];
 
-                foreach ($required as $name) {
-                    $flattened = array_merge($flattened, (array)$name);
+            foreach ($required as $name) {
+                $flattened = array_merge($flattened, (array) $name);
 
-                    if (is_array($name)) {
-                        // This is an array of required names. They all must match.
-                        $hasCountInner = 0;
-                        foreach ($name as $nameInner) {
-                            if (array_key_exists($nameInner, $data)) {
-                                $hasCountInner++;
-                            } else {
-                                break;
-                            }
+                if (is_array($name)) {
+                    // This is an array of required names. They all must match.
+                    $hasCountInner = 0;
+                    foreach ($name as $nameInner) {
+                        if (array_key_exists($nameInner, $data)) {
+                            $hasCountInner++;
+                        } else {
+                            break;
                         }
-                        if ($hasCountInner >= count($name)) {
-                            $hasCount++;
-                        }
-                    } elseif (array_key_exists($name, $data)) {
+                    }
+                    if ($hasCountInner >= count($name)) {
                         $hasCount++;
                     }
-
-                    if ($hasCount >= $count) {
-                        return true;
-                    }
+                } elseif (array_key_exists($name, $data)) {
+                    $hasCount++;
                 }
 
-                if ($count === 1) {
-                    $message = 'One of {properties} are required.';
-                } else {
-                    $message = '{count} of {properties} are required.';
+                if ($hasCount >= $count) {
+                    return true;
                 }
-
-                $field->addError('oneOfRequired', [
-                    'messageCode' => $message,
-                    'properties' => $required,
-                    'count' => $count
-                ]);
-                return false;
             }
-        );
+
+            if ($count === 1) {
+                $message = "One of {properties} are required.";
+            } else {
+                $message = "{count} of {properties} are required.";
+            }
+
+            $field->addError("oneOfRequired", [
+                "messageCode" => $message,
+                "properties" => $required,
+                "count" => $count,
+            ]);
+            return false;
+        });
 
         return $result;
     }
@@ -787,7 +929,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param callable $callback The callback to validate with.
      * @return Schema Returns `$this` for fluent calls.
      */
-    public function addValidator(string $fieldname, callable $callback) {
+    public function addValidator(string $fieldname, callable $callback)
+    {
         $fieldname = $this->parseFieldSelector($fieldname);
         $this->validators[$fieldname][] = $callback;
         return $this;
@@ -801,7 +944,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return bool Returns true if the data is valid. False otherwise.
      * @throws RefNotFoundException Throws an exception when there is an unknown `$ref` in the schema.
      */
-    public function isValid($data, $options = []) {
+    public function isValid($data, $options = [])
+    {
         try {
             $this->validate($data, $options);
             return true;
@@ -821,22 +965,33 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws ValidationException Throws an exception when the data does not validate against the schema.
      * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
-    public function validate($data, $options = []) {
+    public function validate($data, $options = [])
+    {
         if (is_bool($options)) {
-            trigger_error('The $sparse parameter is deprecated. Use [\'sparse\' => true] instead.', E_USER_DEPRECATED);
-            $options = ['sparse' => true];
+            trigger_error(
+                'The $sparse parameter is deprecated. Use [\'sparse\' => true] instead.',
+                E_USER_DEPRECATED
+            );
+            $options = ["sparse" => true];
         }
-        $options += ['sparse' => false];
+        $options += ["sparse" => false];
 
-
-        list($schema, $schemaPath) = $this->lookupSchema($this->schema, '');
-        $field = new ValidationField($this->createValidation(), $schema, '', $schemaPath, $options);
+        list($schema, $schemaPath) = $this->lookupSchema($this->schema, "");
+        $field = new ValidationField(
+            $this->createValidation(),
+            $schema,
+            "",
+            $schemaPath,
+            $options
+        );
 
         $clean = $this->validateField($data, $field);
 
         if (Invalid::isInvalid($clean) && $field->isValid()) {
             // This really shouldn't happen, but we want to protect against seeing the invalid object.
-            $field->addError('invalid', ['messageCode' => 'The value is invalid.']);
+            $field->addError("invalid", [
+                "messageCode" => "The value is invalid.",
+            ]);
         }
 
         if (!$field->getValidation()->isValid()) {
@@ -858,7 +1013,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * - string The path of the schema. This is either the reference or the `$path` parameter for inline schemas.
      * @throws RefNotFoundException Throws an exception when a reference could not be found.
      */
-    private function lookupSchema($schema, string $schemaPath) {
+    private function lookupSchema($schema, string $schemaPath)
+    {
         if ($schema instanceof Schema) {
             return [$schema, $schemaPath];
         } else {
@@ -870,17 +1026,26 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $schemaPath = $schema['$ref'];
 
                 if (isset($visited[$schemaPath])) {
-                    throw new RefNotFoundException("Cyclical reference cannot be resolved. ($schemaPath)", 508);
+                    throw new RefNotFoundException(
+                        "Cyclical reference cannot be resolved. ($schemaPath)",
+                        508
+                    );
                 }
                 $visited[$schemaPath] = true;
 
                 try {
                     $schema = call_user_func($lookup, $schemaPath);
                 } catch (\Exception $ex) {
-                    throw new RefNotFoundException($ex->getMessage(), $ex->getCode(), $ex);
+                    throw new RefNotFoundException(
+                        $ex->getMessage(),
+                        $ex->getCode(),
+                        $ex
+                    );
                 }
                 if ($schema === null) {
-                    throw new RefNotFoundException("Schema reference could not be found. ($schemaPath)");
+                    throw new RefNotFoundException(
+                        "Schema reference could not be found. ($schemaPath)"
+                    );
                 }
             }
 
@@ -893,7 +1058,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return callable Returns the current `$ref` lookup.
      */
-    public function getRefLookup(): callable {
+    public function getRefLookup(): callable
+    {
         return $this->refLookup;
     }
 
@@ -912,7 +1078,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param callable $refLookup The new lookup function.
      * @return $this
      */
-    public function setRefLookup(callable $refLookup) {
+    public function setRefLookup(callable $refLookup)
+    {
         $this->refLookup = $refLookup;
         return $this;
     }
@@ -922,7 +1089,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return Validation Returns a validation object.
      */
-    protected function createValidation(): Validation {
+    protected function createValidation(): Validation
+    {
         return call_user_func($this->getValidationFactory());
     }
 
@@ -931,7 +1099,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return callable Returns the current factory.
      */
-    public function getValidationFactory(): callable {
+    public function getValidationFactory(): callable
+    {
         return $this->validationFactory;
     }
 
@@ -941,7 +1110,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param callable $validationFactory The new factory.
      * @return $this
      */
-    public function setValidationFactory(callable $validationFactory) {
+    public function setValidationFactory(callable $validationFactory)
+    {
         $this->validationFactory = $validationFactory;
         $this->validationClass = null;
         return $this;
@@ -956,7 +1126,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * is completely invalid.
      * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
-    protected function validateField($value, ValidationField $field) {
+    protected function validateField($value, ValidationField $field)
+    {
         $validated = false;
         $result = $value = $this->filterField($value, $field, $validated);
 
@@ -964,29 +1135,45 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return $result;
         } elseif ($field->getField() instanceof Schema) {
             try {
-                $result = $field->getField()->validate($value, $field->getOptions());
+                $result = $field
+                    ->getField()
+                    ->validate($value, $field->getOptions());
             } catch (ValidationException $ex) {
                 // The validation failed, so merge the validations together.
-                $field->getValidation()->merge($ex->getValidation(), $field->getName());
+                $field
+                    ->getValidation()
+                    ->merge($ex->getValidation(), $field->getName());
             }
-        } elseif (($value === null || ($value === '' && !$field->hasType('string'))) && ($field->val('nullable') || $field->hasType('null'))) {
+        } elseif (
+            ($value === null ||
+                ($value === "" && !$field->hasType("string"))) &&
+            ($field->val("nullable") || $field->hasType("null"))
+        ) {
             $result = null;
         } else {
             // Look for a discriminator.
-            if (!empty($field->val('discriminator'))) {
+            if (!empty($field->val("discriminator"))) {
                 $field = $this->resolveDiscriminator($value, $field);
             }
 
             if ($field !== null) {
-                if($field->hasAllOf()) {
+                if ($field->hasAllOf()) {
                     $result = $this->validateAllOf($value, $field);
                 } else {
                     // Validate the field's type.
                     $type = $field->getType();
                     if (is_array($type)) {
-                        $result = $this->validateMultipleTypes($value, $type, $field);
+                        $result = $this->validateMultipleTypes(
+                            $value,
+                            $type,
+                            $field
+                        );
                     } else {
-                        $result = $this->validateSingleType($value, $type, $field);
+                        $result = $this->validateSingleType(
+                            $value,
+                            $type,
+                            $field
+                        );
                     }
 
                     if (Invalid::isValid($result)) {
@@ -1014,26 +1201,36 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $validated Whether or not a filter validated the value.
      * @return mixed Returns the filtered field or the original field value if there are no filters.
      */
-    private function filterField($value, ValidationField $field, bool &$validated = false) {
+    private function filterField(
+        $value,
+        ValidationField $field,
+        bool &$validated = false
+    ) {
         // Check for limited support for Open API style.
-        if (!empty($field->val('style')) && is_string($value)) {
+        if (!empty($field->val("style")) && is_string($value)) {
             $doFilter = true;
-            if ($field->hasType('boolean') && in_array($value, ['true', 'false', '0', '1'], true)) {
+            if (
+                $field->hasType("boolean") &&
+                in_array($value, ["true", "false", "0", "1"], true)
+            ) {
                 $doFilter = false;
-            } elseif (($field->hasType('integer') || $field->hasType('number')) && is_numeric($value)) {
+            } elseif (
+                ($field->hasType("integer") || $field->hasType("number")) &&
+                is_numeric($value)
+            ) {
                 $doFilter = false;
             }
 
             if ($doFilter) {
-                switch ($field->val('style')) {
-                    case 'form':
-                        $value = explode(',', $value);
+                switch ($field->val("style")) {
+                    case "form":
+                        $value = explode(",", $value);
                         break;
-                    case 'spaceDelimited':
-                        $value = explode(' ', $value);
+                    case "spaceDelimited":
+                        $value = explode(" ", $value);
                         break;
-                    case 'pipeDelimited':
-                        $value = explode('|', $value);
+                    case "pipeDelimited":
+                        $value = explode("|", $value);
                         break;
                 }
             }
@@ -1052,7 +1249,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param bool $validated Whether or not a filter validated the field.
      * @return mixed Returns the filtered value. If there are no filters for the field then the original value is returned.
      */
-    private function callFilters($value, ValidationField $field, bool &$validated = false) {
+    private function callFilters(
+        $value,
+        ValidationField $field,
+        bool &$validated = false
+    ) {
         // Strip array references in the name except for the last one.
         $key = $field->getSchemaPath();
         if (!empty($this->filters[$key])) {
@@ -1065,7 +1266,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 }
             }
         }
-        $key = '/format/'.$field->val('format');
+        $key = "/format/" . $field->val("format");
         if (!empty($this->filters[$key])) {
             foreach ($this->filters[$key] as list($filter, $validate)) {
                 $value = call_user_func($filter, $value, $field);
@@ -1092,49 +1293,64 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      * @deprecated Multiple types are being removed next version.
      */
-    private function validateMultipleTypes($value, array $types, ValidationField $field) {
-        trigger_error('Multiple schema types are deprecated.', E_USER_DEPRECATED);
+    private function validateMultipleTypes(
+        $value,
+        array $types,
+        ValidationField $field
+    ) {
+        trigger_error(
+            "Multiple schema types are deprecated.",
+            E_USER_DEPRECATED
+        );
 
         // First check for an exact type match.
         switch (gettype($value)) {
-            case 'boolean':
-                if (in_array('boolean', $types)) {
-                    $singleType = 'boolean';
+            case "boolean":
+                if (in_array("boolean", $types)) {
+                    $singleType = "boolean";
                 }
                 break;
-            case 'integer':
-                if (in_array('integer', $types)) {
-                    $singleType = 'integer';
-                } elseif (in_array('number', $types)) {
-                    $singleType = 'number';
+            case "integer":
+                if (in_array("integer", $types)) {
+                    $singleType = "integer";
+                } elseif (in_array("number", $types)) {
+                    $singleType = "number";
                 }
                 break;
-            case 'double':
-                if (in_array('number', $types)) {
-                    $singleType = 'number';
-                } elseif (in_array('integer', $types)) {
-                    $singleType = 'integer';
+            case "double":
+                if (in_array("number", $types)) {
+                    $singleType = "number";
+                } elseif (in_array("integer", $types)) {
+                    $singleType = "integer";
                 }
                 break;
-            case 'string':
-                if (in_array('datetime', $types) && preg_match(self::$DATE_REGEX, $value)) {
-                    $singleType = 'datetime';
-                } elseif (in_array('string', $types)) {
-                    $singleType = 'string';
+            case "string":
+                if (
+                    in_array("datetime", $types) &&
+                    preg_match(self::$DATE_REGEX, $value)
+                ) {
+                    $singleType = "datetime";
+                } elseif (in_array("string", $types)) {
+                    $singleType = "string";
                 }
                 break;
-            case 'array':
-                if (in_array('array', $types) && in_array('object', $types)) {
-                    $singleType = isset($value[0]) || empty($value) ? 'array' : 'object';
-                } elseif (in_array('object', $types)) {
-                    $singleType = 'object';
-                } elseif (in_array('array', $types)) {
-                    $singleType = 'array';
+            case "array":
+                if (in_array("array", $types) && in_array("object", $types)) {
+                    $singleType =
+                        isset($value[0]) || empty($value) ? "array" : "object";
+                } elseif (in_array("object", $types)) {
+                    $singleType = "object";
+                } elseif (in_array("array", $types)) {
+                    $singleType = "array";
                 }
                 break;
-            case 'NULL':
-                if (in_array('null', $types)) {
-                    $singleType = $this->validateSingleType($value, 'null', $field);
+            case "NULL":
+                if (in_array("null", $types)) {
+                    $singleType = $this->validateSingleType(
+                        $value,
+                        "null",
+                        $field
+                    );
                 }
                 break;
         }
@@ -1143,7 +1359,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         // Clone the validation field to collect errors.
-        $typeValidation = new ValidationField(new Validation(), $field->getField(), '', '', $field->getOptions());
+        $typeValidation = new ValidationField(
+            new Validation(),
+            $field->getField(),
+            "",
+            "",
+            $field->getOptions()
+        );
 
         // Try and validate against each type.
         foreach ($types as $type) {
@@ -1168,43 +1390,56 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws \InvalidArgumentException Throws an exception when `$type` is not recognized.
      * @throws RefNotFoundException Throws an exception when internal validation has a reference that isn't found.
      */
-    protected function validateSingleType($value, string $type, ValidationField $field) {
+    protected function validateSingleType(
+        $value,
+        string $type,
+        ValidationField $field
+    ) {
         switch ($type) {
-            case 'boolean':
+            case "boolean":
                 $result = $this->validateBoolean($value, $field);
                 break;
-            case 'integer':
+            case "integer":
                 $result = $this->validateInteger($value, $field);
                 break;
-            case 'number':
+            case "number":
                 $result = $this->validateNumber($value, $field);
                 break;
-            case 'string':
+            case "string":
                 $result = $this->validateString($value, $field);
                 break;
-            case 'timestamp':
-                trigger_error('The timestamp type is deprecated. Use an integer with a format of timestamp instead.', E_USER_DEPRECATED);
+            case "timestamp":
+                trigger_error(
+                    "The timestamp type is deprecated. Use an integer with a format of timestamp instead.",
+                    E_USER_DEPRECATED
+                );
                 $result = $this->validateTimestamp($value, $field);
                 break;
-            case 'datetime':
-                trigger_error('The datetime type is deprecated. Use a string with a format of date-time instead.', E_USER_DEPRECATED);
+            case "datetime":
+                trigger_error(
+                    "The datetime type is deprecated. Use a string with a format of date-time instead.",
+                    E_USER_DEPRECATED
+                );
                 $result = $this->validateDatetime($value, $field);
                 break;
-            case 'array':
+            case "array":
                 $result = $this->validateArray($value, $field);
                 break;
-            case 'object':
+            case "object":
                 $result = $this->validateObject($value, $field);
                 break;
-            case 'null':
+            case "null":
                 $result = $this->validateNull($value, $field);
                 break;
-            case '':
+            case "":
                 // No type was specified so we are valid.
                 $result = $value;
                 break;
             default:
-                throw new \InvalidArgumentException("Unrecognized type $type.", 500);
+                throw new \InvalidArgumentException(
+                    "Unrecognized type $type.",
+                    500
+                );
         }
         return $result;
     }
@@ -1216,10 +1451,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The validation results to add.
      * @return bool|Invalid Returns the cleaned value or invalid if validation fails.
      */
-    protected function validateBoolean($value, ValidationField $field) {
-        $value = $value === null ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    protected function validateBoolean($value, ValidationField $field)
+    {
+        $value =
+            $value === null
+                ? $value
+                : filter_var(
+                    $value,
+                    FILTER_VALIDATE_BOOLEAN,
+                    FILTER_NULL_ON_FAILURE
+                );
         if ($value === null) {
-            $field->addTypeError($value, 'boolean');
+            $field->addTypeError($value, "boolean");
             return Invalid::value();
         }
 
@@ -1233,15 +1476,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The validation results to add.
      * @return int|Invalid Returns the cleaned value or **null** if validation fails.
      */
-    protected function validateInteger($value, ValidationField $field) {
-        if ($field->val('format') === 'timestamp') {
+    protected function validateInteger($value, ValidationField $field)
+    {
+        if ($field->val("format") === "timestamp") {
             return $this->validateTimestamp($value, $field);
         }
 
         $result = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($result === false) {
-            $field->addTypeError($value, 'integer');
+            $field->addTypeError($value, "integer");
             return Invalid::value();
         }
 
@@ -1257,13 +1501,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The field being validated.
      * @return int|Invalid Returns a valid timestamp or invalid if the value doesn't validate.
      */
-    protected function validateTimestamp($value, ValidationField $field) {
+    protected function validateTimestamp($value, ValidationField $field)
+    {
         if (is_numeric($value) && $value > 0) {
-            $result = (int)$value;
-        } elseif (is_string($value) && $ts = strtotime($value)) {
+            $result = (int) $value;
+        } elseif (is_string($value) && ($ts = strtotime($value))) {
             $result = $ts;
         } else {
-            $field->addTypeError($value, 'timestamp');
+            $field->addTypeError($value, "timestamp");
             $result = Invalid::value();
         }
         return $result;
@@ -1276,37 +1521,58 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field Field information.
      * @return int|float|Invalid Returns the number of invalid.
      */
-    private function validateNumberProperties($value, ValidationField $field) {
+    private function validateNumberProperties($value, ValidationField $field)
+    {
         $count = $field->getErrorCount();
 
-        if ($multipleOf = $field->val('multipleOf')) {
+        if ($multipleOf = $field->val("multipleOf")) {
             $divided = $value / $multipleOf;
 
             if ($divided != round($divided)) {
-                $field->addError('multipleOf', ['messageCode' => 'The value must be a multiple of {multipleOf}.', 'multipleOf' => $multipleOf]);
+                $field->addError("multipleOf", [
+                    "messageCode" =>
+                        "The value must be a multiple of {multipleOf}.",
+                    "multipleOf" => $multipleOf,
+                ]);
             }
         }
 
-        if ($maximum = $field->val('maximum')) {
-            $exclusive = $field->val('exclusiveMaximum');
+        if ($maximum = $field->val("maximum")) {
+            $exclusive = $field->val("exclusiveMaximum");
 
             if ($value > $maximum || ($exclusive && $value == $maximum)) {
                 if ($exclusive) {
-                    $field->addError('maximum', ['messageCode' => 'The value must be less than {maximum}.', 'maximum' => $maximum]);
+                    $field->addError("maximum", [
+                        "messageCode" =>
+                            "The value must be less than {maximum}.",
+                        "maximum" => $maximum,
+                    ]);
                 } else {
-                    $field->addError('maximum', ['messageCode' => 'The value must be less than or equal to {maximum}.', 'maximum' => $maximum]);
+                    $field->addError("maximum", [
+                        "messageCode" =>
+                            "The value must be less than or equal to {maximum}.",
+                        "maximum" => $maximum,
+                    ]);
                 }
             }
         }
 
-        if ($minimum = $field->val('minimum')) {
-            $exclusive = $field->val('exclusiveMinimum');
+        if ($minimum = $field->val("minimum")) {
+            $exclusive = $field->val("exclusiveMinimum");
 
             if ($value < $minimum || ($exclusive && $value == $minimum)) {
                 if ($exclusive) {
-                    $field->addError('minimum', ['messageCode' => 'The value must be greater than {minimum}.', 'minimum' => $minimum]);
+                    $field->addError("minimum", [
+                        "messageCode" =>
+                            "The value must be greater than {minimum}.",
+                        "minimum" => $minimum,
+                    ]);
                 } else {
-                    $field->addError('minimum', ['messageCode' => 'The value must be greater than or equal to {minimum}.', 'minimum' => $minimum]);
+                    $field->addError("minimum", [
+                        "messageCode" =>
+                            "The value must be greater than or equal to {minimum}.",
+                        "minimum" => $minimum,
+                    ]);
                 }
             }
         }
@@ -1321,10 +1587,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The validation results to add.
      * @return float|Invalid Returns a number or **null** if validation fails.
      */
-    protected function validateNumber($value, ValidationField $field) {
+    protected function validateNumber($value, ValidationField $field)
+    {
         $result = filter_var($value, FILTER_VALIDATE_FLOAT);
         if ($result === false) {
-            $field->addTypeError($value, 'number');
+            $field->addTypeError($value, "number");
             return Invalid::value();
         }
 
@@ -1340,109 +1607,126 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The validation results to add.
      * @return string|Invalid Returns the valid string or **null** if validation fails.
      */
-    protected function validateString($value, ValidationField $field) {
-        if ($field->val('format') === 'date-time') {
+    protected function validateString($value, ValidationField $field)
+    {
+        if ($field->val("format") === "date-time") {
             $result = $this->validateDatetime($value, $field);
 
             return $result;
         }
 
         if (is_string($value) || is_numeric($value)) {
-            $value = $result = (string)$value;
+            $value = $result = (string) $value;
         } else {
-            $field->addTypeError($value, 'string');
+            $field->addTypeError($value, "string");
 
             return Invalid::value();
         }
 
         $mbStrLen = mb_strlen($value);
-        if (($minLength = $field->val('minLength', 0)) > 0 && $mbStrLen < $minLength) {
-            $field->addError(
-                'minLength',
-                [
-                    'messageCode' => 'The value should be at least {minLength} {minLength,plural,character,characters} long.',
-                    'minLength' => $minLength,
-                ]
-            );
+        if (
+            ($minLength = $field->val("minLength", 0)) > 0 &&
+            $mbStrLen < $minLength
+        ) {
+            $field->addError("minLength", [
+                "messageCode" =>
+                    "The value should be at least {minLength} {minLength,plural,character,characters} long.",
+                "minLength" => $minLength,
+            ]);
         }
 
-        if (($maxLength = $field->val('maxLength', 0)) > 0 && $mbStrLen > $maxLength) {
-            $field->addError(
-                'maxLength',
-                [
-                    'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
-                    'maxLength' => $maxLength,
-                    'overflow' => $mbStrLen - $maxLength,
-                ]
-            );
+        if (
+            ($maxLength = $field->val("maxLength", 0)) > 0 &&
+            $mbStrLen > $maxLength
+        ) {
+            $field->addError("maxLength", [
+                "messageCode" =>
+                    "The value is {overflow} {overflow,plural,character,characters} too long.",
+                "maxLength" => $maxLength,
+                "overflow" => $mbStrLen - $maxLength,
+            ]);
         }
 
-        $useLengthAsByteLength = !$this->hasFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE);
-        $maxByteLength = $field->val('maxByteLength') ?? ($useLengthAsByteLength ? $maxLength : null);
+        $useLengthAsByteLength = !$this->hasFlag(
+            self::VALIDATE_STRING_LENGTH_AS_UNICODE
+        );
+        $maxByteLength =
+            $field->val("maxByteLength") ??
+            ($useLengthAsByteLength ? $maxLength : null);
         if ($maxByteLength !== null && $maxByteLength > 0) {
             $byteStrLen = strlen($value);
             if ($byteStrLen > $maxByteLength) {
-                $field->addError(
-                    'maxByteLength',
-                    [
-                        'messageCode' => 'The value is {overflow} {overflow,plural,byte,bytes} too long.',
-                        'maxLength' => $maxLength,
-                        'overflow' => $byteStrLen - $maxByteLength,
-                    ]
-                );
+                $field->addError("maxByteLength", [
+                    "messageCode" =>
+                        "The value is {overflow} {overflow,plural,byte,bytes} too long.",
+                    "maxLength" => $maxLength,
+                    "overflow" => $byteStrLen - $maxByteLength,
+                ]);
             }
         }
 
-        if ($pattern = $field->val('pattern')) {
-            $regex = '`'.str_replace('`', preg_quote('`', '`'), $pattern).'`';
+        if ($pattern = $field->val("pattern")) {
+            $regex =
+                "`" . str_replace("`", preg_quote("`", "`"), $pattern) . "`";
 
             if (!preg_match($regex, $value)) {
-                $field->addError(
-                    'pattern',
-                    [
-                        'messageCode' => $field->val('x-patternMessageCode', 'The value doesn\'t match the required pattern {pattern}.'),
-                        'pattern' => $regex,
-                    ]
-                );
+                $field->addError("pattern", [
+                    "messageCode" => $field->val(
+                        "x-patternMessageCode",
+                        'The value doesn\'t match the required pattern {pattern}.'
+                    ),
+                    "pattern" => $regex,
+                ]);
             }
         }
-        if ($format = $field->val('format')) {
+        if ($format = $field->val("format")) {
             $type = $format;
             switch ($format) {
-                case 'date':
+                case "date":
                     $result = $this->validateDatetime($result, $field);
                     if ($result instanceof \DateTimeInterface) {
                         $result = $result->format("Y-m-d\T00:00:00P");
                     }
                     break;
-                case 'email':
+                case "email":
                     $result = filter_var($result, FILTER_VALIDATE_EMAIL);
                     break;
-                case 'ipv4':
-                    $type = 'IPv4 address';
-                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
+                case "ipv4":
+                    $type = "IPv4 address";
+                    $result = filter_var(
+                        $result,
+                        FILTER_VALIDATE_IP,
+                        FILTER_FLAG_IPV4
+                    );
                     break;
-                case 'ipv6':
-                    $type = 'IPv6 address';
-                    $result = filter_var($result, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
+                case "ipv6":
+                    $type = "IPv6 address";
+                    $result = filter_var(
+                        $result,
+                        FILTER_VALIDATE_IP,
+                        FILTER_FLAG_IPV6
+                    );
                     break;
-                case 'ip':
-                    $type = 'IP address';
+                case "ip":
+                    $type = "IP address";
                     $result = filter_var($result, FILTER_VALIDATE_IP);
                     break;
-                case 'uri':
-                    $type = 'URL';
+                case "uri":
+                    $type = "URL";
                     $result = filter_var($result, FILTER_VALIDATE_URL);
                     break;
                 default:
-                    trigger_error("Unrecognized format '$format'.", E_USER_NOTICE);
+                    trigger_error(
+                        "Unrecognized format '$format'.",
+                        E_USER_NOTICE
+                    );
             }
             if ($result === false) {
-                $field->addError('format', [
-                    'format' => $format,
-                    'formatCode' => $type,
-                    'value' => $value,
-                    'messageCode' => '{value} is not a valid {formatCode}.'
+                $field->addError("format", [
+                    "format" => $format,
+                    "formatCode" => $type,
+                    "value" => $value,
+                    "messageCode" => "{value} is not a valid {formatCode}.",
                 ]);
             }
         }
@@ -1461,10 +1745,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The validation results to add.
      * @return \DateTimeInterface|Invalid Returns the cleaned value or **null** if it isn't valid.
      */
-    protected function validateDatetime($value, ValidationField $field) {
+    protected function validateDatetime($value, ValidationField $field)
+    {
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
-        } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
+        } elseif (is_string($value) && $value !== "" && !is_numeric($value)) {
             try {
                 $dt = new \DateTimeImmutable($value);
                 if ($dt) {
@@ -1477,7 +1762,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
         } elseif (is_int($value) && $value > 0) {
             try {
-                $value = new \DateTimeImmutable('@'.(string)round($value));
+                $value = new \DateTimeImmutable("@" . (string) round($value));
             } catch (\Throwable $ex) {
                 $value = Invalid::value();
             }
@@ -1486,7 +1771,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         if (Invalid::isInvalid($value)) {
-            $field->addTypeError($value, 'date/time');
+            $field->addTypeError($value, "date/time");
         }
         return $value;
     }
@@ -1499,26 +1784,36 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws ParseException Throws an exception if an invalid allof member is provided
      * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
      */
-    private function resolveAllOfTree(ValidationField $field) {
+    private function resolveAllOfTree(ValidationField $field)
+    {
         $result = [];
 
-        foreach($field->getAllOf() as $allof) {
+        foreach ($field->getAllOf() as $allof) {
             if (!is_array($allof) || empty($allof)) {
-                throw new ParseException("Invalid allof member in {$field->getSchemaPath()}, array expected", 500);
+                throw new ParseException(
+                    "Invalid allof member in {$field->getSchemaPath()}, array expected",
+                    500
+                );
             }
 
-            list ($items, $schemaPath) = $this->lookupSchema($allof, $field->getSchemaPath());
+            list($items, $schemaPath) = $this->lookupSchema(
+                $allof,
+                $field->getSchemaPath()
+            );
 
             $allOfValidation = new ValidationField(
                 $field->getValidation(),
                 $items,
-                '',
+                "",
                 $schemaPath,
                 $field->getOptions()
             );
 
-            if($allOfValidation->hasAllOf()) {
-                $result = array_replace_recursive($result, $this->resolveAllOfTree($allOfValidation));
+            if ($allOfValidation->hasAllOf()) {
+                $result = array_replace_recursive(
+                    $result,
+                    $this->resolveAllOfTree($allOfValidation)
+                );
             } else {
                 $result = array_replace_recursive($result, $items);
             }
@@ -1535,11 +1830,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array|Invalid Returns an array or invalid if validation fails.
      * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
      */
-    private function validateAllOf($value, ValidationField $field) {
+    private function validateAllOf($value, ValidationField $field)
+    {
         $allOfValidation = new ValidationField(
             $field->getValidation(),
             $this->resolveAllOfTree($field),
-            '',
+            "",
             $field->getSchemaPath(),
             $field->getOptions()
         );
@@ -1555,47 +1851,57 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array|Invalid Returns an array or invalid if validation fails.
      * @throws RefNotFoundException Throws an exception if the array has an items `$ref` that cannot be found.
      */
-    protected function validateArray($value, ValidationField $field) {
-        if ((!is_array($value) || (count($value) > 0 && !array_key_exists(0, $value))) && !$value instanceof \Traversable) {
-            $field->addTypeError($value, 'array');
+    protected function validateArray($value, ValidationField $field)
+    {
+        if (
+            (!is_array($value) ||
+                (count($value) > 0 && !array_key_exists(0, $value))) &&
+            !$value instanceof \Traversable
+        ) {
+            $field->addTypeError($value, "array");
             return Invalid::value();
         } else {
-            if ((null !== $minItems = $field->val('minItems')) && count($value) < $minItems) {
-                $field->addError(
-                    'minItems',
-                    [
-                        'messageCode' => 'This must contain at least {minItems} {minItems,plural,item,items}.',
-                        'minItems' => $minItems,
-                    ]
-                );
+            if (
+                null !== ($minItems = $field->val("minItems")) &&
+                count($value) < $minItems
+            ) {
+                $field->addError("minItems", [
+                    "messageCode" =>
+                        "This must contain at least {minItems} {minItems,plural,item,items}.",
+                    "minItems" => $minItems,
+                ]);
             }
-            if ((null !== $maxItems = $field->val('maxItems')) && count($value) > $maxItems) {
-                $field->addError(
-                    'maxItems',
-                    [
-                        'messageCode' => 'This must contain no more than {maxItems} {maxItems,plural,item,items}.',
-                        'maxItems' => $maxItems,
-                    ]
-                );
-            }
-
-            if ($field->val('uniqueItems') && count($value) > count(array_unique($value))) {
-                $field->addError(
-                    'uniqueItems',
-                    [
-                        'messageCode' => 'The array must contain unique items.',
-                    ]
-                );
+            if (
+                null !== ($maxItems = $field->val("maxItems")) &&
+                count($value) > $maxItems
+            ) {
+                $field->addError("maxItems", [
+                    "messageCode" =>
+                        "This must contain no more than {maxItems} {maxItems,plural,item,items}.",
+                    "maxItems" => $maxItems,
+                ]);
             }
 
-            if ($field->val('items') !== null) {
-                list ($items, $schemaPath) = $this->lookupSchema($field->val('items'), $field->getSchemaPath().'/items');
+            if (
+                $field->val("uniqueItems") &&
+                count($value) > count(array_unique($value))
+            ) {
+                $field->addError("uniqueItems", [
+                    "messageCode" => "The array must contain unique items.",
+                ]);
+            }
+
+            if ($field->val("items") !== null) {
+                list($items, $schemaPath) = $this->lookupSchema(
+                    $field->val("items"),
+                    $field->getSchemaPath() . "/items"
+                );
 
                 // Validate each of the types.
                 $itemValidation = new ValidationField(
                     $field->getValidation(),
                     $items,
-                    '',
+                    "",
                     $schemaPath,
                     $field->getOptions()
                 );
@@ -1603,7 +1909,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $result = [];
                 $count = 0;
                 foreach ($value as $i => $item) {
-                    $itemValidation->setName($field->getName()."/$i");
+                    $itemValidation->setName($field->getName() . "/$i");
                     $validItem = $this->validateField($item, $itemValidation);
                     if (Invalid::isValid($validItem)) {
                         $result[] = $validItem;
@@ -1611,10 +1917,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     $count++;
                 }
 
-                return empty($result) && $count > 0 ? Invalid::value() : $result;
+                return empty($result) && $count > 0
+                    ? Invalid::value()
+                    : $result;
             } else {
                 // Cast the items into a proper numeric array.
-                $result = is_array($value) ? array_values($value) : iterator_to_array($value);
+                $result = is_array($value)
+                    ? array_values($value)
+                    : iterator_to_array($value);
                 return $result;
             }
         }
@@ -1628,35 +1938,41 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return object|Invalid Returns a clean object or **null** if validation fails.
      * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
-    protected function validateObject($value, ValidationField $field) {
+    protected function validateObject($value, ValidationField $field)
+    {
         if (!$this->isArray($value) || isset($value[0])) {
-            $field->addTypeError($value, 'object');
+            $field->addTypeError($value, "object");
             return Invalid::value();
-        } elseif (is_array($field->val('properties')) || null !== $field->val('additionalProperties')) {
+        } elseif (
+            is_array($field->val("properties")) ||
+            null !== $field->val("additionalProperties")
+        ) {
             // Validate the data against the internal schema.
             $value = $this->validateProperties($value, $field);
         } elseif (!is_array($value)) {
             $value = $this->toObjectArray($value);
         }
 
-        if (($maxProperties = $field->val('maxProperties')) && count($value) > $maxProperties) {
-            $field->addError(
-                'maxProperties',
-                [
-                    'messageCode' => 'This must contain no more than {maxProperties} {maxProperties,plural,item,items}.',
-                    'maxItems' => $maxProperties,
-                ]
-            );
+        if (
+            ($maxProperties = $field->val("maxProperties")) &&
+            count($value) > $maxProperties
+        ) {
+            $field->addError("maxProperties", [
+                "messageCode" =>
+                    "This must contain no more than {maxProperties} {maxProperties,plural,item,items}.",
+                "maxItems" => $maxProperties,
+            ]);
         }
 
-        if (($minProperties = $field->val('minProperties')) && count($value) < $minProperties) {
-            $field->addError(
-                'minProperties',
-                [
-                    'messageCode' => 'This must contain at least {minProperties} {minProperties,plural,item,items}.',
-                    'minItems' => $minProperties,
-                ]
-            );
+        if (
+            ($minProperties = $field->val("minProperties")) &&
+            count($value) < $minProperties
+        ) {
+            $field->addError("minProperties", [
+                "messageCode" =>
+                    "This must contain at least {minProperties} {minProperties,plural,item,items}.",
+                "minItems" => $minProperties,
+            ]);
         }
 
         return $value;
@@ -1668,8 +1984,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to check.
      * @return bool Returns **true** if the value can be used like an array or **false** otherwise.
      */
-    private function isArray($value) {
-        return is_array($value) || ($value instanceof \ArrayAccess && $value instanceof \Traversable);
+    private function isArray($value)
+    {
+        return is_array($value) ||
+            ($value instanceof \ArrayAccess && $value instanceof \Traversable);
     }
 
     /**
@@ -1681,10 +1999,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * or invalid if there are no valid properties.
      * @throws RefNotFoundException Throws an exception of a property or additional property has a `$ref` that cannot be found.
      */
-    protected function validateProperties($data, ValidationField $field) {
-        $properties = $field->val('properties', []);
-        $additionalProperties = $field->val('additionalProperties');
-        $required = array_flip($field->val('required', []));
+    protected function validateProperties($data, ValidationField $field)
+    {
+        $properties = $field->val("properties", []);
+        $additionalProperties = $field->val("additionalProperties");
+        $required = array_flip($field->val("required", []));
         $isRequest = $field->isRequest();
         $isResponse = $field->isResponse();
 
@@ -1694,31 +2013,55 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } else {
             $keys = array_keys(iterator_to_array($data));
             $class = get_class($data);
-            $clean = new $class;
+            $clean = new $class();
 
-            if ($clean instanceof \ArrayObject && $data instanceof \ArrayObject) {
+            if (
+                $clean instanceof \ArrayObject &&
+                $data instanceof \ArrayObject
+            ) {
                 $clean->setFlags($data->getFlags());
                 $clean->setIteratorClass($data->getIteratorClass());
             }
         }
-        $keys = array_combine(array_map('strtolower', $keys), $keys);
+        $keys = array_combine(array_map("strtolower", $keys), $keys);
 
-        $propertyField = new ValidationField($field->getValidation(), [], '', '', $field->getOptions());
+        $propertyField = new ValidationField(
+            $field->getValidation(),
+            [],
+            "",
+            "",
+            $field->getOptions()
+        );
 
         // Loop through the schema fields and validate each one.
         foreach ($properties as $propertyName => $property) {
-            list($property, $schemaPath) = $this->lookupSchema($property, $field->getSchemaPath().'/properties/'.self::escapeRef($propertyName));
+            list($property, $schemaPath) = $this->lookupSchema(
+                $property,
+                $field->getSchemaPath() .
+                    "/properties/" .
+                    self::escapeRef($propertyName)
+            );
 
             $propertyField
                 ->setField($property)
-                ->setName(ltrim($field->getName().'/'.self::escapeRef($propertyName), '/'))
+                ->setName(
+                    ltrim(
+                        $field->getName() .
+                            "/" .
+                            self::escapeRef($propertyName),
+                        "/"
+                    )
+                )
                 ->setSchemaPath($schemaPath);
 
             $lName = strtolower($propertyName);
             $isRequired = isset($required[$propertyName]);
 
             // Check to strip this field if it is readOnly or writeOnly.
-            if (($isRequest && $propertyField->val('readOnly')) || ($isResponse && $propertyField->val('writeOnly'))) {
+            if (
+                ($isRequest && $propertyField->val("readOnly")) ||
+                ($isResponse && $propertyField->val("writeOnly"))
+            ) {
                 unset($keys[$lName]);
                 continue;
             }
@@ -1727,24 +2070,37 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             if (!array_key_exists($lName, $keys)) {
                 if ($field->isSparse()) {
                     // Sparse validation can leave required fields out.
-                } elseif ($propertyField->hasVal('default')) {
-                    $clean[$propertyName] = $propertyField->val('default');
+                } elseif ($propertyField->hasVal("default")) {
+                    $clean[$propertyName] = $propertyField->val("default");
                 } elseif ($isRequired) {
-                    $propertyField->addError(
-                        'required',
-                        ['messageCode' => '{property} is required.', 'property' => $propertyName]
-                    );
+                    $propertyField->addError("required", [
+                        "messageCode" => "{property} is required.",
+                        "property" => $propertyName,
+                    ]);
                 }
             } else {
                 $value = $data[$keys[$lName]];
 
-                if (in_array($value, [null, ''], true) && !$isRequired && !($propertyField->val('nullable') || $propertyField->hasType('null'))) {
-                    if ($propertyField->getType() !== 'string' || $value === null) {
+                if (
+                    in_array($value, [null, ""], true) &&
+                    !$isRequired &&
+                    !(
+                        $propertyField->val("nullable") ||
+                        $propertyField->hasType("null")
+                    )
+                ) {
+                    if (
+                        $propertyField->getType() !== "string" ||
+                        $value === null
+                    ) {
                         continue;
                     }
                 }
 
-                $clean[$propertyName] = $this->validateField($value, $propertyField);
+                $clean[$propertyName] = $this->validateField(
+                    $value,
+                    $propertyField
+                );
             }
 
             unset($keys[$lName]);
@@ -1755,20 +2111,21 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             if ($additionalProperties) {
                 list($additionalProperties, $schemaPath) = $this->lookupSchema(
                     $additionalProperties,
-                    $field->getSchemaPath().'/additionalProperties'
+                    $field->getSchemaPath() . "/additionalProperties"
                 );
 
                 $propertyField = new ValidationField(
                     $field->getValidation(),
                     $additionalProperties,
-                    '',
+                    "",
                     $schemaPath,
                     $field->getOptions()
                 );
 
                 foreach ($keys as $key) {
-                    $propertyField
-                        ->setName(ltrim($field->getName()."/$key", '/'));
+                    $propertyField->setName(
+                        ltrim($field->getName() . "/$key", "/")
+                    );
 
                     $valid = $this->validateField($data[$key], $propertyField);
                     if (Invalid::isValid($valid)) {
@@ -1776,12 +2133,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     }
                 }
             } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_NOTICE)) {
-                $msg = sprintf("Unexpected properties: %s.", implode(', ', $keys));
+                $msg = sprintf(
+                    "Unexpected properties: %s.",
+                    implode(", ", $keys)
+                );
                 trigger_error($msg, E_USER_NOTICE);
-            } elseif ($this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)) {
-                $field->addError('unexpectedProperties', [
-                    'messageCode' => 'Unexpected {extra,plural,property,properties}: {extra}.',
-                    'extra' => array_values($keys),
+            } elseif (
+                $this->hasFlag(Schema::VALIDATE_EXTRA_PROPERTY_EXCEPTION)
+            ) {
+                $field->addError("unexpectedProperties", [
+                    "messageCode" =>
+                        "Unexpected {extra,plural,property,properties}: {extra}.",
+                    "extra" => array_values($keys),
                 ]);
             }
         }
@@ -1795,8 +2158,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $field The reference field to escape.
      * @return string Returns an escaped reference.
      */
-    public static function escapeRef(string $field): string {
-        return str_replace(['~', '/'], ['~0', '~1'], $field);
+    public static function escapeRef(string $field): string
+    {
+        return str_replace(["~", "/"], ["~0", "~1"], $field);
     }
 
     /**
@@ -1805,7 +2169,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param int $flag One or more of the **Schema::VALIDATE_*** constants.
      * @return bool Returns **true** if all of the flags are set or **false** otherwise.
      */
-    public function hasFlag(int $flag): bool {
+    public function hasFlag(int $flag): bool
+    {
         return ($this->flags & $flag) === $flag;
     }
 
@@ -1815,12 +2180,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param \Traversable $value The value to convert.
      * @return array Returns an array.
      */
-    private function toObjectArray(\Traversable $value) {
+    private function toObjectArray(\Traversable $value)
+    {
         $class = get_class($value);
         if ($value instanceof \ArrayObject) {
-            return new $class($value->getArrayCopy(), $value->getFlags(), $value->getIteratorClass());
+            return new $class(
+                $value->getArrayCopy(),
+                $value->getFlags(),
+                $value->getIteratorClass()
+            );
         } elseif ($value instanceof \ArrayAccess) {
-            $r = new $class;
+            $r = new $class();
             foreach ($value as $k => $v) {
                 $r[$k] = $v;
             }
@@ -1836,11 +2206,15 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The error collector for the field.
      * @return null|Invalid Returns **null** or invalid.
      */
-    protected function validateNull($value, ValidationField $field) {
+    protected function validateNull($value, ValidationField $field)
+    {
         if ($value === null) {
             return null;
         }
-        $field->addError('type', ['messageCode' => 'The value should be null.', 'type' => 'null']);
+        $field->addError("type", [
+            "messageCode" => "The value should be null.",
+            "type" => "null",
+        ]);
         return Invalid::value();
     }
 
@@ -1851,20 +2225,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The validation object for adding errors.
      * @return mixed|Invalid Returns the value if it is one of the enumerated values or invalid otherwise.
      */
-    protected function validateEnum($value, ValidationField $field) {
-        $enum = $field->val('enum');
+    protected function validateEnum($value, ValidationField $field)
+    {
+        $enum = $field->val("enum");
         if (empty($enum)) {
             return $value;
         }
 
         if (!in_array($value, $enum, true)) {
-            $field->addError(
-                'enum',
-                [
-                    'messageCode' => 'The value must be one of: {enum}.',
-                    'enum' => $enum,
-                ]
-            );
+            $field->addError("enum", [
+                "messageCode" => "The value must be one of: {enum}.",
+                "enum" => $enum,
+            ]);
             return Invalid::value();
         }
         return $value;
@@ -1876,7 +2248,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The field value being validated.
      * @param ValidationField $field The validation object to add errors.
      */
-    private function callValidators($value, ValidationField $field) {
+    private function callValidators($value, ValidationField $field)
+    {
         $valid = true;
 
         // Strip array references in the name except for the last one.
@@ -1893,7 +2266,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Add an error on the field if the validator hasn't done so.
         if (!$valid && $field->isValid()) {
-            $field->addError('invalid', ['messageCode' => 'The value is invalid.']);
+            $field->addError("invalid", [
+                "messageCode" => "The value is invalid.",
+            ]);
         }
     }
 
@@ -1906,7 +2281,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
      * @link http://json-schema.org/
      */
-    public function jsonSerialize() {
+    public function jsonSerialize(): mixed
+    {
         $seen = [$this];
         return $this->jsonSerializeInternal($seen);
     }
@@ -1920,43 +2296,48 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param Schema[] $seen Schemas that have been seen during traversal.
      * @return array Returns an array of data that `json_encode()` will recognize.
      */
-    private function jsonSerializeInternal(array $seen): array {
+    private function jsonSerializeInternal(array $seen): array
+    {
         $fix = function ($schema) use (&$fix, $seen) {
             if ($schema instanceof Schema) {
                 if (in_array($schema, $seen, true)) {
-                    return ['$ref' => '#/components/schemas/'.($schema->getID() ?: '$no-id')];
+                    return [
+                        '$ref' =>
+                            "#/components/schemas/" .
+                            ($schema->getID() ?: '$no-id'),
+                    ];
                 } else {
                     $seen[] = $schema;
                     return $schema->jsonSerializeInternal($seen);
                 }
             }
 
-            if (!empty($schema['type'])) {
-                $types = (array)$schema['type'];
+            if (!empty($schema["type"])) {
+                $types = (array) $schema["type"];
 
                 foreach ($types as $i => &$type) {
                     // Swap datetime and timestamp to other types with formats.
-                    if ($type === 'datetime') {
-                        $type = 'string';
-                        $schema['format'] = 'date-time';
-                    } elseif ($schema['type'] === 'timestamp') {
-                        $type = 'integer';
-                        $schema['format'] = 'timestamp';
+                    if ($type === "datetime") {
+                        $type = "string";
+                        $schema["format"] = "date-time";
+                    } elseif ($schema["type"] === "timestamp") {
+                        $type = "integer";
+                        $schema["format"] = "timestamp";
                     }
                 }
                 $types = array_unique($types);
-                $schema['type'] = count($types) === 1 ? reset($types) : $types;
+                $schema["type"] = count($types) === 1 ? reset($types) : $types;
             }
 
-            if (!empty($schema['items'])) {
-                $schema['items'] = $fix($schema['items']);
+            if (!empty($schema["items"])) {
+                $schema["items"] = $fix($schema["items"]);
             }
-            if (!empty($schema['properties'])) {
+            if (!empty($schema["properties"])) {
                 $properties = [];
-                foreach ($schema['properties'] as $key => $property) {
+                foreach ($schema["properties"] as $key => $property) {
                     $properties[$key] = $fix($property);
                 }
-                $schema['properties'] = $properties;
+                $schema["properties"] = $properties;
             }
 
             return $schema;
@@ -1973,8 +2354,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return Validation|string Returns the validation class.
      * @deprecated
      */
-    public function getValidationClass() {
-        trigger_error('Schema::getValidationClass() is deprecated. Use Schema::getValidationFactory() instead.', E_USER_DEPRECATED);
+    public function getValidationClass()
+    {
+        trigger_error(
+            "Schema::getValidationClass() is deprecated. Use Schema::getValidationFactory() instead.",
+            E_USER_DEPRECATED
+        );
         return $this->validationClass;
     }
 
@@ -1985,18 +2370,25 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return $this
      * @deprecated
      */
-    public function setValidationClass($class) {
-        trigger_error('Schema::setValidationClass() is deprecated. Use Schema::setValidationFactory() instead.', E_USER_DEPRECATED);
+    public function setValidationClass($class)
+    {
+        trigger_error(
+            "Schema::setValidationClass() is deprecated. Use Schema::setValidationFactory() instead.",
+            E_USER_DEPRECATED
+        );
 
         if (!is_a($class, Validation::class, true)) {
-            throw new \InvalidArgumentException("$class must be a subclass of ".Validation::class, 500);
+            throw new \InvalidArgumentException(
+                "$class must be a subclass of " . Validation::class,
+                500
+            );
         }
 
         $this->setValidationFactory(function () use ($class) {
             if ($class instanceof Validation) {
                 $result = clone $class;
             } else {
-                $result = new $class;
+                $result = new $class();
             }
             return $result;
         });
@@ -2011,8 +2403,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return Schema Returns a new sparse schema.
      */
-    public function withSparse() {
-        $sparseSchema = $this->withSparseInternal($this, new \SplObjectStorage());
+    public function withSparse()
+    {
+        $sparseSchema = $this->withSparseInternal(
+            $this,
+            new \SplObjectStorage()
+        );
         return $sparseSchema;
     }
 
@@ -2023,28 +2419,35 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param \SplObjectStorage $schemas Collected sparse schemas that have already been made.
      * @return mixed
      */
-    private function withSparseInternal($schema, \SplObjectStorage $schemas) {
+    private function withSparseInternal($schema, \SplObjectStorage $schemas)
+    {
         if ($schema instanceof Schema) {
             if ($schemas->contains($schema)) {
                 return $schemas[$schema];
             } else {
                 $schemas[$schema] = $sparseSchema = new Schema();
-                $sparseSchema->schema = $schema->withSparseInternal($schema->schema, $schemas);
+                $sparseSchema->schema = $schema->withSparseInternal(
+                    $schema->schema,
+                    $schemas
+                );
                 if ($id = $sparseSchema->getID()) {
-                    $sparseSchema->setID($id.'Sparse');
+                    $sparseSchema->setID($id . "Sparse");
                 }
 
                 return $sparseSchema;
             }
         }
 
-        unset($schema['required']);
+        unset($schema["required"]);
 
-        if (isset($schema['items'])) {
-            $schema['items'] = $this->withSparseInternal($schema['items'], $schemas);
+        if (isset($schema["items"])) {
+            $schema["items"] = $this->withSparseInternal(
+                $schema["items"],
+                $schemas
+            );
         }
-        if (isset($schema['properties'])) {
-            foreach ($schema['properties'] as $name => &$property) {
+        if (isset($schema["properties"])) {
+            foreach ($schema["properties"] as $name => &$property) {
                 $property = $this->withSparseInternal($property, $schemas);
             }
         }
@@ -2057,8 +2460,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      *
      * @return string
      */
-    public function getID(): string {
-        return $this->schema['id'] ?? '';
+    public function getID(): string
+    {
+        return $this->schema["id"] ?? "";
     }
 
     /**
@@ -2067,8 +2471,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param string $id The new ID.
      * @return $this
      */
-    public function setID(string $id) {
-        $this->schema['id'] = $id;
+    public function setID(string $id)
+    {
+        $this->schema["id"] = $id;
 
         return $this;
     }
@@ -2080,7 +2485,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return boolean true on success or false on failure.
      * @link http://php.net/manual/en/arrayaccess.offsetexists.php
      */
-    public function offsetExists($offset) {
+    public function offsetExists($offset): bool
+    {
         return isset($this->schema[$offset]);
     }
 
@@ -2091,7 +2497,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return mixed Can return all value types.
      * @link http://php.net/manual/en/arrayaccess.offsetget.php
      */
-    public function offsetGet($offset) {
+    public function offsetGet($offset): mixed
+    {
         return isset($this->schema[$offset]) ? $this->schema[$offset] : null;
     }
 
@@ -2102,7 +2509,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to set.
      * @link http://php.net/manual/en/arrayaccess.offsetset.php
      */
-    public function offsetSet($offset, $value) {
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
         $this->schema[$offset] = $value;
     }
 
@@ -2112,7 +2520,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $offset The offset to unset.
      * @link http://php.net/manual/en/arrayaccess.offsetunset.php
      */
-    public function offsetUnset($offset) {
+    public function offsetUnset(mixed $offset): void
+    {
         unset($this->schema[$offset]);
     }
 
@@ -2124,65 +2533,70 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return ValidationField|null Returns the resolved schema or **null** if it can't be resolved.
      * @throws ParseException Throws an exception if the discriminator isn't a string.
      */
-    private function resolveDiscriminator($value, ValidationField $field, array $visited = []) {
-        $propertyName = $field->val('discriminator')['propertyName'] ?? '';
+    private function resolveDiscriminator(
+        $value,
+        ValidationField $field,
+        array $visited = []
+    ) {
+        $propertyName = $field->val("discriminator")["propertyName"] ?? "";
         if (empty($propertyName) || !is_string($propertyName)) {
-            throw new ParseException("Invalid propertyName for discriminator at {$field->getSchemaPath()}", 500);
+            throw new ParseException(
+                "Invalid propertyName for discriminator at {$field->getSchemaPath()}",
+                500
+            );
         }
 
-        $propertyFieldName = ltrim($field->getName().'/'.self::escapeRef($propertyName), '/');
+        $propertyFieldName = ltrim(
+            $field->getName() . "/" . self::escapeRef($propertyName),
+            "/"
+        );
 
         // Do some basic validation checking to see if we can even look at the property.
         if (!$this->isArray($value)) {
-            $field->addTypeError($value, 'object');
+            $field->addTypeError($value, "object");
             return null;
         } elseif (empty($value[$propertyName])) {
-            $field->getValidation()->addError(
-                $propertyFieldName,
-                'required',
-                ['messageCode' => '{property} is required.', 'property' => $propertyName]
-            );
+            $field->getValidation()->addError($propertyFieldName, "required", [
+                "messageCode" => "{property} is required.",
+                "property" => $propertyName,
+            ]);
             return null;
         }
 
         $propertyValue = $value[$propertyName];
         if (!is_string($propertyValue)) {
-            $field->getValidation()->addError(
-                $propertyFieldName,
-                'type',
-                [
-                    'type' => 'string',
-                    'value' => is_scalar($value) ? $value : null,
-                    'messageCode' => is_scalar($value) ? "{value} is not a valid string." : "The value is not a valid string."
-                ]
-            );
+            $field->getValidation()->addError($propertyFieldName, "type", [
+                "type" => "string",
+                "value" => is_scalar($value) ? $value : null,
+                "messageCode" => is_scalar($value)
+                    ? "{value} is not a valid string."
+                    : "The value is not a valid string.",
+            ]);
             return null;
         }
 
-        $mapping = $field->val('discriminator')['mapping'] ?? '';
+        $mapping = $field->val("discriminator")["mapping"] ?? "";
         if (isset($mapping[$propertyValue])) {
             $ref = $mapping[$propertyValue];
 
-            if (strpos($ref, '#') === false) {
-                $ref = '#/components/schemas/'.self::escapeRef($ref);
+            if (strpos($ref, "#") === false) {
+                $ref = "#/components/schemas/" . self::escapeRef($ref);
             }
         } else {
             // Don't let a property value provide its own ref as that may pose a security concern..
-            $ref = '#/components/schemas/'.self::escapeRef($propertyValue);
+            $ref = "#/components/schemas/" . self::escapeRef($propertyValue);
         }
 
         // Validate the reference against the oneOf constraint.
-        $oneOf = $field->val('oneOf', []);
+        $oneOf = $field->val("oneOf", []);
         if (!empty($oneOf) && !in_array(['$ref' => $ref], $oneOf)) {
-            $field->getValidation()->addError(
-                $propertyFieldName,
-                'oneOf',
-                [
-                    'type' => 'string',
-                    'value' => is_scalar($propertyValue) ? $propertyValue : null,
-                    'messageCode' => is_scalar($propertyValue) ? "{value} is not a valid option." : "The value is not a valid option."
-                ]
-            );
+            $field->getValidation()->addError($propertyFieldName, "oneOf", [
+                "type" => "string",
+                "value" => is_scalar($propertyValue) ? $propertyValue : null,
+                "messageCode" => is_scalar($propertyValue)
+                    ? "{value} is not a valid option."
+                    : "The value is not a valid option.",
+            ]);
             return null;
         }
 
@@ -2190,9 +2604,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // Lookup the schema.
             $visited[$field->getSchemaPath()] = true;
 
-            list($schema, $schemaPath) = $this->lookupSchema(['$ref' => $ref], $field->getSchemaPath());
+            list($schema, $schemaPath) = $this->lookupSchema(
+                ['$ref' => $ref],
+                $field->getSchemaPath()
+            );
             if (isset($visited[$schemaPath])) {
-                throw new RefNotFoundException('Cyclical ref.', 508);
+                throw new RefNotFoundException("Cyclical ref.", 508);
             }
 
             $result = new ValidationField(
@@ -2202,22 +2619,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $schemaPath,
                 $field->getOptions()
             );
-            if (!empty($schema['discriminator'])) {
+            if (!empty($schema["discriminator"])) {
                 return $this->resolveDiscriminator($value, $result, $visited);
             } else {
                 return $result;
             }
         } catch (RefNotFoundException $ex) {
             // Since this is a ref provided by the value it is technically a validation error.
-            $field->getValidation()->addError(
-                $propertyFieldName,
-                'propertyName',
-                [
-                    'type' => 'string',
-                    'value' => is_scalar($propertyValue) ? $propertyValue : null,
-                    'messageCode' => is_scalar($propertyValue) ? "{value} is not a valid option." : "The value is not a valid option."
-                ]
-            );
+            $field
+                ->getValidation()
+                ->addError($propertyFieldName, "propertyName", [
+                    "type" => "string",
+                    "value" => is_scalar($propertyValue)
+                        ? $propertyValue
+                        : null,
+                    "messageCode" => is_scalar($propertyValue)
+                        ? "{value} is not a valid option."
+                        : "The value is not a valid option.",
+                ]);
             return null;
         }
     }
