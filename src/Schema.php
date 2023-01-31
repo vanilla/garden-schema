@@ -2081,6 +2081,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return boolean true on success or false on failure.
      * @link http://php.net/manual/en/arrayaccess.offsetexists.php
      */
+    #[\ReturnTypeWillChange]
     public function offsetExists($offset) {
         return isset($this->schema[$offset]);
     }
@@ -2092,6 +2093,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return mixed Can return all value types.
      * @link http://php.net/manual/en/arrayaccess.offsetget.php
      */
+    #[\ReturnTypeWillChange]
     public function offsetGet($offset) {
         return isset($this->schema[$offset]) ? $this->schema[$offset] : null;
     }
@@ -2103,6 +2105,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $value The value to set.
      * @link http://php.net/manual/en/arrayaccess.offsetset.php
      */
+    #[\ReturnTypeWillChange]
     public function offsetSet($offset, $value) {
         $this->schema[$offset] = $value;
     }
@@ -2113,6 +2116,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param mixed $offset The offset to unset.
      * @link http://php.net/manual/en/arrayaccess.offsetunset.php
      */
+    #[\ReturnTypeWillChange]
     public function offsetUnset($offset) {
         unset($this->schema[$offset]);
     }
