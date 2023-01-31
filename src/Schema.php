@@ -1906,6 +1906,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
      * @link http://json-schema.org/
      */
+    #[\ReturnTypeWillChange]
     public function jsonSerialize() {
         $seen = [$this];
         return $this->jsonSerializeInternal($seen);

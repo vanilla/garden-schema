@@ -578,6 +578,7 @@ class Validation implements \JsonSerializable {
      * which is a value of any type other than a resource.
      * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
      */
+    #[\ReturnTypeWillChange]
     public function jsonSerialize() {
         $errors = [];
 
