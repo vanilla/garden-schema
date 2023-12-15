@@ -48,27 +48,27 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     private static $DATE_REGEX = '`^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?`i';
 
-    private $schema = [];
+    protected $schema = [];
 
     /**
      * @var int A bitwise combination of the various **Schema::FLAG_*** constants.
      */
-    private $flags = 0;
+    protected $flags = 0;
 
     /**
      * @var array An array of callbacks that will filter data in the schema.
      */
-    private $filters = [];
+    protected $filters = [];
 
     /**
      * @var array An array of callbacks that will custom validate the schema.
      */
-    private $validators = [];
+    protected $validators = [];
 
     /**
      * @var string|Validation The name of the class or an instance that will be cloned.
      */
-    private $validationClass = Validation::class;
+    protected $validationClass = Validation::class;
 
 
     /// Methods ///
