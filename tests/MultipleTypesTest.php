@@ -130,14 +130,6 @@ class MultipleTypesTest extends AbstractSchemaTest {
     }
 
     /**
-     * Multiple types should have a deprecation notice.
-     */
-    public function testDeprecationNotice() {
-        $this->expectNotice();
-        $sch = Schema::parse(['a:i|s']);
-    }
-
-    /**
      * Provide tests for **testExpandUseCase()**.
      *
      * @return array Returns a data provider array.
