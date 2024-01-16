@@ -165,9 +165,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     private function parseNode($node, $value = null) {
         if (is_array($value)) {
-            if (is_array($node['type'])) {
-                trigger_error('Schemas with multiple types are deprecated.', E_USER_DEPRECATED);
-            }
 
             // The value describes a bit more about the schema.
             switch ($node['type']) {
@@ -345,10 +342,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (!empty($nullable)) {
             $param['nullable'] = true;
-        }
-
-        if (is_array($param['type'])) {
-            trigger_error('Schemas with multiple types is deprecated.', E_USER_DEPRECATED);
         }
 
         return [$name, $param, $required];
@@ -1090,10 +1083,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field Contains field and validation information.
      * @return mixed Returns the valid value or `Invalid`.
      * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
-     * @deprecated Multiple types are being removed next version.
      */
     private function validateMultipleTypes($value, array $types, ValidationField $field) {
-        trigger_error('Multiple schema types are deprecated.', E_USER_DEPRECATED);
 
         // First check for an exact type match.
         switch (gettype($value)) {
