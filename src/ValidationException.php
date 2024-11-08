@@ -13,7 +13,8 @@ namespace Garden\Schema;
  * The validation object collects errors and is mutable. Once it's ready to be thrown as an exception it gets converted
  * to an instance of the immutable {@link ValidationException} class.
  */
-class ValidationException extends \Exception implements \JsonSerializable {
+class ValidationException extends \Exception implements \JsonSerializable
+{
     /**
      * @var Validation
      */
@@ -24,9 +25,13 @@ class ValidationException extends \Exception implements \JsonSerializable {
      *
      * @param Validation $validation The {@link Validation} object for the exception.
      */
-    public function __construct(Validation $validation) {
+    public function __construct(Validation $validation)
+    {
         $this->validation = $validation;
-        parent::__construct($validation->getFullMessage(), $validation->getCode());
+        parent::__construct(
+            $validation->getFullMessage(),
+            $validation->getCode()
+        );
     }
 
     /**
@@ -37,7 +42,8 @@ class ValidationException extends \Exception implements \JsonSerializable {
      * which is a value of any type other than a resource.
      */
     #[\ReturnTypeWillChange]
-    public function jsonSerialize() {
+    public function jsonSerialize(): mixed
+    {
         return $this->validation->jsonSerialize();
     }
 
@@ -46,7 +52,8 @@ class ValidationException extends \Exception implements \JsonSerializable {
      *
      * @return Validation Returns a validation object.
      */
-    public function getValidation() {
+    public function getValidation()
+    {
         return $this->validation;
     }
 }

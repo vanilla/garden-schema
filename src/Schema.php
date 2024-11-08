@@ -304,10 +304,12 @@ class Schema implements \JsonSerializable, \ArrayAccess
             $typeStr = substr($key, $pos + 1);
 
             // Kludge for names with colons that are not specifying an array of a type.
+            /*
             if (isset($value["type"]) && "array" !== $this->getType($typeStr)) {
                 $name = $key;
                 $typeStr = "";
             }
+            */
         } else {
             $name = $key;
             $typeStr = "";
@@ -392,6 +394,8 @@ class Schema implements \JsonSerializable, \ArrayAccess
      */
     private function getType($alias)
     {
+        // Remove the nullable indicator.
+        $alias = str_replace("?", "", strtolower($alias));
         if (isset(self::$types[$alias])) {
             return $alias;
         }
@@ -508,10 +512,6 @@ class Schema implements \JsonSerializable, \ArrayAccess
     {
         if (is_string($path)) {
             if (strpos($path, ".") !== false && strpos($path, "/") === false) {
-                trigger_error(
-                    'Field selectors must be separated by "/" instead of "."',
-                    E_USER_DEPRECATED
-                );
                 $path = explode(".", $path);
             } else {
                 $path = explode("/", $path);
@@ -786,7 +786,8 @@ class Schema implements \JsonSerializable, \ArrayAccess
             $field = "items";
         } elseif (
             strpos($field, "/") === false &&
-            !in_array($field, ["items", "additionalProperties"], true)
+            strpos($field, ".") === false &&
+            in_array($field, ["items", "additionalProperties"], true)
         ) {
             trigger_error(
                 "Field selectors must specify full schema paths. ($field)",
@@ -950,7 +951,7 @@ class Schema implements \JsonSerializable, \ArrayAccess
     public function validate($data, $options = [])
     {
         if (is_bool($options)) {
-            $options = ["sparse" => true];
+            $options = ["sparse" => $options];
         }
         $options += ["sparse" => false];
 
