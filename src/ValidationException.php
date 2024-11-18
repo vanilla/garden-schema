@@ -13,7 +13,8 @@ namespace Garden\Schema;
  * The validation object collects errors and is mutable. Once it's ready to be thrown as an exception it gets converted
  * to an instance of the immutable {@link ValidationException} class.
  */
-class ValidationException extends \Exception implements \JsonSerializable {
+class ValidationException extends \Exception implements \JsonSerializable
+{
     /**
      * @var Validation
      */
@@ -24,9 +25,13 @@ class ValidationException extends \Exception implements \JsonSerializable {
      *
      * @param Validation $validation The {@link Validation} object for the exception.
      */
-    public function __construct(Validation $validation) {
+    public function __construct(Validation $validation)
+    {
         $this->validation = $validation;
-        parent::__construct($validation->getMessage(), (int)$validation->getStatus());
+        parent::__construct(
+            $validation->getMessage(),
+            (int) $validation->getStatus()
+        );
     }
 
     /**
@@ -36,14 +41,15 @@ class ValidationException extends \Exception implements \JsonSerializable {
      * @return mixed data which can be serialized by <b>json_encode</b>,
      * which is a value of any type other than a resource.
      */
-    public function jsonSerialize() {
+    public function jsonSerialize(): mixed
+    {
         $errors = $this->validation->getErrors();
-        $message = $this->getValidation()->translate('Validation Failed');
+        $message = $this->getValidation()->translate("Validation Failed");
 
         $result = [
-            'message' => $message,
-            'status' => $this->getCode(),
-            'errors' => $errors
+            "message" => $message,
+            "status" => $this->getCode(),
+            "errors" => $errors,
         ];
         return $result;
     }
@@ -53,7 +59,8 @@ class ValidationException extends \Exception implements \JsonSerializable {
      *
      * @return Validation Returns a validation object.
      */
-    public function getValidation() {
+    public function getValidation()
+    {
         return $this->validation;
     }
 }
