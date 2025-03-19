@@ -187,6 +187,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                         }
                     }
                     break;
+                case 'datetime': 
+                    // Backwards compatibility for datetime.
+                    $node["type"] = "string";
+                    $node["format"] = "date-time";
+                    break;
+                case 'timestamp':
+                    // Backwards compatibility for timestamp.
+                    $node["type"] = "integer";
+                    $node["format"] = "timestamp";
+                    break;
                 default:
                     $node = array_replace($node, $value);
                     break;
@@ -433,7 +443,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     public function getField($path, $default = null) {
         if (is_string($path)) {
             if (strpos($path, '.') !== false && strpos($path, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
                 $path = explode('.', $path);
             } else {
                 $path = explode('/', $path);
@@ -663,23 +672,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         if (strpos($field, '.') !== false) {
             if (strpos($field, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
-
                 $parts = explode('.', $field);
                 $parts = @array_map([$this, 'parseFieldSelector'], $parts); // silence because error triggered already.
 
                 $field = implode('/', $parts);
             }
         } elseif ($field === '[]') {
-            trigger_error('Field selectors with item selector "[]" must be converted to "items".', E_USER_DEPRECATED);
             $field = 'items';
         } elseif (strpos($field, '/') === false && !in_array($field, ['items', 'additionalProperties'], true)) {
-            trigger_error("Field selectors must specify full schema paths. ($field)", E_USER_DEPRECATED);
             $field = "/properties/$field";
         }
 
         if (strpos($field, '[]') !== false) {
-            trigger_error('Field selectors with item selector "[]" must be converted to "/items".', E_USER_DEPRECATED);
             $field = str_replace('[]', '/items', $field);
         }
 
@@ -816,7 +820,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function validate($data, $options = []) {
         if (is_bool($options)) {
-            trigger_error('The $sparse parameter is deprecated. Use [\'sparse\' => true] instead.', E_USER_DEPRECATED);
             $options = ['sparse' => true];
         }
         $options += ['sparse' => false];
