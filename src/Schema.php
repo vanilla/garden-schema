@@ -187,7 +187,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                         }
                     }
                     break;
-                case 'datetime': 
+                case 'datetime':
                     // Backwards compatibility for datetime.
                     $node["type"] = "string";
                     $node["format"] = "date-time";
@@ -472,7 +472,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     public function setField($path, $value) {
         if (is_string($path)) {
             if (strpos($path, '.') !== false && strpos($path, '/') === false) {
-                trigger_error('Field selectors must be separated by "/" instead of "."', E_USER_DEPRECATED);
                 $path = explode('.', $path);
             } else {
                 $path = explode('/', $path);
@@ -1177,11 +1176,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $result = $this->validateString($value, $field);
                 break;
             case 'timestamp':
-                trigger_error('The timestamp type is deprecated. Use an integer with a format of timestamp instead.', E_USER_DEPRECATED);
                 $result = $this->validateTimestamp($value, $field);
                 break;
             case 'datetime':
-                trigger_error('The datetime type is deprecated. Use a string with a format of date-time instead.', E_USER_DEPRECATED);
                 $result = $this->validateDatetime($value, $field);
                 break;
             case 'array':
