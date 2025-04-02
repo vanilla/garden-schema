@@ -108,6 +108,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param array $arr The schema array.
      * @param mixed[] $args Constructor arguments for the schema instance.
      * @return static Returns a new schema.
+     * @throws ParseException
      */
     public static function parse(array $arr, ...$args) {
         $schema = new static([], ...$args);
@@ -274,14 +275,22 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws ParseException Throws an exception if the short param is not in the correct format.
      */
     public function parseShortParam(string $key, $value = []): array {
-        // LEGACY SUPPORT: Detect "key:type?" (legacy) and convert to "key?:type"
-        if (preg_match('/^(.+):([a-z|]+)\?$/', $key, $matches)) {
-            $key = $matches[1] . '?:' . $matches[2];
-        }
-
-        // Detect the name and type parts.
         $nullable = false;
 
+        // Legacy Compatibility: If the value is a full schema definition, use the key as-is.
+        if (is_array($value) && isset($value['type'])) {
+            $name = $key;
+            $required = true;
+
+            if (str_ends_with($key, '?')) {
+                $name = substr($key, 0, -1);
+                $required = false;
+            }
+
+            return [$name, $value, $required];
+        }
+
+        // Standard parsing for key:type?
         if (false !== ($colonPos = strrpos($key, ':'))) {
             $namePart = substr($key, 0, $colonPos);
             $typeStr = substr($key, $colonPos + 1);
@@ -290,8 +299,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $typeStr = '';
         }
 
-        // Check for optional key (ends with "?").
-        if (substr($namePart, -1) === '?') {
+        if (str_ends_with($namePart, '?')) {
             $required = false;
             $name = substr($namePart, 0, -1);
         } else {
@@ -302,7 +310,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $types = [];
         $param = [];
 
-        // Parse the type string, map aliases, and detect formats.
         if (!empty($typeStr)) {
             $shortTypes = explode('|', $typeStr);
             foreach ($shortTypes as $alias) {
@@ -364,7 +371,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         return [$name, $param, $required];
     }
-
 
     /**
      * Look up a type based on its alias.
