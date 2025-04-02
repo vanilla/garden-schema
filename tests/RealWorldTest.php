@@ -129,6 +129,35 @@ class RealWorldTest extends TestCase {
     }
 
     /**
+     * Colons should be allowed in property name short definitions.
+     */
+    public function testColonLongParse() {
+        $sch = Schema::parse([
+            'foo:bar' => [
+                'type' => 'boolean',
+            ],
+        ]);
+
+        $this->assertEquals('boolean', $sch->getField('properties/foo:bar/type'));
+    }
+
+    /**
+     * Colons should be allowed in full property name definitions.
+     */
+    public function testColonFullParse() {
+        $sch = Schema::parse([
+            'type' => 'object',
+            'properties' => [
+                'foo:bar' => [
+                    'type' => 'boolean',
+                ],
+            ],
+        ]);
+
+        $this->assertEquals('boolean', $sch->getField('properties/foo:bar/type'));
+    }
+
+    /**
      * A nested schema object should have its default value respected.
      */
     public function testNestedDefaultRequired() {
