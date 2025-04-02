@@ -278,8 +278,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $nullable = false;
         $required = true;
         $typeStr = '';
-        $types = [];
-        $param = [];
+        $name = $key;
 
         // Handle "field:type?" notation
         if (preg_match('/^(.+):([a-z|]+)\?$/', $key, $matches)) {
@@ -291,21 +290,26 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         elseif (false !== ($colonPos = strrpos($key, ':'))) {
             $name = substr($key, 0, $colonPos);
             $typeStr = substr($key, $colonPos + 1);
-        } else {
-            $name = $key;
+            $required = true;
+        }
+        // Handle legacy syntax like "field?" => [ ... ]
+        elseif (substr($key, -1) === '?') {
+            $name = substr($key, 0, -1);
+            $typeStr = $value['type'] ?? '';
+            $required = false;
         }
 
-        // Parse types from shorthand aliases (e.g. s|n → string|null)
+        $types = [];
+        $param = [];
+
+        // Parse the type string into actual schema types
         if (!empty($typeStr)) {
             $shortTypes = explode('|', $typeStr);
             foreach ($shortTypes as $alias) {
                 $found = $this->getType($alias);
                 if ($found === null) {
                     throw new ParseException("Unknown type '$alias'.", 500);
-                }
-
-                // Special type handling
-                if ($found === 'datetime') {
+                } elseif ($found === 'datetime') {
                     $param['format'] = 'date-time';
                     $types[] = 'string';
                 } elseif ($found === 'timestamp') {
@@ -319,34 +323,28 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
         }
 
-        // If value is already a Schema, merge it accordingly
+        // Build the $param definition based on types and value
         if ($value instanceof Schema) {
             if (count($types) === 1 && $types[0] === 'array') {
-                $param += ['type' => 'array', 'items' => $value];
+                $param += ['type' => $types[0], 'items' => $value];
             } else {
                 $param = $value;
             }
-        }
-        // Merge type from $value into $param if defined
-        elseif (isset($value['type'])) {
+        } elseif (isset($value['type'])) {
             $param = $value + $param;
 
-            // Throw if type declarations mismatch
-            if (!empty($types) && $types !== (array) $param['type']) {
+            if (!empty($types) && $types !== (array)$param['type']) {
                 $typesStr = implode('|', $types);
-                $paramTypesStr = implode('|', (array) $param['type']);
+                $paramTypesStr = implode('|', (array)$param['type']);
                 throw new ParseException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
             }
-        }
-        // No explicit "type" override, infer from shorthand
-        else {
+        } else {
             if (empty($types) && !empty($typeStr)) {
                 throw new ParseException("Invalid type {$typeStr} for field $name.", 500);
             }
-
             $param['type'] = empty($types) ? null : (count($types) === 1 ? $types[0] : $types);
 
-            // Add minimum length for required strings
+            // Add minLength if required and type is string
             if (
                 in_array('string', $types, true) &&
                 !empty($name) &&
@@ -357,7 +355,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
         }
 
-        // Add nullable flag if "null" was in the type list
         if ($nullable) {
             $param['nullable'] = true;
         }
