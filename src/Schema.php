@@ -274,7 +274,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return array Returns an array in the form `[string name, array param, bool required]`.
      * @throws ParseException Throws an exception if the short param is not in the correct format.
      */
-    public function parseShortParam(string $key, array $value = []): array {
+    public function parseShortParam(string $key, $value = []): array {
         $nullable = false;
         $required = true;
         $typeStr = '';
