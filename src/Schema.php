@@ -39,7 +39,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         'number' => ['f', 'float'],
         'boolean' => ['b', 'bool'],
 
-        // Psuedo-types
+        // Pseudo-types
         'timestamp' => ['ts'], // type: integer, format: timestamp
         'datetime' => ['dt'], // type: string, format: date-time
         'null' => ['n'], // Adds nullable: true
@@ -95,9 +95,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $this->schema = $schema;
 
         $this->refLookup = $refLookup ?? function (/** @scrutinizer ignore-unused */
-                string $_) {
-                return null;
-            };
+            string $_) {
+            return null;
+        };
 
         $this->setFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE, true);
     }
@@ -274,31 +274,35 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws ParseException Throws an exception if the short param is not in the correct format.
      */
     public function parseShortParam(string $key, $value = []): array {
-        // Is the parameter optional?
-        if (substr($key, -1) === '?') {
-            $required = false;
-            $key = substr($key, 0, -1);
-        } else {
-            $required = true;
+        // LEGACY SUPPORT: Detect "key:type?" (legacy) and convert to "key?:type"
+        if (preg_match('/^(.+):([a-z|]+)\?$/', $key, $matches)) {
+            $key = $matches[1] . '?:' . $matches[2];
         }
 
-        // Check for a type.
-        if (false !== ($pos = strrpos($key, ':'))) {
-            $name = substr($key, 0, $pos);
-            $typeStr = substr($key, $pos + 1);
+        // Detect the name and type parts.
+        $nullable = false;
 
-            // Kludge for names with colons that are not specifying an array of a type.
-            if (isset($value['type']) && 'array' !== $this->getType($typeStr)) {
-                $name = $key;
-                $typeStr = '';
-            }
+        if (false !== ($colonPos = strrpos($key, ':'))) {
+            $namePart = substr($key, 0, $colonPos);
+            $typeStr = substr($key, $colonPos + 1);
         } else {
-            $name = $key;
+            $namePart = $key;
             $typeStr = '';
         }
+
+        // Check for optional key (ends with "?").
+        if (substr($namePart, -1) === '?') {
+            $required = false;
+            $name = substr($namePart, 0, -1);
+        } else {
+            $required = true;
+            $name = $namePart;
+        }
+
         $types = [];
         $param = [];
 
+        // Parse the type string, map aliases, and detect formats.
         if (!empty($typeStr)) {
             $shortTypes = explode('|', $typeStr);
             foreach ($shortTypes as $alias) {
@@ -335,8 +339,8 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 throw new ParseException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
             }
         } else {
-            if (empty($types) && !empty($parts[1])) {
-                throw new ParseException("Invalid type {$parts[1]} for field $name.", 500);
+            if (empty($types) && !empty($typeStr)) {
+                throw new ParseException("Invalid type {$typeStr} for field $name.", 500);
             }
             if (empty($types)) {
                 $param += ['type' => null];
@@ -344,8 +348,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $param += ['type' => count($types) === 1 ? $types[0] : $types];
             }
 
-            // Parsed required strings have a minimum length of 1.
-            if (in_array('string', $types) && !empty($name) && $required && (!isset($value['default']) || $value['default'] !== '')) {
+            if (
+                in_array('string', $types) &&
+                !empty($name) &&
+                $required &&
+                (!isset($value['default']) || $value['default'] !== '')
+            ) {
                 $param['minLength'] = 1;
             }
         }
@@ -356,6 +364,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         return [$name, $param, $required];
     }
+
 
     /**
      * Look up a type based on its alias.
