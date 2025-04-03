@@ -188,16 +188,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                         }
                     }
                     break;
-                case 'datetime':
-                    // Backwards compatibility for datetime.
-                    $node["type"] = "string";
-                    $node["format"] = "date-time";
-                    break;
-                case 'timestamp':
-                    // Backwards compatibility for timestamp.
-                    $node["type"] = "integer";
-                    $node["format"] = "timestamp";
-                    break;
                 default:
                     $node = array_replace($node, $value);
                     break;
@@ -211,7 +201,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif ($value === null) {
             // Parse child elements.
             if ($node['type'] === 'array' && isset($node['items'])) {
-                // The value includes array schema information.
                 $node['items'] = $this->parseInternal($node['items']);
             } elseif ($node['type'] === 'object' && isset($node['properties'])) {
                 list($node['properties']) = $this->parseProperties($node['properties']);
@@ -219,11 +208,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         if (is_array($node)) {
+            // Backwards compatibility for allowNull
             if (!empty($node['allowNull'])) {
                 $node['nullable'] = true;
             }
             unset($node['allowNull']);
 
+            // Normalize pseudo-types to actual JSON Schema representations
+            if (isset($node['type'])) {
+                if ($node['type'] === 'timestamp') {
+                    $node['type'] = 'integer';
+                    $node['format'] = 'timestamp';
+                } elseif ($node['type'] === 'datetime') {
+                    $node['type'] = 'string';
+                    $node['format'] = 'date-time';
+                }
+            }
+
+            // Remove empty type
             if ($node['type'] === null || $node['type'] === []) {
                 unset($node['type']);
             }
@@ -333,6 +335,16 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif (isset($value['type'])) {
             $param = $value + $param;
 
+            // Normalize longform pseudo-types
+            if ($param['type'] === 'timestamp') {
+                $param['type'] = 'integer';
+                $param['format'] = 'timestamp';
+            } elseif ($param['type'] === 'datetime') {
+                $param['type'] = 'string';
+                $param['format'] = 'date-time';
+            }
+
+            // Check type consistency if types were also parsed
             if (!empty($types) && $types !== (array)$param['type']) {
                 $typesStr = implode('|', $types);
                 $paramTypesStr = implode('|', (array)$param['type']);
