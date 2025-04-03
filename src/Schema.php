@@ -298,6 +298,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         elseif (substr($key, -1) === '?') {
             $name = substr($key, 0, -1);
             $typeStr = $value['type'] ?? '';
+            $typeStr = (is_array($typeStr) ? implode('|', $typeStr) : $typeStr);
             $required = false;
         }
 
