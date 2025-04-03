@@ -39,7 +39,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         'number' => ['f', 'float'],
         'boolean' => ['b', 'bool'],
 
-        // Psuedo-types
+        // Pseudo-types
         'timestamp' => ['ts'], // type: integer, format: timestamp
         'datetime' => ['dt'], // type: string, format: date-time
         'null' => ['n'], // Adds nullable: true
@@ -95,9 +95,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $this->schema = $schema;
 
         $this->refLookup = $refLookup ?? function (/** @scrutinizer ignore-unused */
-                string $_) {
-                return null;
-            };
+            string $_) {
+            return null;
+        };
 
         $this->setFlag(self::VALIDATE_STRING_LENGTH_AS_UNICODE, true);
     }
@@ -108,6 +108,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param array $arr The schema array.
      * @param mixed[] $args Constructor arguments for the schema instance.
      * @return static Returns a new schema.
+     * @throws ParseException
      */
     public static function parse(array $arr, ...$args) {
         $schema = new static([], ...$args);
@@ -187,16 +188,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                         }
                     }
                     break;
-                case 'datetime':
-                    // Backwards compatibility for datetime.
-                    $node["type"] = "string";
-                    $node["format"] = "date-time";
-                    break;
-                case 'timestamp':
-                    // Backwards compatibility for timestamp.
-                    $node["type"] = "integer";
-                    $node["format"] = "timestamp";
-                    break;
                 default:
                     $node = array_replace($node, $value);
                     break;
@@ -210,7 +201,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif ($value === null) {
             // Parse child elements.
             if ($node['type'] === 'array' && isset($node['items'])) {
-                // The value includes array schema information.
                 $node['items'] = $this->parseInternal($node['items']);
             } elseif ($node['type'] === 'object' && isset($node['properties'])) {
                 list($node['properties']) = $this->parseProperties($node['properties']);
@@ -218,11 +208,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         if (is_array($node)) {
+            // Backwards compatibility for allowNull
             if (!empty($node['allowNull'])) {
                 $node['nullable'] = true;
             }
             unset($node['allowNull']);
 
+            // Normalize pseudo-types to actual JSON Schema representations
+            if (isset($node['type'])) {
+                if ($node['type'] === 'timestamp') {
+                    $node['type'] = 'integer';
+                    $node['format'] = 'timestamp';
+                } elseif ($node['type'] === 'datetime') {
+                    $node['type'] = 'string';
+                    $node['format'] = 'date-time';
+                }
+            }
+
+            // Remove empty type
             if ($node['type'] === null || $node['type'] === []) {
                 unset($node['type']);
             }
@@ -274,31 +277,34 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws ParseException Throws an exception if the short param is not in the correct format.
      */
     public function parseShortParam(string $key, $value = []): array {
-        // Is the parameter optional?
-        if (substr($key, -1) === '?') {
+        $nullable = false;
+        $required = true;
+        $typeStr = '';
+        $name = $key;
+
+        // Handle "field:type?" notation
+        if (preg_match('/^(.+):([a-z|]+)\?$/', $key, $matches)) {
+            $name = $matches[1];
+            $typeStr = $matches[2];
             $required = false;
-            $key = substr($key, 0, -1);
-        } else {
+        }
+        // Handle "field:type" or "field" (with optional type part)
+        elseif (false !== ($colonPos = strrpos($key, ':'))) {
+            $name = substr($key, 0, $colonPos);
+            $typeStr = substr($key, $colonPos + 1);
             $required = true;
         }
-
-        // Check for a type.
-        if (false !== ($pos = strrpos($key, ':'))) {
-            $name = substr($key, 0, $pos);
-            $typeStr = substr($key, $pos + 1);
-
-            // Kludge for names with colons that are not specifying an array of a type.
-            if (isset($value['type']) && 'array' !== $this->getType($typeStr)) {
-                $name = $key;
-                $typeStr = '';
-            }
-        } else {
-            $name = $key;
-            $typeStr = '';
+        // Handle legacy syntax like "field?" => [ ... ]
+        elseif (substr($key, -1) === '?') {
+            $name = substr($key, 0, -1);
+            $typeStr = $value['type'] ?? '';
+            $required = false;
         }
+
         $types = [];
         $param = [];
 
+        // Parse the type string into actual schema types
         if (!empty($typeStr)) {
             $shortTypes = explode('|', $typeStr);
             foreach ($shortTypes as $alias) {
@@ -319,6 +325,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
         }
 
+        // Build the $param definition based on types and value
         if ($value instanceof Schema) {
             if (count($types) === 1 && $types[0] === 'array') {
                 $param += ['type' => $types[0], 'items' => $value];
@@ -328,29 +335,39 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif (isset($value['type'])) {
             $param = $value + $param;
 
+            // Normalize longform pseudo-types
+            if ($param['type'] === 'timestamp') {
+                $param['type'] = 'integer';
+                $param['format'] = 'timestamp';
+            } elseif ($param['type'] === 'datetime') {
+                $param['type'] = 'string';
+                $param['format'] = 'date-time';
+            }
+
+            // Check type consistency if types were also parsed
             if (!empty($types) && $types !== (array)$param['type']) {
                 $typesStr = implode('|', $types);
                 $paramTypesStr = implode('|', (array)$param['type']);
-
                 throw new ParseException("Type mismatch between $typesStr and {$paramTypesStr} for field $name.", 500);
             }
         } else {
-            if (empty($types) && !empty($parts[1])) {
-                throw new ParseException("Invalid type {$parts[1]} for field $name.", 500);
+            if (empty($types) && !empty($typeStr)) {
+                throw new ParseException("Invalid type {$typeStr} for field $name.", 500);
             }
-            if (empty($types)) {
-                $param += ['type' => null];
-            } else {
-                $param += ['type' => count($types) === 1 ? $types[0] : $types];
-            }
+            $param['type'] = empty($types) ? null : (count($types) === 1 ? $types[0] : $types);
 
-            // Parsed required strings have a minimum length of 1.
-            if (in_array('string', $types) && !empty($name) && $required && (!isset($value['default']) || $value['default'] !== '')) {
+            // Add minLength if required and type is string
+            if (
+                in_array('string', $types, true) &&
+                !empty($name) &&
+                $required &&
+                (!isset($value['default']) || $value['default'] !== '')
+            ) {
                 $param['minLength'] = 1;
             }
         }
 
-        if (!empty($nullable)) {
+        if ($nullable) {
             $param['nullable'] = true;
         }
 
@@ -775,7 +792,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Add a custom validator to to validate the schema.
+     * Add a custom validator to validate the schema.
      *
      * @param string $fieldname The name of the field to validate, if any.
      *
