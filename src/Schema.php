@@ -780,7 +780,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Add a custom validator to to validate the schema.
+     * Add a custom validator to validate the schema.
      *
      * @param string $fieldname The name of the field to validate, if any.
      *
