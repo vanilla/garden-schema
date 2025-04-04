@@ -283,22 +283,27 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $name = $key;
 
         // Handle "field:type?" notation
-        if (preg_match('/^(.+):([a-z|]+)\?$/', $key, $matches)) {
+        if (preg_match('/^(.+):([a-z]+(?:\|[a-z]+)*)\?$/', $key, $matches)) {
             $name = $matches[1];
             $typeStr = $matches[2];
             $required = false;
         }
-        // Handle "field:type" or "field" (with optional type part)
+        // Handle ":type?" notation
+        elseif (preg_match('/^:([a-z]+(?:\|[a-z]+)*)\?$/', $key, $matches)) {
+            $name = '';
+            $typeStr = $matches[1];
+            $required = false;
+        }
+        // Handle "field:type" or "field"
         elseif (false !== ($colonPos = strrpos($key, ':'))) {
             $name = substr($key, 0, $colonPos);
             $typeStr = substr($key, $colonPos + 1);
             $required = true;
         }
-        // Handle legacy syntax like "field?" => [ ... ]
+        // Handle syntax like "field?" => [ ... ]
         elseif (substr($key, -1) === '?') {
             $name = substr($key, 0, -1);
             $typeStr = $value['type'] ?? '';
-            $typeStr = (is_array($typeStr) ? implode('|', $typeStr) : $typeStr);
             $required = false;
         }
 
@@ -309,9 +314,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if (!empty($typeStr)) {
             $shortTypes = explode('|', $typeStr);
             foreach ($shortTypes as $alias) {
+                $alias = rtrim($alias, '?'); // Strip `?` from alias if it's there
+
                 $found = $this->getType($alias);
                 if ($found === null) {
-                    throw new ParseException("Unknown type '$alias'.", 500);
+                    throw new ParseException("Unknown type alias '$alias'.", 500);
                 } elseif ($found === 'datetime') {
                     $param['format'] = 'date-time';
                     $types[] = 'string';
@@ -336,16 +343,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         } elseif (isset($value['type'])) {
             $param = $value + $param;
 
-            // Normalize longform pseudo-types
-            if ($param['type'] === 'timestamp') {
-                $param['type'] = 'integer';
-                $param['format'] = 'timestamp';
-            } elseif ($param['type'] === 'datetime') {
-                $param['type'] = 'string';
-                $param['format'] = 'date-time';
-            }
-
-            // Check type consistency if types were also parsed
             if (!empty($types) && $types !== (array)$param['type']) {
                 $typesStr = implode('|', $types);
                 $paramTypesStr = implode('|', (array)$param['type']);
