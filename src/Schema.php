@@ -306,6 +306,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $typeStr = substr($key, $colonPos + 1);
             $required = true;
         }
+        // Handle legacy syntax like "field?" => [ ... ]
+        elseif (substr($key, -1) === '?') {
+            $name = substr($key, 0, -1);
+            $typeStr = $value['type'] ?? '';
+            $typeStr = (is_array($typeStr) ? implode('|', $typeStr) : $typeStr);
+            $required = false;
+        }
 
         $types = [];
         $param = [];
