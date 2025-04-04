@@ -282,30 +282,29 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         $typeStr = '';
         $name = $key;
 
-        // Handle "field:type?" notation
+        // Handle "field:type?" notation (optional named field)
         if (preg_match('/^(.+):([a-z|]+)\?$/', $key, $matches)) {
             $name = $matches[1];
             $typeStr = $matches[2];
             $required = false;
         }
-        // Handle ":type?" notation
+        // Handle ":type?" notation (optional unnamed root)
         elseif (preg_match('/^:([a-z]+(?:\|[a-z]+)*)\?$/', $key, $matches)) {
             $name = '';
             $typeStr = $matches[1];
             $required = false;
         }
-        // Handle "field:type" or "field"
+        // Handle ":type" notation (required unnamed root)
+        elseif (preg_match('/^:([a-z]+(?:\|[a-z]+)*)$/', $key, $matches)) {
+            $name = '';
+            $typeStr = $matches[1];
+            $required = true;
+        }
+        // Handle "field:type" notation (required named field)
         elseif (false !== ($colonPos = strrpos($key, ':'))) {
             $name = substr($key, 0, $colonPos);
             $typeStr = substr($key, $colonPos + 1);
             $required = true;
-        }
-        // Handle legacy syntax like "field?" => [ ... ]
-        elseif (substr($key, -1) === '?') {
-            $name = substr($key, 0, -1);
-            $typeStr = $value['type'] ?? '';
-            $typeStr = (is_array($typeStr) ? implode('|', $typeStr) : $typeStr);
-            $required = false;
         }
 
         $types = [];
