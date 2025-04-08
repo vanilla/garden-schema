@@ -112,6 +112,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public static function parse(array $arr, ...$args) {
         $schema = new static([], ...$args);
+
+        // Patch: Allow parsing of keys like "field:?" => Schema::parse([...])
+        foreach ($arr as $key => $value) {
+            if (is_string($key) && $value instanceof self) {
+                if (preg_match('/^(.+)\:\?$/', $key, $m)) {
+                    $newKey = $m[1];
+                    unset($arr[$key]);
+                    $arr[$newKey] = $value->withNullable();
+                }
+            }
+        }
+
         $schema->schema = $schema->parseInternal($arr);
         return $schema;
     }
@@ -2246,5 +2258,18 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             );
             return null;
         }
+    }
+
+    /**
+     * Marks the current schema as nullable.
+     *
+     * This method sets the `nullable` flag to true in the schema definition,
+     * allowing the value to be explicitly `null` and still be considered valid.
+     *
+     * @return $this Returns the current schema instance for fluent method chaining.
+     */
+    public function withNullable(): self {
+        $this->schema['nullable'] = true;
+        return $this;
     }
 }

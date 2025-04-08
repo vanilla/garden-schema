@@ -49,4 +49,22 @@ class ValidationException extends \Exception implements \JsonSerializable {
     public function getValidation() {
         return $this->validation;
     }
+
+    /**
+     * Get the first validation error message from the internal Validation object.
+     *
+     * Useful to present a user-friendly error message when multiple validation errors may exist, but we only need the first one.
+     *
+     * @return string
+     */
+    public function getFirstValidationMessage(): string {
+        $errors = $this->validation->getErrors();
+
+        if (!empty($errors)) {
+            $first = reset($errors);
+            return $first['messageCode'] ?? $first['message'] ?? 'Validation error';
+        }
+
+        return 'Validation failed.';
+    }
 }

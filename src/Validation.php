@@ -8,7 +8,7 @@
 namespace Garden\Schema;
 
 /**
- * An class for collecting validation errors.
+ * A class for collecting validation errors.
  */
 class Validation implements \JsonSerializable {
     /**
