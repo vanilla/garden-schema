@@ -1325,9 +1325,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             if ($value > $maximum || ($exclusive && $value == $maximum)) {
                 if ($exclusive) {
-                    $field->addError('maximum', ['messageCode' => 'The value must be less than {maximum}.', 'maximum' => $maximum]);
+                    $field->addError('maximum', ['messageCode' => '{field} must be less than {maximum}.', 'maximum' => $maximum]);
                 } else {
-                    $field->addError('maximum', ['messageCode' => 'The value must be less than or equal to {maximum}.', 'maximum' => $maximum]);
+                    $field->addError('maximum', ['messageCode' => '{field} is greater than {maximum}.', 'maximum' => $maximum]);
                 }
             }
         }
@@ -1337,9 +1337,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
             if ($value < $minimum || ($exclusive && $value == $minimum)) {
                 if ($exclusive) {
-                    $field->addError('minimum', ['messageCode' => 'The value must be greater than {minimum}.', 'minimum' => $minimum]);
+                    $field->addError('minimum', ['messageCode' => '{field} must be greater than {minimum}.', 'minimum' => $minimum]);
                 } else {
-                    $field->addError('minimum', ['messageCode' => 'The value must be greater than or equal to {minimum}.', 'minimum' => $minimum]);
+                    $field->addError('minimum', ['messageCode' => '{field} is lower than {minimum}.', 'minimum' => $minimum]);
                 }
             }
         }
@@ -1393,7 +1393,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addError(
                 'minLength',
                 [
-                    'messageCode' => 'The value should be at least {minLength} {minLength,plural,character,characters} long.',
+                    'messageCode' => '{field} should be at least {minLength} {minLength,plural,character,characters} long.',
                     'minLength' => $minLength,
                 ]
             );
@@ -1403,7 +1403,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addError(
                 'maxLength',
                 [
-                    'messageCode' => 'The value is {overflow} {overflow,plural,character,characters} too long.',
+                    'messageCode' => '{field} is {overflow} {overflow,plural,character,characters} too long.',
                     'maxLength' => $maxLength,
                     'overflow' => $mbStrLen - $maxLength,
                 ]
@@ -1418,7 +1418,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError(
                     'maxByteLength',
                     [
-                        'messageCode' => 'The value is {overflow} {overflow,plural,byte,bytes} too long.',
+                        'messageCode' => '{field} is {overflow} {overflow,plural,byte,bytes} too long.',
                         'maxLength' => $maxLength,
                         'overflow' => $byteStrLen - $maxByteLength,
                     ]
@@ -1894,7 +1894,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addError(
                 'enum',
                 [
-                    'messageCode' => 'The value must be one of: {enum}.',
+                    'messageCode' => '{field} must be one of: {enum}.',
                     'enum' => $enum,
                 ]
             );
@@ -1904,7 +1904,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
-     * Call all of the validators attached to a field.
+     * Call every validator attached to a field.
      *
      * @param mixed $value The field value being validated.
      * @param ValidationField $field The validation object to add errors.
