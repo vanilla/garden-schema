@@ -861,10 +861,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     public function validate($data, $options = []) {
         if (is_bool($options)) {
-            $options = ['sparse' => true];
+            $options = ['sparse' => $options];
+        } else {
+            $options += ['sparse' => false];
         }
-        $options += ['sparse' => false];
-
 
         list($schema, $schemaPath) = $this->lookupSchema($this->schema, '');
         $field = new ValidationField($this->createValidation(), $schema, '', $schemaPath, $options);
@@ -2205,7 +2205,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $ref = '#/components/schemas/'.self::escapeRef($ref);
             }
         } else {
-            // Don't let a property value provide its own ref as that may pose a security concern..
+            // Don't let a property value provide its own ref as that may pose a security concern.
             $ref = '#/components/schemas/'.self::escapeRef($propertyValue);
         }
 

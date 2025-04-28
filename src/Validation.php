@@ -112,11 +112,11 @@ class Validation implements \JsonSerializable {
     }
 
     /**
-     * Gets all of the errors as a flat array.
+     * Gets every error as a flat array.
      *
      * The errors are internally stored indexed by field. This method flattens them for final error returns.
      *
-     * @return \Traversable Returns all of the errors.
+     * @return \Traversable Returns every error.
      */
     protected function getRawErrors() {
         foreach ($this->errors as $field => $errors) {
@@ -213,19 +213,21 @@ class Validation implements \JsonSerializable {
      */
     private function formatErrorList(string $field, array $errors) {
         $separator = " ";
+        $fieldName = '';
+        $colon = '%s';
         if (empty($field)) {
-            $fieldName = '';
-            $colon = '%s%s';
+            //$fieldName = '';
+            $colon = '%s';
         } else {
-            $fieldName = $this->formatFieldName($field);
-            $colon = $this->translate('%s %s');
-            if (count($errors) > 1) {
-                $colon = rtrim(sprintf($colon, '%s', "")).$separator.'%s';
-            }
+            //$fieldName = $this->formatFieldName($field);
+            //$colon = $this->translate('%s');
+//            if (count($errors) > 1) {
+//                $colon = rtrim(sprintf($colon, '%s', "")).$separator.'%s';
+//            }
         }
 
         $messages = $this->errorMessages($field, $errors);
-        $result = sprintf($colon, $fieldName, implode($separator, $messages));
+        $result = sprintf($colon, implode($separator, $messages));
         return $result;
     }
 
