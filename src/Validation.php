@@ -212,22 +212,21 @@ class Validation implements \JsonSerializable {
      * @return string Returns the error messages, translated and formatted.
      */
     private function formatErrorList(string $field, array $errors) {
-        $separator = " ";
-        $fieldName = '';
-        $colon = '%s';
         if (empty($field)) {
-            //$fieldName = '';
-            $colon = '%s';
+            $fieldName = '';
+            $colon = '%s%s';
+            $separator = "\n";
         } else {
-            //$fieldName = $this->formatFieldName($field);
-            //$colon = $this->translate('%s');
-//            if (count($errors) > 1) {
-//                $colon = rtrim(sprintf($colon, '%s', "")).$separator.'%s';
-//            }
+            $fieldName = $this->formatFieldName($field);
+            $colon = $this->translate('%s: %s');
+            $separator = "\n  ";
+            if (count($errors) > 1) {
+                $colon = rtrim(sprintf($colon, '%s', "")).$separator.'%s';
+            }
         }
 
         $messages = $this->errorMessages($field, $errors);
-        $result = sprintf($colon, implode($separator, $messages));
+        $result = sprintf($colon, $fieldName, implode($separator, $messages));
         return $result;
     }
 
