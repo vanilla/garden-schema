@@ -132,7 +132,7 @@ class Validation implements \JsonSerializable {
      * @return string Returns the exception message.
      */
     public function getMessage(): string {
-        return $this->getFullMessage();
+        return $this->getSummaryMessage();
     }
 
     /**
@@ -160,7 +160,7 @@ class Validation implements \JsonSerializable {
             $paras[] = $this->formatErrorList($field, $errors);
         }
 
-        $result = implode("\n\n", $paras);
+        $result = implode(" ", $paras);
         return $result;
     }
 
@@ -173,7 +173,15 @@ class Validation implements \JsonSerializable {
      * @return string Returns the main message.
      */
     public function getMainMessage() {
-        return $this->mainMessage;
+
+        $messages = [$this->mainMessage];
+        if (isset($this->errors[''])) {
+            $messages = array_merge($this->errors['']);
+        }
+
+        $messages = array_filter($messages);
+
+        return implode(" ", $messages);
     }
 
     /**
@@ -212,21 +220,22 @@ class Validation implements \JsonSerializable {
      * @return string Returns the error messages, translated and formatted.
      */
     private function formatErrorList(string $field, array $errors) {
+        $separator = " ";
+        $fieldName = '';
+        $colon = '%s';
         if (empty($field)) {
-            $fieldName = '';
-            $colon = '%s%s';
-            $separator = "\n";
+            //$fieldName = '';
+            $colon = '%s';
         } else {
             $fieldName = $this->formatFieldName($field);
-            $colon = $this->translate('%s: %s');
-            $separator = "\n  ";
-            if (count($errors) > 1) {
-                $colon = rtrim(sprintf($colon, '%s', "")).$separator.'%s';
-            }
+            //$colon = $this->translate('%s');
+//            if (count($errors) > 1) {
+//                $colon = rtrim(sprintf($colon, '%s', "")).$separator.'%s';
+//            }
         }
 
         $messages = $this->errorMessages($field, $errors);
-        $result = sprintf($colon, $fieldName, implode($separator, $messages));
+        $result = sprintf($colon, implode($separator, $messages));
         return $result;
     }
 
@@ -572,14 +581,11 @@ class Validation implements \JsonSerializable {
     }
 
     /**
-     * Specify data which should be serialized to JSON.
+     * Get an array of errors indexed by field.
      *
-     * @return mixed Data which can be serialized by <b>json_encode</b>,
-     * which is a value of any type other than a resource.
-     * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
+     * @return array
      */
-    #[\ReturnTypeWillChange]
-    public function jsonSerialize() {
+    public function getErrorsByField(): array {
         $errors = [];
 
         foreach ($this->getRawErrors() as $field => $error) {
@@ -588,11 +594,22 @@ class Validation implements \JsonSerializable {
                 ['error' => 1, 'message' => 1, 'code' => 1]
             );
         }
+        return $errors;
+    }
 
+    /**
+     * Specify data which should be serialized to JSON.
+     *
+     * @return mixed Data which can be serialized by <b>json_encode</b>,
+     * which is a value of any type other than a resource.
+     * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
+     */
+    #[\ReturnTypeWillChange]
+    public function jsonSerialize() {
         $result = [
             'message' => $this->getSummaryMessage(),
             'code' => $this->getCode(),
-            'errors' => $errors,
+            'errors' => $this->getErrorsByField(),
         ];
         return $result;
     }

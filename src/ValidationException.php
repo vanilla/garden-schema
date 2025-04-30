@@ -7,13 +7,15 @@
 
 namespace Garden\Schema;
 
+use Garden\Utils\ContextException;
+
 /**
  * An exception that was built from a {@link Validation} object.
  *
  * The validation object collects errors and is mutable. Once it's ready to be thrown as an exception it gets converted
  * to an instance of the immutable {@link ValidationException} class.
  */
-class ValidationException extends \Exception implements \JsonSerializable {
+class ValidationException extends ContextException implements \JsonSerializable {
     /**
      * @var Validation
      */
@@ -26,7 +28,7 @@ class ValidationException extends \Exception implements \JsonSerializable {
      */
     public function __construct(Validation $validation) {
         $this->validation = $validation;
-        parent::__construct($validation->getFullMessage(), $validation->getCode());
+        parent::__construct($validation->getSummaryMessage(), $validation->getCode(), context: ["errors" => $validation->getErrorsByField()]);
     }
 
     /**

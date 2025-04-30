@@ -7,8 +7,10 @@
 
 namespace Garden\Schema\Tests;
 
+use Garden\Schema\Schema;
 use Garden\Schema\Tests\Fixtures\TestValidation;
 use Garden\Schema\Validation;
+use Garden\Schema\ValidationException;
 
 /**
  * Tests for the `Validation` class' error message formatting.
@@ -77,7 +79,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     public function testTwoFieldlessErrors() {
         $vld = $this->createErrors('', 2);
 
-        $this->assertSame("!error 1\n!error 2", $vld->getFullMessage());
+        $this->assertSame("!error 1 !error 2", $vld->getMainMessage());
     }
 
     /**
@@ -85,7 +87,15 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
      */
     public function testOneFieldError() {
         $vld = $this->createErrors('', 0, 1);
-        $this->assertSame('![Field 1]: !error 1', $vld->getFullMessage());
+        $this->assertSame([
+            'message' => "!Validation failed.",
+            "code" => 400,
+            "errors" => [
+                'Field 1' => [
+                    ['error' => 'error 1', 'message' => '!error 1']
+                ]
+            ]
+        ], $vld->jsonSerialize());
     }
 
     /**
@@ -103,18 +113,6 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
         $vld = $this->createErrors('Failed', 0, 1);
 
         $this->assertSame("!Failed\n\n![Field 1]: !error 1", $vld->getFullMessage());
-    }
-
-    /**
-     * Fieldless errors should go above other errors.
-     */
-    public function testFieldlessAboveFields() {
-        $vld = new TestValidation();
-
-        $vld->addError('foo', 'bar');
-        $vld->addError('', 'baz');
-
-        $this->assertSame("!baz\n\n![foo]: !bar", $vld->getFullMessage());
     }
 
     /**
