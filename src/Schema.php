@@ -2191,7 +2191,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 [
                     'type' => 'string',
                     'value' => is_scalar($value) ? $value : null,
-                    'messageCode' => is_scalar($value) ? "{value} is not a valid string." : "The value is not a valid string."
+                    'messageCode' => is_scalar($value) ? "{value} is not a valid string." : "{field}: The value is not a valid string."
                 ]
             );
             return null;

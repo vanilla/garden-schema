@@ -45,7 +45,7 @@ class ValidationClassTest extends TestCase {
         $vld = new Validation();
         $vld->addError('foo', 'The {field}!');
 
-        $this->assertSame('foo: The foo!', $vld->getMessage());
+        $this->assertSame('The foo!', $vld->getMessage());
     }
 
     /**
@@ -100,7 +100,7 @@ class ValidationClassTest extends TestCase {
 
         $vld->addError('it', 'Keeping {field} {number}', ['number' => 100]);
 
-        $this->assertSame('!!it: !Keeping !it 100', $vld->getFullMessage());
+        $this->assertSame('!Keeping !it 100', $vld->getFullMessage());
     }
 
     /**
