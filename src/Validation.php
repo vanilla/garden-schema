@@ -173,10 +173,14 @@ class Validation implements \JsonSerializable {
      * @return string Returns the main message.
      */
     public function getMainMessage() {
+        $messages = (!empty($this->mainMessage)) ? [$this->mainMessage] : [];
 
-        $messages = [$this->mainMessage];
         if (isset($this->errors[''])) {
-            $messages = array_merge($this->errors['']);
+            foreach ($this->errors[''] as $error) {
+                if (is_array($error) && isset($error['messageCode'])) {
+                    $messages[] = $this->formatErrorMessage($error);
+                }
+            }
         }
 
         $messages = array_filter($messages);
