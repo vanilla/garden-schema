@@ -149,9 +149,9 @@ class Validation implements \JsonSerializable {
             return '';
         }
 
-        if (isset($this->errors[''])) {
-            $paras[] = $this->formatErrorList('', $this->errors['']);
-        }
+//        if (isset($this->errors[''])) {
+//            $paras[] = $this->formatErrorList('', $this->errors['']);
+//        }
 
         foreach ($this->errors as $field => $errors) {
             if ($field === '') {
