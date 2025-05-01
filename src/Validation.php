@@ -132,7 +132,7 @@ class Validation implements \JsonSerializable {
      * @return string Returns the exception message.
      */
     public function getMessage(): string {
-        return $this->getSummaryMessage();
+        return $this->getFullMessage();
     }
 
     /**
