@@ -112,7 +112,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     public function testMainAndFieldError() {
         $vld = $this->createErrors('Failed', 0, 1);
 
-        $this->assertSame("!Failed\n\n![Field 1]: !error 1", $vld->getFullMessage());
+        $this->assertSame("!Failed !error 1", $vld->getFullMessage());
     }
 
     /**
