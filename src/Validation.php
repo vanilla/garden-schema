@@ -160,7 +160,7 @@ class Validation implements \JsonSerializable {
             $paras[] = $this->formatErrorList($field, $errors);
         }
 
-        $result = implode("\n\n", $paras);
+        $result = implode(" ", $paras);
         return $result;
     }
 
@@ -211,23 +211,26 @@ class Validation implements \JsonSerializable {
      * @param array $errors The field's errors.
      * @return string Returns the error messages, translated and formatted.
      */
-    private function formatErrorList(string $field, array $errors) {
-        if (empty($field)) {
-            $fieldName = '';
-            $colon = '%s%s';
-            $sep = "\n";
-        } else {
-            $fieldName = $this->formatFieldName($field);
-            $colon = $this->translate('%s');
-            $sep = "\n  ";
-            if (count($errors) > 1) {
-                $colon = rtrim(sprintf($colon, '%s', "")).$sep.'%s';
-            }
+    private function formatErrorList(string $field, array $errors): string {
+        $isUnnamed = empty($field);
+        $messages = $this->errorMessages($field, $errors);
+
+        if (empty($messages)) {
+            return '';
         }
 
-        $messages = $this->errorMessages($field, $errors);
-        $result = sprintf($colon, implode($sep, $messages));
-        return $result;
+        $fieldLabel = $isUnnamed ? '' : $this->formatFieldName($field);
+        $separator = " ";
+
+        if ($isUnnamed) {
+            return implode($separator, $messages);
+        }
+
+        if (count($messages) === 1) {
+            return sprintf('%s: %s', $fieldLabel, $messages[0]);
+        }
+
+        return sprintf('%s:%s%s', $fieldLabel, $separator, implode($separator, $messages));
     }
 
     /**
