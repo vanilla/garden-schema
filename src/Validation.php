@@ -356,7 +356,7 @@ class Validation implements \JsonSerializable {
                 case 'value':
                     return $this->formatValue($context[$field] ?? null);
                 case 'field':
-                    $field = $context['field'] ?: 'value';
+                    $field = $context['field'] ?? 'value';
                     return $this->formatFieldName($field);
                 default:
                     return $this->formatField(isset($context[$field]) ? $context[$field] : null, $args);

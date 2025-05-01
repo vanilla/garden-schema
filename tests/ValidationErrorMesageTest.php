@@ -103,7 +103,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
      */
     public function testTwoFieldErrors() {
         $vld = $this->createErrors('', 0, 2);
-        $this->assertSame("![Field 1]:\n  !error 1\n  !error 2", $vld->getFullMessage());
+        $this->assertSame("!error 1 !error 2", $vld->getFullMessage());
     }
 
     /**
