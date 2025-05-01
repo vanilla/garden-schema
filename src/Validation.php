@@ -227,7 +227,7 @@ class Validation implements \JsonSerializable {
         }
 
         if (count($messages) === 1) {
-            return sprintf('%s: %s', $fieldLabel, $messages[0]);
+            return sprintf(/*'%s: '*/'%s', /*$fieldLabel, */$messages[0]);
         }
 
         return sprintf('%s:%s%s', $fieldLabel, $separator, implode($separator, $messages));
