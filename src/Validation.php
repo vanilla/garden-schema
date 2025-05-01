@@ -218,7 +218,7 @@ class Validation implements \JsonSerializable {
             $sep = "\n";
         } else {
             $fieldName = $this->formatFieldName($field);
-            $colon = $this->translate('%s: %s');
+            $colon = $this->translate('%s');
             $sep = "\n  ";
             if (count($errors) > 1) {
                 $colon = rtrim(sprintf($colon, '%s', "")).$sep.'%s';
@@ -226,7 +226,7 @@ class Validation implements \JsonSerializable {
         }
 
         $messages = $this->errorMessages($field, $errors);
-        $result = sprintf($colon, $fieldName, implode($sep, $messages));
+        $result = sprintf($colon, implode($sep, $messages));
         return $result;
     }
 
