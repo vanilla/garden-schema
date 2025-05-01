@@ -182,13 +182,16 @@ class Validation implements \JsonSerializable {
 //            $messages[] = $this->formatErrorList($field, $errors);
 //        }
 
-        if (isset($this->errors[''])) {
-            foreach ($this->errors[''] as $error) {
+        $errors = reset($this->errors);
+
+//        if (isset($this->errors[''])) {
+//            foreach ($this->errors[''] as $error) {
+              foreach ($errors as $error) {
                 if (is_array($error)) {
                     $messages[] = $this->formatErrorMessage($error);
                 }
             }
-        }
+//        }
 
         $messages = array_filter($messages);
 
