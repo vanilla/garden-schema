@@ -184,7 +184,7 @@ class Validation implements \JsonSerializable {
 
         if (isset($this->errors[''])) {
             foreach ($this->errors[''] as $error) {
-                if (is_array($error) && isset($error['messageCode'])) {
+                if (is_array($error)) {
                     $messages[] = $this->formatErrorMessage($error);
                 }
             }

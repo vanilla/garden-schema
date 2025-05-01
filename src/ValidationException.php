@@ -28,7 +28,7 @@ class ValidationException extends ContextException implements \JsonSerializable 
      */
     public function __construct(Validation $validation) {
         $this->validation = $validation;
-        parent::__construct($validation->getSummaryMessage(), $validation->getCode(), context: ["errors" => $validation->getErrorsByField()]);
+        parent::__construct($validation->getFullMessage(), $validation->getCode(), context: ["errors" => $validation->getErrorsByField()]);
     }
 
     /**
