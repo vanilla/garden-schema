@@ -101,7 +101,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
         } catch (ValidationException $ex) {
             $validation = $ex->getValidation();
             $this->assertFalse($validation->isValidField('arr/2'));
-            $this->assertEquals('arr/2 must be less than 2.', $validation->getMessage());
+            $this->assertEquals('arr/2: arr/2 must be less than 2.', $validation->getMessage());
         }
     }
 
