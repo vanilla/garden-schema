@@ -205,32 +205,27 @@ class Validation implements \JsonSerializable {
     }
 
     /**
-     * Format a field's errors.
+     * Format a field's error messages into a single string.
      *
-     * @param string $field The field name.
-     * @param array $errors The field's errors.
-     * @return string Returns the error messages, translated and formatted.
+     * @param string $field The field name. If empty, messages are treated as global.
+     * @param array $errors The list of errors for the field.
+     * @return string Formatted error message string.
      */
     private function formatErrorList(string $field, array $errors): string {
-        $isUnnamed = empty($field);
         $messages = $this->errorMessages($field, $errors);
 
         if (empty($messages)) {
             return '';
         }
 
-        $fieldLabel = $isUnnamed ? '' : $this->formatFieldName($field);
-        $separator = " ";
-
-        if ($isUnnamed) {
-            return implode($separator, $messages);
+        if ($field === '') {
+            return implode(' ', $messages);
         }
 
-        if (count($messages) === 1) {
-            return sprintf(/*'%s: '*/'%s', /*$fieldLabel, */$messages[0]);
-        }
+        $fieldLabel = $this->formatFieldName($field);
+        $formattedMessages = implode(' ', $messages);
 
-        return sprintf('%s:%s%s', $fieldLabel, $separator, implode($separator, $messages));
+        return sprintf('%s: %s', $fieldLabel, $formattedMessages);
     }
 
     /**
