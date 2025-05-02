@@ -85,7 +85,7 @@ class ValidationErrorMessageTest extends AbstractSchemaTest {
      */
     public function testOneFieldError() {
         $vld = $this->createErrors('', 0, 1);
-        $this->assertSame('!error 1', $vld->getFullMessage());
+        $this->assertSame('[Field 1]: !error 1', $vld->getFullMessage());
     }
 
     /**
@@ -102,7 +102,7 @@ class ValidationErrorMessageTest extends AbstractSchemaTest {
     public function testMainAndFieldError() {
         $vld = $this->createErrors('Failed', 0, 1);
 
-        $this->assertSame("!Failed !error 1", $vld->getFullMessage());
+        $this->assertSame("!Failed [Field 1]: !error 1", $vld->getFullMessage());
     }
 
     /**
@@ -114,7 +114,7 @@ class ValidationErrorMessageTest extends AbstractSchemaTest {
         $vld->addError('foo', 'bar');
         $vld->addError('', 'baz');
 
-        $this->assertSame("!baz !bar", $vld->getFullMessage());
+        $this->assertSame("!baz [foo]: !bar", $vld->getFullMessage());
     }
 
     /**
