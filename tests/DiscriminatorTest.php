@@ -163,7 +163,7 @@ class DiscriminatorTest extends TestCase {
     }
 
     /**
-     * A discriminators should fail if the discriminate to themselves.
+     * A discriminator should fail if it refers to its own schema, creating a circular reference.
      */
     public function testDiscriminatorCyclicalRef() {
         $this->expectException(ValidationException::class);
