@@ -13,7 +13,7 @@ use Garden\Schema\Validation;
 /**
  * Tests for the `Validation` class' error message formatting.
  */
-class ValidationErrorMesageTest extends AbstractSchemaTest {
+class ValidationErrorMessageTest extends AbstractSchemaTest {
 
     /**
      * An empty validation object should return no error message.
@@ -77,7 +77,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     public function testTwoFieldlessErrors() {
         $vld = $this->createErrors('', 2);
 
-        $this->assertSame("!error 1\n!error 2", $vld->getFullMessage());
+        $this->assertSame("!error 1 !error 2", $vld->getFullMessage());
     }
 
     /**
@@ -85,7 +85,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
      */
     public function testOneFieldError() {
         $vld = $this->createErrors('', 0, 1);
-        $this->assertSame('![Field 1]: !error 1', $vld->getFullMessage());
+        $this->assertSame('!error 1', $vld->getFullMessage());
     }
 
     /**
@@ -93,7 +93,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
      */
     public function testTwoFieldErrors() {
         $vld = $this->createErrors('', 0, 2);
-        $this->assertSame("![Field 1]:\n  !error 1\n  !error 2", $vld->getFullMessage());
+        $this->assertSame("[Field 1]: !error 1 !error 2", $vld->getFullMessage());
     }
 
     /**
@@ -102,7 +102,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
     public function testMainAndFieldError() {
         $vld = $this->createErrors('Failed', 0, 1);
 
-        $this->assertSame("!Failed\n\n![Field 1]: !error 1", $vld->getFullMessage());
+        $this->assertSame("!Failed !error 1", $vld->getFullMessage());
     }
 
     /**
@@ -114,7 +114,7 @@ class ValidationErrorMesageTest extends AbstractSchemaTest {
         $vld->addError('foo', 'bar');
         $vld->addError('', 'baz');
 
-        $this->assertSame("!baz\n\n![foo]: !bar", $vld->getFullMessage());
+        $this->assertSame("!baz !bar", $vld->getFullMessage());
     }
 
     /**

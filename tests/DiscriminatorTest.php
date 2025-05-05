@@ -158,16 +158,16 @@ class DiscriminatorTest extends TestCase {
      */
     public function testDiscriminatorTypeNotFound() {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("type: \"Foo\" is not a valid option.");
+        $this->expectExceptionMessage("\"Foo\" is not a valid option.");
         $valid = $this->schema->validate(['type' => 'Foo']);
     }
 
     /**
-     * A discriminators should fail if the discriminate to themselves.
+     * A discriminator should fail if it refers to its own schema, creating a circular reference.
      */
     public function testDiscriminatorCyclicalRef() {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("type: \"Pet\" is not a valid option.");
+        $this->expectExceptionMessage("\"Pet\" is not a valid option.");
         $valid = $this->schema->validate(['type' => 'Pet']);
     }
 
@@ -185,7 +185,7 @@ class DiscriminatorTest extends TestCase {
      */
     public function testDiscriminatorInfiniteRecursion() {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("type: \"Pet\" is not a valid option.");
+        $this->expectExceptionMessage("\"Pet\" is not a valid option.");
         $valid = $this->schema->validate(['type' => 'Bird', 'subtype' => 'Pet']);
     }
 
@@ -194,7 +194,7 @@ class DiscriminatorTest extends TestCase {
      */
     public function testDiscriminatorTypeError() {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("type: The value is not a valid string.");
+        $this->expectExceptionMessage("The value is not a valid string.");
         $valid = $this->schema->validate(['type' => ['hey!!!']]);
     }
 
@@ -203,7 +203,7 @@ class DiscriminatorTest extends TestCase {
      */
     public function testEmptyDiscriminator() {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("type: type is required.");
+        $this->expectExceptionMessage("type is required.");
         $valid = $this->schema->validate([]);
     }
 
@@ -229,7 +229,7 @@ class DiscriminatorTest extends TestCase {
      */
     public function testOneOfRef() {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('subtype: "Dog" is not a valid option.');
+        $this->expectExceptionMessage('"Dog" is not a valid option.');
         $valid = $this->schema->validate(['type' => 'Bird', 'subtype' => 'Dog']);
     }
 }

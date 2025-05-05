@@ -160,7 +160,7 @@ class Validation implements \JsonSerializable {
             $paras[] = $this->formatErrorList($field, $errors);
         }
 
-        $result = implode("\n\n", $paras);
+        $result = implode(" ", $paras);
         return $result;
     }
 
@@ -205,29 +205,40 @@ class Validation implements \JsonSerializable {
     }
 
     /**
-     * Format a field's errors.
+     * Format a field's error messages into a single string.
      *
-     * @param string $field The field name.
-     * @param array $errors The field's errors.
-     * @return string Returns the error messages, translated and formatted.
+     * @param string $field The field name. If empty, messages are treated as global.
+     * @param array $errors The list of errors for the field.
+     * @return string Formatted error message string.
      */
-    private function formatErrorList(string $field, array $errors) {
-        if (empty($field)) {
-            $fieldName = '';
-            $colon = '%s%s';
-            $sep = "\n";
-        } else {
-            $fieldName = $this->formatFieldName($field);
-            $colon = $this->translate('%s: %s');
-            $sep = "\n  ";
-            if (count($errors) > 1) {
-                $colon = rtrim(sprintf($colon, '%s', "")).$sep.'%s';
-            }
+    private function formatErrorList(string $field, array $errors): string {
+        // Determine if this is an unnamed/general error (not tied to a specific field).
+        $isUnnamed = empty($field);
+
+        // Resolve and format the actual error messages for the field.
+        $messages = $this->errorMessages($field, $errors);
+
+        // No messages? Return an empty string.
+        if (empty($messages)) {
+            return '';
         }
 
-        $messages = $this->errorMessages($field, $errors);
-        $result = sprintf($colon, $fieldName, implode($sep, $messages));
-        return $result;
+        // Format the field name (if named).
+        $fieldLabel = $isUnnamed ? '' : $this->formatFieldName($field);
+        $separator = " ";
+
+        // For unnamed fields, just return the concatenated messages.
+        if ($isUnnamed) {
+            return implode($separator, $messages);
+        }
+
+        // If there's only one message, omit the label prefix (by design).
+        if (count($messages) === 1) {
+            return sprintf('%s', $messages[0]);
+        }
+
+        // Otherwise, include the field label followed by all messages.
+        return sprintf('%s:%s%s', $fieldLabel, $separator, implode($separator, $messages));
     }
 
     /**
