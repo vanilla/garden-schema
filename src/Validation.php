@@ -223,22 +223,24 @@ class Validation implements \JsonSerializable {
             return '';
         }
 
+//        var_export($messages);
+//        die();
+
         // Format the field name (if named).
         $fieldLabel = $isUnnamed ? '' : $this->formatFieldName($field);
-        $separator = " ";
 
         // For unnamed fields, just return the concatenated messages.
         if ($isUnnamed) {
-            return implode($separator, $messages);
+            return implode(" ", $messages);
         }
 
         // If there's only one message, omit the label prefix (by design).
         if (count($messages) === 1) {
-            return sprintf('%s', $messages[0]);
+            return sprintf('%s %s', $fieldLabel, $messages[0]);
         }
 
         // Otherwise, include the field label followed by all messages.
-        return sprintf('%s:%s%s', $fieldLabel, $separator, implode($separator, $messages));
+        return sprintf('%s: %s', $fieldLabel, implode(" ", $messages));
     }
 
     /**
