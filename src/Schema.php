@@ -1765,7 +1765,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($isRequired) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => '{property} is required.', 'property' => $propertyName]
+                        ['messageCode' => 'is required.', 'property' => $propertyName]
                     );
                 }
             } else {
