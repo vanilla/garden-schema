@@ -107,7 +107,7 @@ class ObjectValidationTest extends AbstractSchemaTest {
             $valid = $sch->validate(['~/' => 123.4]);
             $this->fail("There should be a validation exception.");
         } catch (ValidationException $ex) {
-            $this->assertSame('123.4 is not a valid integer.', $ex->getValidation()->getConcatMessage('~0~1'));
+            $this->assertSame('value: 123.4 is not a valid integer.', $ex->getValidation()->getConcatMessage('~0~1'));
         }
     }
 }
