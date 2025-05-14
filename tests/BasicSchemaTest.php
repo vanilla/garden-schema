@@ -435,7 +435,7 @@ class BasicSchemaTest extends AbstractSchemaTest {
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!"aaa" is not a valid integer.', $ex->getMessage());
+            $this->assertSame('![value]: "aaa" is not a valid integer.', $ex->getMessage());
         }
     }
 
