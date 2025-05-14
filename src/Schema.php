@@ -321,7 +321,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Handle legacy syntax like "field?" => [ ... ]
         elseif (substr($key, -1) === '?') {
             $name = substr($key, 0, -1);
-            $typeStr = $value['type'] ?? '';
+            $typeStr = $value instanceof Schema ? '' : ($value['type'] ?? '');
             $typeStr = (is_array($typeStr) ? implode('|', $typeStr) : $typeStr);
             $required = false;
         }
@@ -1765,7 +1765,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($isRequired) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => '{property} is required.', 'property' => $propertyName]
+                        ['messageCode' => '{field} is required.']
                     );
                 }
             } else {
