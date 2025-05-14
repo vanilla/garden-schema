@@ -223,9 +223,6 @@ class Validation implements \JsonSerializable {
             return '';
         }
 
-//        var_export($messages);
-//        die();
-
         // Format the field name (if named).
         $fieldLabel = $isUnnamed ? '' : $this->formatFieldName($field);
 
@@ -236,7 +233,6 @@ class Validation implements \JsonSerializable {
 
         // If there's only one message, omit the label prefix (by design).
         if (count($messages) === 1) {
-//            return sprintf('%s %s', $fieldLabel, $messages[0]);
             return sprintf('%s', $messages[0]);
         }
 
