@@ -86,7 +86,7 @@ class ValidationField {
             [
                 'type' => $type,
                 'value' => is_scalar($value) ? $value : null,
-                'messageCode' => is_scalar($value) ? "{value} is not a valid $type." : "{field} is not a valid $type."
+                'messageCode' => is_scalar($value) ? "{field}: {value} is not a valid $type." : "{field}: The value is not a valid $type."
             ]
         );
 
