@@ -353,7 +353,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
         } catch (ValidationException $ex) {
             $errors = $ex->getValidation()->getErrors();
             $this->assertCount(2, $errors);
-            $this->assertEquals('name is required.', $errors[0]['message']);
+            $this->assertEquals('0/name is required.', $errors[0]['message']);
             $this->assertEquals('1/name is not a valid string.', $errors[1]['message']);
         }
     }
@@ -429,5 +429,28 @@ class NestedSchemaTest extends AbstractSchemaTest {
 
         $this->expectExceptionMessage('sub-schema-fail is always invalid.');
         $schema->validate(['sub-schema-fail' => null]);
+    }
+
+    /**
+     * Test that parse preserves subschema instances.
+     *
+     * @return void
+     */
+    public function testPreserveSchemasOnParse(): void {
+        $childArrSchema = new Schema([
+            "type" => "array",
+            "items" => [
+                "type" => "string",
+            ]
+        ]);
+
+        $objSchema = Schema::parse([
+            "name:s",
+            "description:s?",
+            "tags?" => $childArrSchema,
+        ]);
+
+        $this->assertInstanceOf(Schema::class, $objSchema->getSchemaArray()["properties"]["tags"]);
+        $this->assertEquals($childArrSchema, $objSchema->getSchemaArray()["properties"]["tags"]);
     }
 }
