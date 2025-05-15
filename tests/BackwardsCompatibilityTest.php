@@ -141,7 +141,7 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!"aaa" is not a valid integer.', $ex->getMessage());
+            $this->assertSame('![value]: "aaa" is not a valid integer.', $ex->getMessage());
         }
 
         $validation = new TestValidation();
@@ -150,14 +150,14 @@ class BackwardsCompatibilityTest extends AbstractSchemaTest {
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!"aaa" is not a valid integer.', $ex->getMessage());
+            $this->assertSame('![value]: "aaa" is not a valid integer.', $ex->getMessage());
         }
 
         $validation->setTranslateFieldNames(true);
         try {
             $schema->validate('aaa');
         } catch (ValidationException $ex) {
-            $this->assertSame('!!"aaa" is not a valid integer.', $ex->getMessage());
+            $this->assertSame('!!value: !"aaa" is not a valid integer.', $ex->getMessage());
         }
     }
 

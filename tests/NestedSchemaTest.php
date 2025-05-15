@@ -354,7 +354,7 @@ class NestedSchemaTest extends AbstractSchemaTest {
             $errors = $ex->getValidation()->getErrors();
             $this->assertCount(2, $errors);
             $this->assertEquals('0/name is required.', $errors[0]['message']);
-            $this->assertEquals('1/name is not a valid string.', $errors[1]['message']);
+            $this->assertEquals('1/name: The value is not a valid string.', $errors[1]['message']);
         }
     }
 
