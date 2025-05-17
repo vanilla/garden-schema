@@ -27,7 +27,7 @@ class StringValidationTest extends AbstractSchemaTest {
      * @dataProvider provideMinLengthTests
      */
     public function testMinLength($str, $code, $minLength = 3, int $flags = null) {
-        $schema = Schema::parse(['str:s' => ['minLength' => $minLength]]);
+        $schema = Schema::parse(['str:s?' => ['minLength' => $minLength]]);
         if ($flags) {
             $schema->setFlags($flags);
         }
