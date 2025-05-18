@@ -1597,7 +1597,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError(
                     'minItems',
                     [
-                        'messageCode' => 'This must contain at least {minItems} {minItems,plural,item,items}.',
+                        'messageCode' => '{field} must contain at least {minItems} {minItems,plural,item,items}.',
                         'minItems' => $minItems,
                     ]
                 );
