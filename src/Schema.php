@@ -1759,7 +1759,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // Check for required fields.
             $dataValue = $data[$propertyName] ?? null;
 
-            if (!array_key_exists($lName, $keys) || ($isRequired && in_array($dataValue, ['', null], true))) {
+            if (!array_key_exists($lName, $keys) || ($isRequired && in_array($dataValue, [''], true))) {
                 if ($field->isSparse()) {
                     // Sparse validation can leave required fields out.
                 } elseif ($propertyField->hasVal('default')) {
