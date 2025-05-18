@@ -1772,9 +1772,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 }
             } else {
                 $value = $data[$keys[$lName]];
+                $fieldSpecs = $propertyField->getField();
 
-                $allowEmpty = $propertyField->val('minLength', false) === 0;
-                if ($propertyField->hasType('string') & $isRequired && ($value == '') && !$allowEmpty) {
+                $minLength = $propertyField->val('minLength', false);
+                if ($isRequired && ($value === '') && ($minLength!=false) && $minLength > 0) {
                     $propertyField->addError(
                         'required',
                         ['messageCode' => '{field} is required.']
