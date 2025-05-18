@@ -1757,9 +1757,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             }
 
             // Check for required fields.
-            $dataValue = $data[$propertyName] ?? null;
+//            $dataValue = $data[$propertyName] ?? null;
 
-            if (!array_key_exists($lName, $keys) || ($isRequired && ($dataValue == '') && $propertyField->hasType('string'))) {
+            if (!array_key_exists($lName, $keys)) {
                 if ($field->isSparse()) {
                     // Sparse validation can leave required fields out.
                 } elseif ($propertyField->hasVal('default')) {
@@ -1772,6 +1772,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 }
             } else {
                 $value = $data[$keys[$lName]];
+
+                $allowEmpty = $propertyField->val('minLength', false) === 0;
+                if ($isRequired && ($value == '') && !$allowEmpty) {
+                    $propertyField->addError(
+                        'required',
+                        ['messageCode' => '{field} is required.']
+                    );
+                }
 
                 if (in_array($value, [null, ''], true) && !$isRequired && !($propertyField->val('nullable') || $propertyField->hasType('null'))) {
                     if ($propertyField->getType() !== 'string' || $value === null) {
