@@ -1597,7 +1597,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $field->addError(
                     'minItems',
                     [
-                        'messageCode' => 'This must contain at least {minItems} {minItems,plural,item,items}.',
+                        'messageCode' => '{field} must contain at least {minItems} {minItems,plural,item,items}.',
                         'minItems' => $minItems,
                     ]
                 );
@@ -1770,6 +1770,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 }
             } else {
                 $value = $data[$keys[$lName]];
+                // Check for required fields.
+                $minLength = $propertyField->val('minLength', false);
+                if ($isRequired && ($value === '') && ($minLength!=false) && $minLength > 0) {
+                    $propertyField->addError(
+                        'required',
+                        ['messageCode' => '{field} is required.']
+                    );
+                }
 
                 if (in_array($value, [null, ''], true) && !$isRequired && !($propertyField->val('nullable') || $propertyField->hasType('null'))) {
                     if ($propertyField->getType() !== 'string' || $value === null) {
