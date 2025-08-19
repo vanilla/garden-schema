@@ -437,7 +437,7 @@ class Validation implements \JsonSerializable {
     private function pluckError(array $error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'error' => 1, 'code' => 1]
+            ['field' => 1, 'error' => 1, 'code' => 1, 'status' => 1]
         );
 
         $row['message'] = $this->formatErrorMessage($error);
@@ -593,10 +593,7 @@ class Validation implements \JsonSerializable {
         $errors = [];
 
         foreach ($this->getRawErrors() as $field => $error) {
-            $errors[$field][] = array_intersect_key(
-                $this->pluckError($error + ['field' => $field]),
-                ['error' => 1, 'message' => 1, 'code' => 1]
-            );
+            $errors[] = $this->pluckError($error + ['field' => $field, 'status' => 400]);
         }
 
         $result = [
