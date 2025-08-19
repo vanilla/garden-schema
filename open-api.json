@@ -44,31 +44,42 @@
 					"errors": {
 						"title": "Field Errors",
 						"description": "A mapping of field references to errors.",
-						"type": "object",
-						"additionalProperties": {
-							"type": "array",
-							"items": {
-								"type": "object",
-								"properties": {
-									"message": {
-										"description": "A human-readable error message.",
-										"type": "string"
-									},
-									"error": {
-										"description": "A string code for the specific validation error meant for consumption by code.",
-										"type": "string"
-									},
-									"code": {
-										"description": "An HTTP-style error code for the error.",
-										"type": "integer"
-									}
+						"type": "array",
+						"items": {
+							"type": "object",
+							"properties": {
+								"message": {
+									"description": "A human-readable error message.",
+									"type": "string"
 								},
-								"required": ["message", "error"],
-								"example": {
-									"message": "The value should be at least 10 characters long.",
-									"error": "minLength",
-									"code": 400
+								"error": {
+									"description": "A string code for the specific validation error meant for consumption by code.",
+									"type": "string"
+								},
+								"code": {
+									"description": "An HTTP-style error code for the error.",
+									"type": "integer"
+								},
+								"status": {
+									"description": "An HTTP-style error code for the error.",
+									"type": "integer"
+								},
+								"field": {
+									"description": "Field the error applies to",
+									"type": "string"
 								}
+							},
+							"required": [
+								"message",
+								"error",
+								"status",
+								"field"
+							],
+							"example": {
+								"message": "The value should be at least 10 characters long.",
+								"error": "minLength",
+								"field": "myField",
+								"status": 400
 							}
 						}
 					}
