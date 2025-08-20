@@ -422,7 +422,7 @@ class StringValidationTest extends AbstractSchemaTest {
     /**
      * Test optional date fields without allowNull (just shorthand).
      * This test verifies the behavior of field:s? without explicit allowNull.
-     * 
+     *
      * NOTE: field:s? makes a field optional (not required) but NOT nullable.
      * This means empty strings should still fail validation since the field
      * is provided but invalid.
@@ -444,7 +444,7 @@ class StringValidationTest extends AbstractSchemaTest {
         // Test 2: Null value should pass (garden-schema handles null for optional fields)
         $result = $schema->validate(['optionalDate' => null]);
         // Note: This behavior might vary between garden-schema versions
-        
+
         // Test 3: Omitted field should pass (field is optional)
         $result = $schema->validate([]);
         $this->assertEquals([], $result);
@@ -455,6 +455,86 @@ class StringValidationTest extends AbstractSchemaTest {
             $this->fail('Empty string should fail for non-nullable optional field');
         } catch (ValidationException $ex) {
             $this->assertStringContainsString('not a valid date/time', $ex->getMessage());
+        }
+    }
+
+    /**
+     * Verify the behavior of optional date fields with date-time format.
+     */
+    public function testDateFormatBehavior(): void
+    {
+        // Optional means not required.
+        $this->assertEquals(
+            [],
+            Schema::parse(["myDate:s?" => ["format" => "date-time"]])->validate([
+                "myDate" => null,
+            ])
+        );
+
+        // Also makes minLength: 0 on strings, but date-time format validation still applies
+        // NOTE: field:s? alone doesn't make a field nullable, so empty strings still fail format validation
+        // This should fail validation and crash the test (even with our fix, since field:s? is not nullable)
+        try {
+            Schema::parse(["myDate:s?" => ["format" => "date-time"]])->validate([
+                "myDate" => "",
+            ]);
+            $this->fail('Empty string should fail for non-nullable optional field');
+        } catch (ValidationException $ex) {
+            $this->assertStringContainsString('not a valid date/time', $ex->getMessage());
+        }
+
+        // Optional strips off null values
+        $this->assertEquals(
+            [],
+            Schema::parse(["myDate:s?" => ["format" => "date-time"]])->validate([])
+        );
+
+        // Unless you pass allowNull
+        $this->assertEquals(
+            [
+                "myDate" => null,
+            ],
+            Schema::parse([
+                "myDate:s?" => [
+                    "format" => "date-time",
+                    "allowNull" => true,
+                ],
+            ])->validate([
+                "myDate" => null,
+            ])
+        );
+
+        // Required, but allowNull is different.
+        $this->assertEquals(
+            ["myDate" => null],
+            Schema::parse(["myDate:s" => ["format" => "date-time", "allowNull" => true]])->validate([
+                "myDate" => null,
+            ])
+        );
+
+        // Validation error
+        // Field is required but may be null
+        try {
+            Schema::parse(["myDate:s" => ["format" => "date-time", "allowNull" => true]])->validate([]);
+            $this->fail('Required field should fail when omitted');
+        } catch (ValidationException $ex) {
+            $this->assertStringContainsString('required', $ex->getMessage());
+        }
+
+        // Validation error, field is required and has default "minLength: 1" from the ":s alias.
+        // But for date-time format, empty string fails format validation, not minLength
+        try {
+            Schema::parse(["myDate:s" => ["format" => "date-time", "allowNull" => true]])->validate([
+                "myDate" => "",
+            ]);
+            $this->fail('Required field with empty string should fail validation');
+        } catch (ValidationException $ex) {
+            // The error could be either "required" or "not a valid date/time" depending on validation order
+            $this->assertTrue(
+                strpos($ex->getMessage(), 'required') !== false ||
+                strpos($ex->getMessage(), 'not a valid date/time') !== false,
+                'Expected either "required" or "not a valid date/time" error, got: ' . $ex->getMessage()
+            );
         }
     }
 }
