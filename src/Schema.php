@@ -1495,6 +1495,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return \DateTimeInterface|Invalid Returns the cleaned value or **null** if it isn't valid.
      */
     protected function validateDatetime($value, ValidationField $field) {
+        // Handle empty strings for optional date fields by converting to null
+        if ($value === '' && ($field->val('nullable') || $field->hasType('null'))) {
+            return null;
+        }
+        
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
         } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {

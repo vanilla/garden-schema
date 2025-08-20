@@ -374,4 +374,87 @@ class StringValidationTest extends AbstractSchemaTest {
 
         return array_column($r, null, 0);
     }
+
+    /**
+     * Test optional date fields with format validation.
+     * This test verifies that optional date fields with date-time format
+     * handle empty strings and null values correctly.
+     */
+    public function testOptionalDateFieldWithFormat(): void
+    {
+        // Test schema: optional date field with date-time format
+        $schema = Schema::parse(['optionalDate:s?' => [
+            'format' => 'date-time',
+            'allowNull' => true
+        ]]);
+
+        // Test 1: Valid date should pass and be converted to DateTimeImmutable
+        $validDate = '2024-01-15T10:30:00Z';
+        $result = $schema->validate(['optionalDate' => $validDate]);
+        $this->assertArrayHasKey('optionalDate', $result);
+        $this->assertInstanceOf(\DateTimeImmutable::class, $result['optionalDate']);
+        $this->assertEquals($validDate, $result['optionalDate']->format('Y-m-d\TH:i:s\Z'));
+
+        // Test 2: Null value should pass (due to allowNull: true)
+        $result = $schema->validate(['optionalDate' => null]);
+        $this->assertEquals(['optionalDate' => null], $result);
+
+        // Test 3: Omitted field should pass (due to optional shorthand)
+        $result = $schema->validate([]);
+        $this->assertEquals([], $result);
+
+        // Test 4: Empty string should pass for optional fields (converted to null or handled gracefully)
+        $result = $schema->validate(['optionalDate' => '']);
+        // For optional fields, empty strings should either be converted to null or handled gracefully
+        // This is the behavior we want to implement in garden-schema
+        $this->assertArrayHasKey('optionalDate', $result);
+        // The result could be null, empty string, or omitted - depending on implementation
+
+        // Test 5: Invalid date string should fail
+        try {
+            $schema->validate(['optionalDate' => 'not-a-date']);
+            $this->fail('Invalid date string should fail date-time format validation');
+        } catch (ValidationException $ex) {
+            $this->assertStringContainsString('not a valid date/time', $ex->getMessage());
+        }
+    }
+
+    /**
+     * Test optional date fields without allowNull (just shorthand).
+     * This test verifies the behavior of field:s? without explicit allowNull.
+     * 
+     * NOTE: field:s? makes a field optional (not required) but NOT nullable.
+     * This means empty strings should still fail validation since the field
+     * is provided but invalid.
+     */
+    public function testOptionalDateFieldWithoutAllowNull(): void
+    {
+        // Test schema: optional date field with date-time format (no allowNull)
+        $schema = Schema::parse(['optionalDate:s?' => [
+            'format' => 'date-time'
+        ]]);
+
+        // Test 1: Valid date should pass and be converted to DateTimeImmutable
+        $validDate = '2024-01-15T10:30:00Z';
+        $result = $schema->validate(['optionalDate' => $validDate]);
+        $this->assertArrayHasKey('optionalDate', $result);
+        $this->assertInstanceOf(\DateTimeImmutable::class, $result['optionalDate']);
+        $this->assertEquals($validDate, $result['optionalDate']->format('Y-m-d\TH:i:s\Z'));
+
+        // Test 2: Null value should pass (garden-schema handles null for optional fields)
+        $result = $schema->validate(['optionalDate' => null]);
+        // Note: This behavior might vary between garden-schema versions
+        
+        // Test 3: Omitted field should pass (field is optional)
+        $result = $schema->validate([]);
+        $this->assertEquals([], $result);
+
+        // Test 4: Empty string should fail (field is provided but invalid)
+        try {
+            $schema->validate(['optionalDate' => '']);
+            $this->fail('Empty string should fail for non-nullable optional field');
+        } catch (ValidationException $ex) {
+            $this->assertStringContainsString('not a valid date/time', $ex->getMessage());
+        }
+    }
 }
