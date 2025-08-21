@@ -459,82 +459,92 @@ class StringValidationTest extends AbstractSchemaTest {
     }
 
     /**
-     * Verify the behavior of optional date fields with date-time format.
+     * Test date format behavior with various field configurations.
+     *
+     * @param array $schema The schema to test.
+     * @param array $data The data to validate.
+     * @param string|array $expectedResult Expected result or error code.
+     * @param string $description Description of the test case.
+     *
+     * @dataProvider provideDateFormatTests
      */
-    public function testDateFormatBehavior(): void
-    {
-        // Optional means not required.
-        $this->assertEquals(
-            [],
-            Schema::parse(["myDate:s?" => ["format" => "date-time"]])->validate([
-                "myDate" => null,
-            ])
-        );
+    public function testDateFormatBehavior($schema, array $data, $expectedResult, string $description) {
+        $schemaObj = Schema::parse($schema);
 
-        // Also makes minLength: 0 on strings, but date-time format validation still applies
-        // NOTE: field:s? alone doesn't make a field nullable, so empty strings still fail format validation
-        // This should fail validation and crash the test (even with our fix, since field:s? is not nullable)
         try {
-            Schema::parse(["myDate:s?" => ["format" => "date-time"]])->validate([
-                "myDate" => "",
-            ]);
-            $this->fail('Empty string should fail for non-nullable optional field');
+            $result = $schemaObj->validate($data);
+
+            if (is_string($expectedResult)) {
+                // Expected validation to fail
+                $this->fail("'$description' should have failed validation with error: $expectedResult");
+            } else {
+                // Expected validation to succeed
+                // Handle DateTimeImmutable conversion for date fields
+                if (isset($result['myDate']) && $result['myDate'] instanceof \DateTimeImmutable) {
+                    $result['myDate'] = $result['myDate']->format('c');
+                }
+                $this->assertEquals($expectedResult, $result, $description);
+            }
         } catch (ValidationException $ex) {
-            $this->assertStringContainsString('not a valid date/time', $ex->getMessage());
+            if (is_string($expectedResult)) {
+                // Expected validation to fail
+                $this->assertFieldHasError($ex->getValidation(), 'myDate', $expectedResult);
+            } else {
+                // Expected validation to succeed but it failed
+                $this->fail("'$description' should have succeeded but failed with: " . $ex->getMessage());
+            }
         }
+    }
 
-        // Optional strips off null values
-        $this->assertEquals(
-            [],
-            Schema::parse(["myDate:s?" => ["format" => "date-time"]])->validate([])
-        );
-
-        // Unless you pass allowNull
-        $this->assertEquals(
-            [
-                "myDate" => null,
+    /**
+     * Provide test data for {@link testDateFormatBehavior()}.
+     *
+     * @return array Returns a data provider array.
+     */
+    public function provideDateFormatTests() {
+        return [
+            'optional date field with allowNull - null value' => [
+                ['myDate:s?' => ['format' => 'date-time', 'allowNull' => true]],
+                ['myDate' => null],
+                ['myDate' => null],
+                'Optional date field with allowNull should accept null'
             ],
-            Schema::parse([
-                "myDate:s?" => [
-                    "format" => "date-time",
-                    "allowNull" => true,
-                ],
-            ])->validate([
-                "myDate" => null,
-            ])
-        );
-
-        // Required, but allowNull is different.
-        $this->assertEquals(
-            ["myDate" => null],
-            Schema::parse(["myDate:s" => ["format" => "date-time", "allowNull" => true]])->validate([
-                "myDate" => null,
-            ])
-        );
-
-        // Validation error
-        // Field is required but may be null
-        try {
-            Schema::parse(["myDate:s" => ["format" => "date-time", "allowNull" => true]])->validate([]);
-            $this->fail('Required field should fail when omitted');
-        } catch (ValidationException $ex) {
-            $this->assertStringContainsString('required', $ex->getMessage());
-        }
-
-        // Validation error, field is required and has default "minLength: 1" from the ":s alias.
-        // But for date-time format, empty string fails format validation, not minLength
-        try {
-            Schema::parse(["myDate:s" => ["format" => "date-time", "allowNull" => true]])->validate([
-                "myDate" => "",
-            ]);
-            $this->fail('Required field with empty string should fail validation');
-        } catch (ValidationException $ex) {
-            // The error could be either "required" or "not a valid date/time" depending on validation order
-            $this->assertTrue(
-                strpos($ex->getMessage(), 'required') !== false ||
-                strpos($ex->getMessage(), 'not a valid date/time') !== false,
-                'Expected either "required" or "not a valid date/time" error, got: ' . $ex->getMessage()
-            );
-        }
+            'optional date field with allowNull - empty string' => [
+                ['myDate:s?' => ['format' => 'date-time', 'allowNull' => true]],
+                ['myDate' => ''],
+                ['myDate' => null],
+                '->Optional date field with allowNull should convert empty string to null'
+            ],
+            'optional date field with allowNull - valid date' => [
+                ['myDate:s?' => ['format' => 'date-time', 'allowNull' => true]],
+                ['myDate' => '2023-01-15T10:30:00Z'],
+                ['myDate' => '2023-01-15T10:30:00+00:00'],
+                'Optional date field with allowNull should accept valid date'
+            ],
+            'optional date field without allowNull - null value' => [
+                ['myDate:s?'],
+                ['myDate' => null],
+                [],
+                'Optional date field without allowNull should accept null (field:s? behavior)'
+            ],
+            'optional date field without allowNull - empty string' => [
+                ['myDate:s?' => ['format' => 'date-time']],
+                ['myDate' => ''],
+                'type',
+                'Optional date field without allowNull should reject empty string'
+            ],
+            'required date field with allowNull - omitted' => [
+                ['myDate:s' => ['format' => 'date-time', 'allowNull' => true]],
+                [],
+                'required',
+                'Required date field with allowNull should reject omitted field'
+            ],
+            'required date field with allowNull - empty string' => [
+                ['myDate:s' => ['format' => 'date-time', 'allowNull' => true]],
+                ['myDate' => ''],
+                'required',
+                'Required date field with allowNull should reject empty string'
+            ],
+        ];
     }
 }

@@ -1499,7 +1499,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ($value === '' && ($field->val('nullable') || $field->hasType('null'))) {
             return null;
         }
-        
+
         if ($value instanceof \DateTimeInterface) {
             // do nothing, we're good
         } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
