@@ -203,7 +203,7 @@ class DiscriminatorTest extends TestCase {
      */
     public function testEmptyDiscriminator() {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage("type is required.");
+        $this->expectExceptionMessage("Field is required.");
         $valid = $this->schema->validate([]);
     }
 
