@@ -1765,17 +1765,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($isRequired) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => '{field} is required.']
+                        ['messageCode' => 'Field is required.']
                     );
                 }
             } else {
                 $value = $data[$keys[$lName]];
-                // Check for required fields.
+                // Check for required fields with empty strings
                 $minLength = $propertyField->val('minLength', false);
                 if ($isRequired && ($value === '') && ($minLength!=false) && $minLength > 0) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => '{field} is required.']
+                        ['messageCode' => 'Field is required.']
                     );
                 }
 
@@ -1785,7 +1785,24 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     }
                 }
 
-                $clean[$propertyName] = $this->validateField($value, $propertyField);
+                // Short-circuit validation only if field has "required" error
+                $fieldErrors = $propertyField->getValidation()->getFieldErrors($propertyField->getName());
+                $hasRequiredError = false;
+                
+                foreach ($fieldErrors as $error) {
+                    if ($error['error'] === 'required') {
+                        $hasRequiredError = true;
+                        break;
+                    }
+                }
+                
+                if ($hasRequiredError) {
+                    // Field has required error, skip further validation
+                    $clean[$propertyName] = Invalid::value();
+                } else {
+                    // Run full validation (including other error types)
+                    $clean[$propertyName] = $this->validateField($value, $propertyField);
+                }
             }
 
             unset($keys[$lName]);
@@ -2186,7 +2203,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->getValidation()->addError(
                 $propertyFieldName,
                 'required',
-                ['messageCode' => '{property} is required.', 'property' => $propertyName]
+                ['messageCode' => 'Field is required.']
             );
             return null;
         }

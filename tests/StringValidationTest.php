@@ -53,11 +53,11 @@ class StringValidationTest extends AbstractSchemaTest {
      */
     public function provideMinLengthTests() {
         $r = [
-            'empty' => ['', 'minLength'],
+            'empty' => ['', 'required'],  // Empty string on required field now shows "required" error
             'ab' => ['ab', 'minLength'],
             'abc' => ['abc', ''],
             'abcd' => ['abcd', ''],
-            'empty 1' => ['', 'minLength', 1],
+            'empty 1' => ['', 'required', 1],  // Empty string with minLength=1 now shows "required" error
             'empty 0' => ['', '', 0],
             'unicode as bytes success' => ['😱', 'minLength', 4],
             'unicode as unicode fail' => ['😱', 'minLength', 2, Schema::VALIDATE_STRING_LENGTH_AS_UNICODE],
