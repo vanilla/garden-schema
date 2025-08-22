@@ -263,7 +263,13 @@ class StringValidationTest extends AbstractSchemaTest {
      * @throws \Garden\Schema\RefNotFoundException
      */
     public function testEmptyOptionalDateTime() {
-        $schema = Schema::parse(['field?' => ['type' => 'string', 'format' => 'date-time']]);
+        $schema = Schema::parse([
+            'field?' => [
+                'type' => 'string',
+                'format' => 'date-time',
+                'allowNull' => true
+            ]
+        ]);
         $value['field'] = '';
         $valid = $schema->validate($value);
     }
