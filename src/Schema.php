@@ -271,6 +271,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             list($name, $param, $required) = $this->parseShortParam($key, $value);
 
             $node = $this->parseNode($param, $value);
+            
+            // Store the required status in the field definition for validation
+            if (is_array($node)) {
+                $node['required'] = $required;
+            }
 
             $properties[$name] = $node;
             if ($required) {
@@ -1374,9 +1379,23 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string|Invalid Returns the valid string or **null** if validation fails.
      */
     protected function validateString($value, ValidationField $field) {
+        // Skip format validation for optional fields with empty strings
         if ($field->val('format') === 'date-time') {
-            $result = $this->validateDatetime($value, $field);
+            // Check if this field is in the required list by examining the field definition
+            $fieldDef = $field->getField();
+            $isOptional = false;
+            
+            // If the field definition has a 'required' property, check it
+            if (is_array($fieldDef) && isset($fieldDef['required'])) {
+                $isOptional = !$fieldDef['required'];
+            }
 
+             // Skip format validation for optional empty fields
+            if ($isOptional && $value === '') {
+                return $value;
+            }
+
+            $result = $this->validateDatetime($value, $field);
             return $result;
         }
 
@@ -1765,7 +1784,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($isRequired) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => '{field} is required.']
+                        ['messageCode' => 'Field is required.']
                     );
                 }
             } else {
@@ -1775,7 +1794,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 if ($isRequired && ($value === '') && ($minLength!=false) && $minLength > 0) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => '{field} is required.']
+                        ['messageCode' => 'Field is required.']
                     );
                 }
 

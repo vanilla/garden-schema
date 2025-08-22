@@ -271,7 +271,8 @@ class StringValidationTest extends AbstractSchemaTest {
             ]
         ]);
         $value['field'] = '';
-        $valid = $schema->validate($value);
+        $schema->validate($value);
+        $this->assertTrue(true);
     }
 
     /**
