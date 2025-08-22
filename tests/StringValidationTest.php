@@ -257,6 +257,18 @@ class StringValidationTest extends AbstractSchemaTest {
     }
 
     /**
+     * @return void
+     * @throws ValidationException
+     * @throws \Garden\Schema\ParseException
+     * @throws \Garden\Schema\RefNotFoundException
+     */
+    public function testEmptyOptionalDateTime() {
+        $schema = Schema::parse(['field?' => ['type' => 'string', 'format' => 'date-time']]);
+        $value['field'] = '';
+        $valid = $schema->validate($value);
+    }
+
+    /**
      * Test different date/time parsing.
      *
      * @param mixed $value The value to parse.

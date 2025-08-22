@@ -1765,7 +1765,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($isRequired) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => 'Field is required.']
+                        ['messageCode' => '{field} is required.']
                     );
                 }
             } else {
@@ -1775,7 +1775,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 if ($isRequired && ($value === '') && ($minLength!=false) && $minLength > 0) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => 'Field is required.']
+                        ['messageCode' => '{field} is required.']
                     );
                 }
 
@@ -1788,14 +1788,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 // Short-circuit validation only if field has "required" error
                 $fieldErrors = $propertyField->getValidation()->getFieldErrors($propertyField->getName());
                 $hasRequiredError = false;
-                
+
                 foreach ($fieldErrors as $error) {
                     if ($error['error'] === 'required') {
                         $hasRequiredError = true;
                         break;
                     }
                 }
-                
+
                 if ($hasRequiredError) {
                     // Field has required error, skip further validation
                     $clean[$propertyName] = Invalid::value();
