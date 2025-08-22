@@ -270,7 +270,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // The parameter is defined in the key.
             list($name, $param, $required) = $this->parseShortParam($key, $value);
 
-                        $node = $this->parseNode($param, $value);
+            $node = $this->parseNode($param, $value);
 
             $properties[$name] = $node;
             if ($required) {
@@ -1375,21 +1375,21 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     private function isFieldOptional(ValidationField $field): bool {
         $schemaPath = $field->getSchemaPath();
         $fieldName = $field->getName();
-        
+
         // Extract the field name from the path (last part after /)
         $pathParts = explode('/', $fieldName);
         $actualFieldName = end($pathParts);
-        
+
         // Navigate to parent schema path (remove /properties/fieldName)
         $parentPath = $schemaPath;
         if (str_contains($parentPath, '/properties/')) {
             $parentPath = substr($parentPath, 0, strrpos($parentPath, '/properties/'));
         }
-        
+
         try {
             // Get the parent schema
             $parentSchema = empty($parentPath) ? $this->schema : $this->getField($parentPath);
-            
+
             // Check if this field is in the required array
             $required = $parentSchema['required'] ?? [];
             return !in_array($actualFieldName, $required, true);
@@ -1410,10 +1410,10 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         if ($field->val('format') === 'date-time') {
             // Skip format validation for optional fields with empty strings
             // Determine if this field is optional by checking parent schema's required array
-            if ($value === '' && $this->isFieldOptional($field)) {
-                return $value; // Skip format validation for optional empty fields
+            if ($this->isFieldOptional($field) && $value === '') {
+                return $value;
             }
-            
+
             $result = $this->validateDatetime($value, $field);
             return $result;
         }
