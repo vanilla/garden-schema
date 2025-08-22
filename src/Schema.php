@@ -1826,14 +1826,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 // Short-circuit validation only if field has "required" error
                 $fieldErrors = $propertyField->getValidation()->getFieldErrors($propertyField->getName());
                 $hasRequiredError = false;
-
                 foreach ($fieldErrors as $error) {
                     if ($error['error'] === 'required') {
                         $hasRequiredError = true;
                         break;
                     }
                 }
-
                 if ($hasRequiredError) {
                     // Field has required error, skip further validation
                     $clean[$propertyName] = Invalid::value();
