@@ -2244,7 +2244,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->getValidation()->addError(
                 $propertyFieldName,
                 'required',
-                ['messageCode' => '{field} is required.']
+                ['messageCode' => 'Field is required.']
             );
             return null;
         }
