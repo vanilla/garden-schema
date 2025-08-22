@@ -270,12 +270,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // The parameter is defined in the key.
             list($name, $param, $required) = $this->parseShortParam($key, $value);
 
-            $node = $this->parseNode($param, $value);
-
-            // Store the required status in the field definition for validation
-            if (is_array($node)) {
-                $node['required'] = $required;
-            }
+                        $node = $this->parseNode($param, $value);
 
             $properties[$name] = $node;
             if ($required) {
@@ -1372,6 +1367,39 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Check if a field is optional by examining the parent schema's required array.
+     *
+     * @param ValidationField $field The field to check.
+     * @return bool Returns true if the field is optional, false if required.
+     */
+    private function isFieldOptional(ValidationField $field): bool {
+        $schemaPath = $field->getSchemaPath();
+        $fieldName = $field->getName();
+        
+        // Extract the field name from the path (last part after /)
+        $pathParts = explode('/', $fieldName);
+        $actualFieldName = end($pathParts);
+        
+        // Navigate to parent schema path (remove /properties/fieldName)
+        $parentPath = $schemaPath;
+        if (str_contains($parentPath, '/properties/')) {
+            $parentPath = substr($parentPath, 0, strrpos($parentPath, '/properties/'));
+        }
+        
+        try {
+            // Get the parent schema
+            $parentSchema = empty($parentPath) ? $this->schema : $this->getField($parentPath);
+            
+            // Check if this field is in the required array
+            $required = $parentSchema['required'] ?? [];
+            return !in_array($actualFieldName, $required, true);
+        } catch (\Exception $e) {
+            // If we can't determine, assume required for safety
+            return false;
+        }
+    }
+
+    /**
      * Validate a string.
      *
      * @param mixed $value The value to validate.
@@ -1379,22 +1407,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string|Invalid Returns the valid string or **null** if validation fails.
      */
     protected function validateString($value, ValidationField $field) {
-        // Skip format validation for optional fields with empty strings
         if ($field->val('format') === 'date-time') {
-            // Check if this field is in the required list by examining the field definition
-            $fieldDef = $field->getField();
-            $isOptional = false;
-
-            // If the field definition has a 'required' property, check it
-            if (is_array($fieldDef) && isset($fieldDef['required'])) {
-                $isOptional = !$fieldDef['required'];
+            // Skip format validation for optional fields with empty strings
+            // Determine if this field is optional by checking parent schema's required array
+            if ($value === '' && $this->isFieldOptional($field)) {
+                return $value; // Skip format validation for optional empty fields
             }
-
-             // Skip format validation for optional empty fields
-            if ($isOptional && $value === '') {
-                return $value;
-            }
-
+            
             $result = $this->validateDatetime($value, $field);
             return $result;
         }
