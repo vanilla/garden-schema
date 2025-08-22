@@ -257,10 +257,9 @@ class StringValidationTest extends AbstractSchemaTest {
     }
 
     /**
+     * Test that verifies that optional date-time field accepts empty string("") as a valid value.
+     *
      * @return void
-     * @throws ValidationException
-     * @throws \Garden\Schema\ParseException
-     * @throws \Garden\Schema\RefNotFoundException
      */
     public function testEmptyOptionalDateTime() {
         $schema = Schema::parse([
@@ -271,8 +270,8 @@ class StringValidationTest extends AbstractSchemaTest {
             ]
         ]);
         $value['field'] = '';
-        $schema->validate($value);
-        $this->assertTrue(true);
+        $validation = $schema->validate($value);
+        $this->assertEquals(['field' => ''], $validation);
     }
 
     /**

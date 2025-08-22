@@ -271,7 +271,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             list($name, $param, $required) = $this->parseShortParam($key, $value);
 
             $node = $this->parseNode($param, $value);
-            
+
             // Store the required status in the field definition for validation
             if (is_array($node)) {
                 $node['required'] = $required;
@@ -1384,7 +1384,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // Check if this field is in the required list by examining the field definition
             $fieldDef = $field->getField();
             $isOptional = false;
-            
+
             // If the field definition has a 'required' property, check it
             if (is_array($fieldDef) && isset($fieldDef['required'])) {
                 $isOptional = !$fieldDef['required'];
@@ -1807,14 +1807,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 // Short-circuit validation only if field has "required" error
                 $fieldErrors = $propertyField->getValidation()->getFieldErrors($propertyField->getName());
                 $hasRequiredError = false;
-
                 foreach ($fieldErrors as $error) {
                     if ($error['error'] === 'required') {
                         $hasRequiredError = true;
                         break;
                     }
                 }
-
                 if ($hasRequiredError) {
                     // Field has required error, skip further validation
                     $clean[$propertyName] = Invalid::value();
