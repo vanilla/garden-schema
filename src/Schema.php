@@ -1372,31 +1372,36 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @param ValidationField $field The field to check.
      * @return bool Returns true if the field is optional, false if required.
      */
-    private function isFieldOptional(ValidationField $field): bool {
+    private function isFieldOptional(ValidationField $field): bool
+    {
         $schemaPath = $field->getSchemaPath();
         $fieldName = $field->getName();
 
-        // Extract the field name from the path (last part after /)
+        // Extract the field name from the path
         $pathParts = explode('/', $fieldName);
         $actualFieldName = end($pathParts);
 
-        // Navigate to parent schema path (remove /properties/fieldName)
+        // Navigate to parent schema path
         $parentPath = $schemaPath;
         if (str_contains($parentPath, '/properties/')) {
             $parentPath = substr($parentPath, 0, strrpos($parentPath, '/properties/'));
         }
 
-        try {
-            // Get the parent schema
-            $parentSchema = empty($parentPath) ? $this->schema : $this->getField($parentPath);
+        // Get the parent schema
+        $parentSchema = empty($parentPath) ? $this->schema : $this->getField($parentPath);
 
-            // Check if this field is in the required array
-            $required = $parentSchema['required'] ?? [];
-            return !in_array($actualFieldName, $required, true);
-        } catch (\Exception $e) {
-            // If we can't determine, assume required for safety
+        // Early validation - if parentSchema isn't an array, we can't proceed
+        if (!is_array($parentSchema)) {
             return false;
         }
+
+        // Get required array with validation
+        $required = $parentSchema['required'] ?? [];
+        if (!is_array($required)) {
+            return false;
+        }
+
+        return !in_array($actualFieldName, $required, true);
     }
 
     /**
@@ -1813,7 +1818,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 if ($isRequired && ($value === '') && ($minLength!=false) && $minLength > 0) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => '{field} is required.']
+                        ['messageCode' => 'Field is required.']
                     );
                 }
 
@@ -2239,7 +2244,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->getValidation()->addError(
                 $propertyFieldName,
                 'required',
-                ['messageCode' => 'Field is required.']
+                ['messageCode' => '{field} is required.']
             );
             return null;
         }
