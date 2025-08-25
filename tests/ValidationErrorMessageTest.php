@@ -146,7 +146,7 @@ class ValidationErrorMessageTest extends AbstractSchemaTest {
                 'message' => '!Validation failed.',
                 'code' => 400,
                 'errors' => [
-                    ['error' => 'error 1', 'message' => '!error 1', 'status' => 400, 'field' => '']
+                    ['error' => 'error 1', 'message' => '!error 1', 'status' => 400, 'field' => '', 'code' => 'error 1']
                 ]
         ], $json);
     }
@@ -159,10 +159,10 @@ class ValidationErrorMessageTest extends AbstractSchemaTest {
         $vld->addError('Field X', 'error 1', ['code' => 433, 'messageCode' => 'foo']);
         $json = $vld->jsonSerialize();
         $this->assertEquals(['message' => '!Foo', 'code' => 433, 'errors' => [
-            ['error' => 'error 1', 'message' => '!error 1', 'status' => 400, 'field' => 'Field 1'],
-            ['error' => 'error 2', 'message' => '!error 2', 'status' => 400, 'field' => 'Field 1'],
-            ['error' => 'error 1', 'message' => '!error 1', 'status' => 400, 'field' => 'Field 2'],
-            ['error' => 'error 2', 'message' => '!error 2', 'status' => 400, 'field' => 'Field 2'],
+            ['error' => 'error 1', 'message' => '!error 1', 'status' => 400, 'field' => 'Field 1', 'code' => 'error 1'],
+            ['error' => 'error 2', 'message' => '!error 2', 'status' => 400, 'field' => 'Field 1', 'code' => 'error 2'],
+            ['error' => 'error 1', 'message' => '!error 1', 'status' => 400, 'field' => 'Field 2', 'code' => 'error 1'],
+            ['error' => 'error 2', 'message' => '!error 2', 'status' => 400, 'field' => 'Field 2', 'code' => 'error 2'],
             ['error' => 'error 1', 'code' => 433, 'message' => '!foo', 'status' => 400, 'field' => 'Field X'],
         ]], $json);
     }

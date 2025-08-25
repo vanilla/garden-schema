@@ -245,11 +245,11 @@ abstract class AbstractSchemaTest extends TestCase {
 
         $codes = [];
         foreach ($validation->getFieldErrors($field) as $row) {
-            if ($error === $row['error']) {
-                $this->assertEquals($error, $row['error']); // Need at least one assertion.
+            if ($error === $row['code']) {
+                $this->assertEquals($error, $row['code']); // Need at least one assertion.
                 return;
             }
-            $codes[] = $row['error'];
+            $codes[] = $row['code'];
         }
 
         $has = implode(', ', $codes);

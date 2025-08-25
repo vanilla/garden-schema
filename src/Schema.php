@@ -1367,6 +1367,44 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Check if a field is optional by examining the parent schema's required array.
+     *
+     * @param ValidationField $field The field to check.
+     * @return bool Returns true if the field is optional, false if required.
+     */
+    private function isFieldOptional(ValidationField $field): bool
+    {
+        $schemaPath = $field->getSchemaPath();
+        $fieldName = $field->getName();
+
+        // Extract the field name from the path
+        $pathParts = explode('/', $fieldName);
+        $actualFieldName = end($pathParts);
+
+        // Navigate to parent schema path
+        $parentPath = $schemaPath;
+        if (str_contains($parentPath, '/properties/')) {
+            $parentPath = substr($parentPath, 0, strrpos($parentPath, '/properties/'));
+        }
+
+        // Get the parent schema
+        $parentSchema = empty($parentPath) ? $this->schema : $this->getField($parentPath);
+
+        // Early validation - if parentSchema isn't an array, we can't proceed
+        if (!is_array($parentSchema)) {
+            return false;
+        }
+
+        // Get required array with validation
+        $required = $parentSchema['required'] ?? [];
+        if (!is_array($required)) {
+            return false;
+        }
+
+        return !in_array($actualFieldName, $required, true);
+    }
+
+    /**
      * Validate a string.
      *
      * @param mixed $value The value to validate.
@@ -1375,8 +1413,13 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     protected function validateString($value, ValidationField $field) {
         if ($field->val('format') === 'date-time') {
-            $result = $this->validateDatetime($value, $field);
+            // Skip format validation for optional fields with empty strings
+            // Determine if this field is optional by checking parent schema's required array
+            if ($this->isFieldOptional($field) && $value === '') {
+                return $value;
+            }
 
+            $result = $this->validateDatetime($value, $field);
             return $result;
         }
 
@@ -1765,7 +1808,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 } elseif ($isRequired) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => 'Field is required.']
+                        ['messageCode' => '{field} is required.']
                     );
                 }
             } else {
@@ -1775,7 +1818,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 if ($isRequired && ($value === '') && ($minLength!=false) && $minLength > 0) {
                     $propertyField->addError(
                         'required',
-                        ['messageCode' => 'Field is required.']
+                        ['messageCode' => '{field} is required.']
                     );
                 }
 
@@ -1788,14 +1831,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 // Short-circuit validation only if field has "required" error
                 $fieldErrors = $propertyField->getValidation()->getFieldErrors($propertyField->getName());
                 $hasRequiredError = false;
-                
                 foreach ($fieldErrors as $error) {
-                    if ($error['error'] === 'required') {
+                    if ($error['code'] === 'required') {
                         $hasRequiredError = true;
                         break;
                     }
                 }
-                
                 if ($hasRequiredError) {
                     // Field has required error, skip further validation
                     $clean[$propertyName] = Invalid::value();
@@ -2203,7 +2244,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->getValidation()->addError(
                 $propertyFieldName,
                 'required',
-                ['messageCode' => 'Field is required.']
+                ['messageCode' => '{property} is required.', 'property' => $propertyName]
             );
             return null;
         }
