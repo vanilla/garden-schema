@@ -437,8 +437,13 @@ class Validation implements \JsonSerializable {
     private function pluckError(array $error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'error' => 1, 'code' => 1, 'status' => 1]
+            ['field' => 1, 'code' => 1, 'status' => 1]
         );
+
+        // Map 'error' to 'code' for the output
+        if (isset($error['error'])) {
+            $row['code'] = $error['error'];
+        }
 
         $row['message'] = $this->formatErrorMessage($error);
         return $row;

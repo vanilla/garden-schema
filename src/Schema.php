@@ -1832,7 +1832,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $fieldErrors = $propertyField->getValidation()->getFieldErrors($propertyField->getName());
                 $hasRequiredError = false;
                 foreach ($fieldErrors as $error) {
-                    if ($error['error'] === 'required') {
+                    if ($error['code'] === 'required') {
                         $hasRequiredError = true;
                         break;
                     }
