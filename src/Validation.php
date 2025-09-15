@@ -437,18 +437,12 @@ class Validation implements \JsonSerializable {
     private function pluckError(array $error) {
         $row = array_intersect_key(
             $error,
-            ['field' => 1, 'status' => 1]
+            ['field' => 1, 'status' => 1, 'code' => 1]
         );
 
-        // Map 'error' to 'code' for the output, and also keep 'error' for OpenAPI schema compatibility
+        // Map 'error' field to 'code' field as requested by user
         if (isset($error['error'])) {
-            $row['code'] = $error['error']; // This will be the error type (string)
-            $row['error'] = $error['error']; // Keep for OpenAPI schema compatibility
-        }
-        
-        // Ensure 'code' field contains the HTTP status code (integer)
-        if (isset($error['code']) && is_numeric($error['code'])) {
-            $row['code'] = $error['code']; // Override with numeric HTTP status code
+            $row['code'] = $error['error']; // Error type becomes 'code'
         }
 
         $row['message'] = $this->formatErrorMessage($error);

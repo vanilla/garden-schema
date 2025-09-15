@@ -71,13 +71,13 @@
 							},
 							"required": [
 								"message",
-								"error",
+								"code",
 								"status",
 								"field"
 							],
 							"example": {
 								"message": "The value should be at least 10 characters long.",
-								"error": "minLength",
+								"code": "minLength",
 								"field": "myField",
 								"status": 400
 							}
