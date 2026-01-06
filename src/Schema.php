@@ -241,9 +241,27 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             if ($node['type'] === null || $node['type'] === []) {
                 unset($node['type']);
             }
+
+            if (isset($value['enumClassName']) && class_exists($value['enumClassName']) && is_subclass_of($value['enumClassName'], \BackedEnum::class)) {
+                $node['enum'] = $this->extractParsedEnumValues($value['enumClassName']);
+            }
         }
 
         return $node;
+    }
+
+    /**
+     * Extract the values from a backed enum class.
+     *
+     * @param class-string<\BackedEnum> $enumClass The class name of the backed enum.
+     * @return array Returns an array of the enum values.
+     */
+    private function extractParsedEnumValues(string $enumClass): array {
+        $values = [];
+        foreach ($enumClass::cases() as $case) {
+            $values[] = $case->value;
+        }
+        return $values;
     }
 
     /**
@@ -353,11 +371,22 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         // Build the $param definition based on types and value
         if ($value instanceof Schema) {
             if (count($types) === 1 && $types[0] === 'array') {
-                $param += ['type' => $types[0], 'items' => $value];
+                $param += ['type' => 'array', 'items' => $value];
             } else {
                 $param = $value;
             }
-        } elseif (isset($value['type'])) {
+        } elseif(is_string($value) && class_exists($value) && is_a($value, \BackedEnum::class, allow_string: true)) {
+            $resolvedEnumType = [
+                'type' => ['string', 'integer'],
+                'enum' => $this->extractParsedEnumValues($value),
+                "enumClassName" => $value,
+            ];
+            if (count($types) === 1 && $types[0] === 'array') {
+                $param = ['type' => 'array', 'items' => $resolvedEnumType];
+            } else {
+                $param = $resolvedEnumType;
+            }
+        }  elseif (isset($value['type'])) {
             $param = $value + $param;
 
             // Normalize longform pseudo-types
@@ -1966,6 +1995,25 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             );
             return Invalid::value();
         }
+
+        // We may have a \BackedEnum value to cast to.
+        $enumClass = $field->val('enumClassName');
+        if ($enumClass && is_string($value) && class_exists($enumClass) && is_subclass_of($enumClass, \BackedEnum::class)) {
+            $value = $enumClass::tryFrom($value);
+            if ($value === null) {
+                $field->addError(
+                    'enum',
+                    [
+                        'messageCode' => '{field} must be one of: {enum}.',
+                        'enum' => $enum,
+                    ]
+                );
+                return Invalid::value();
+            } else {
+                return $value;
+            }
+        }
+
         return $value;
     }
 

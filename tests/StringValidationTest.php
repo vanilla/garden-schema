@@ -9,6 +9,7 @@ namespace Garden\Schema\Tests;
 
 use DateTime;
 use Garden\Schema\Schema;
+use Garden\Schema\Tests\Fixtures\TestEnum;
 use Garden\Schema\Validation;
 use Garden\Schema\ValidationException;
 
@@ -231,6 +232,34 @@ class StringValidationTest extends AbstractSchemaTest {
             $this->assertTrue($schema->isValid($str));
         }
 
+        $schema->validate('four');
+    }
+
+    /**
+     * Test the enum constraint with a backed enum class.
+     */
+    public function testEnumClassValidValues(): void {
+        // Test with super shorthand
+        $schema = Schema::parse(['val' => TestEnum::class]);
+        $this->assertEquals(["val" => TestEnum::One], $schema->validate(["val" => 'one']));
+        
+        // Test with explicit values.
+        $schema = Schema::parse([':s' => ['enumClassName' => TestEnum::class]]);
+        $this->assertEquals(TestEnum::One, $schema->validate('one'));
+        $this->assertEquals(TestEnum::Two, $schema->validate('two'));
+        $this->assertEquals(TestEnum::Three, $schema->validate('three'));
+        
+        // Try with a nullable value
+        $schema = Schema::parse([':s|n' => ['enumClassName' => TestEnum::class]]);
+        $this->assertEquals(TestEnum::One, $schema->validate('one'));
+        $this->assertEquals(TestEnum::Two, $schema->validate('two'));
+        $this->assertEquals(TestEnum::Three, $schema->validate('three'));
+        $this->assertNull($schema->validate(null));
+
+        // Test an invalid value
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage("value must be one of: one, two, three.");
+        $this->expectExceptionCode(400);
         $schema->validate('four');
     }
 

@@ -112,6 +112,66 @@ $schema = Schema::parse([
 ]);
 ```
 
+### Re-usable schemas
+
+Schemas can be nested and composed.
+
+```php
+$userSchema = Schema::parse([
+    'name:s',
+    'email:s?'
+]);
+
+$recordSchema = Schema::parse([
+    "uuid:s",
+    "body:s",
+    // User schema is required here.
+    "user" => $userSchema,
+]);
+
+$recordSchema = Schema::parse([
+    "uuid:s",
+    "body:s",
+    // User schema is optional here.
+    "user?" => $userSchema,
+]);
+
+$recordSchema = Schema::parse([
+    "uuid:s",
+    "body:s",
+    // Array of user schema objects.
+    "users:a" => $userSchema,
+]);
+```
+
+### Enum Values
+
+You use a PHP `\BackedEnum` for validation. 
+
+```php
+enum MyEnum: string {
+    One: 'one',
+    Two: 'two',
+    Three: 'three',
+}
+
+// Shorthand
+$schema = Schema::parse([
+    "numberField" => MyEnum::class, 
+]);
+
+// Long form
+$schema = Schema::parse([
+    "numberField" => [
+        'type' => 'string',
+        "enumClassName" => MyEnum::class,
+    ],
+]);
+
+$value = $schema->validate(["numberField" => 'one']);
+$value['numberField']; // MyEnum::One
+```
+
 ### Non-Object Schemas
 
 By default, schemas define an object because that is the most common use for a schema. If you want a schema to represent an array or even a basic type you define a single field with no name. The following example defines an array of objects (i.e. the output of a database query).
