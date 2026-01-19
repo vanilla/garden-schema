@@ -248,6 +248,11 @@ class StringValidationTest extends AbstractSchemaTest {
         $this->assertEquals(TestEnum::One, $schema->validate('one'));
         $this->assertEquals(TestEnum::Two, $schema->validate('two'));
         $this->assertEquals(TestEnum::Three, $schema->validate('three'));
+        $this->assertEquals(TestEnum::Three, $schema->validate(TestEnum::Three));
+        
+        // Test with constructed instead of parsed
+        $schema = new Schema(['type' => 'string', 'enumClassName' => TestEnum::class]);
+        $this->assertEquals(TestEnum::One, $schema->validate('one'));
         
         // Try with a nullable value
         $schema = Schema::parse([':s|n' => ['enumClassName' => TestEnum::class]]);

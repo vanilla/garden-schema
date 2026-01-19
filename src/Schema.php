@@ -1441,6 +1441,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return string|Invalid Returns the valid string or **null** if validation fails.
      */
     protected function validateString($value, ValidationField $field) {
+        $enumClassName = $field->val('enumClassName');
+        if (!empty($enumClassName) && class_exists($enumClassName)) {
+            return $this->validateEnum($value, $field);  
+        }
+        
         if ($field->val('format') === 'date-time') {
             // Skip format validation for optional fields with empty strings
             // Determine if this field is optional by checking parent schema's required array
@@ -1980,6 +1985,30 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return mixed|Invalid Returns the value if it is one of the enumerated values or invalid otherwise.
      */
     protected function validateEnum($value, ValidationField $field) {
+        // We may have a \BackedEnum value to cast to.
+        $enumClass = $field->val('enumClassName');
+        if ($enumClass && class_exists($enumClass) && $value instanceof $enumClass) {
+            // We are an enum variant.
+            return $value;
+        }
+        
+        if ($enumClass && is_string($value) && class_exists($enumClass) && is_subclass_of($enumClass, \BackedEnum::class)) {
+            $value = $enumClass::tryFrom($value);
+            if ($value === null) {
+                $validValues = array_column($enumClass::cases(), 'value');
+                $field->addError(
+                    'enum',
+                    [
+                        'messageCode' => '{field} must be one of: {enum}.',
+                        'enum' => $validValues,
+                    ]
+                );
+                return Invalid::value();
+            } else {
+                return $value;
+            }
+        }
+
         $enum = $field->val('enum');
         if (empty($enum)) {
             return $value;
@@ -1994,24 +2023,6 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 ]
             );
             return Invalid::value();
-        }
-
-        // We may have a \BackedEnum value to cast to.
-        $enumClass = $field->val('enumClassName');
-        if ($enumClass && is_string($value) && class_exists($enumClass) && is_subclass_of($enumClass, \BackedEnum::class)) {
-            $value = $enumClass::tryFrom($value);
-            if ($value === null) {
-                $field->addError(
-                    'enum',
-                    [
-                        'messageCode' => '{field} must be one of: {enum}.',
-                        'enum' => $enum,
-                    ]
-                );
-                return Invalid::value();
-            } else {
-                return $value;
-            }
         }
 
         return $value;
