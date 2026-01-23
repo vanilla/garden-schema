@@ -228,6 +228,11 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                     if (!$value instanceof $typeName && $value !== null) {
                         $value = $typeName::from($value);
                     }
+                } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
+                    // Convert array to ArrayObject instance
+                    if (is_array($value)) {
+                        $value = new $typeName($value);
+                    }
                 }
             } elseif (is_array($value)) {
                 // Handle arrays of nested entities via PropertySchema attribute
@@ -297,6 +302,8 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                     }
                 } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
                     $schema = self::buildEnumSchema($typeName);
+                } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
+                    $schema['type'] = 'object';
                 } else {
                     throw new \InvalidArgumentException("Unsupported property type {$typeName}.");
                 }
@@ -465,6 +472,15 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
         }
         if ($value instanceof \BackedEnum) {
             return $value->value;
+        }
+        if ($value instanceof \ArrayObject) {
+            // Preserve ArrayObject so empty objects serialize to {} not []
+            // Recursively process values within the ArrayObject
+            $result = new \ArrayObject();
+            foreach ($value as $k => $v) {
+                $result[$k] = self::valueToArray($v);
+            }
+            return $result;
         }
         if (is_array($value)) {
             return array_map([self::class, 'valueToArray'], $value);

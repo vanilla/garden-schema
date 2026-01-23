@@ -230,6 +230,7 @@ Entity properties are mapped to schema types as follows:
 | `float` | `number` |
 | `bool` | `boolean` |
 | `array` | `array` |
+| `ArrayObject` | `object` |
 | `BackedEnum` subclass | `string` or `integer` with `enumClassName` |
 | `Entity` subclass | Nested object schema with `entityClassName` |
 | Untyped | No type validation (accepts any value) |
@@ -351,6 +352,40 @@ $person = Person::from([
 
 $person->address; // Address instance
 $person->address->city; // 'Springfield'
+```
+
+#### ArrayObject Properties
+
+Properties typed as `ArrayObject` (or subclasses) are mapped to `object` in the schema. Arrays are automatically converted to `ArrayObject` instances during validation:
+
+```php
+use Garden\Schema\Entity;
+
+class Config extends Entity {
+    public string $name;
+    public \ArrayObject $settings;
+    public ?\ArrayObject $metadata = null;
+}
+
+$config = Config::from([
+    'name' => 'app',
+    'settings' => ['debug' => true, 'timeout' => 30],
+]);
+
+$config->settings; // ArrayObject instance
+$config->settings['debug']; // true
+$config->settings['timeout'] = 60; // Modify in place
+```
+
+`ArrayObject` instances are preserved in `toArray()` and JSON serialization to ensure empty objects serialize as `{}` (JSON object) rather than `[]` (JSON array):
+
+```php
+$config = Config::from([
+    'name' => 'app',
+    'settings' => [],  // Empty
+]);
+
+json_encode($config); // {"name":"app","settings":{},"metadata":null}
 ```
 
 #### Using entityClassName in Schemas
