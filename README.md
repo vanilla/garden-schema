@@ -231,6 +231,7 @@ Entity properties are mapped to schema types as follows:
 | `bool` | `boolean` |
 | `array` | `array` |
 | `ArrayObject` | `object` |
+| `DateTimeImmutable` | `string` with `format: date-time` |
 | `BackedEnum` subclass | `string` or `integer` with `enumClassName` |
 | `Entity` subclass | Nested object schema with `entityClassName` |
 | Untyped | No type validation (accepts any value) |
@@ -386,6 +387,37 @@ $config = Config::from([
 ]);
 
 json_encode($config); // {"name":"app","settings":{},"metadata":null}
+```
+
+#### DateTimeImmutable Properties
+
+Properties typed as `DateTimeImmutable` are mapped to `string` with `format: date-time` in the schema. Date-time strings are automatically converted to `DateTimeImmutable` instances, and serialized to RFC3339 format (or RFC3339_EXTENDED if milliseconds are present):
+
+```php
+use Garden\Schema\Entity;
+
+class Event extends Entity {
+    public string $title;
+    public \DateTimeImmutable $startsAt;
+    public ?\DateTimeImmutable $endsAt = null;
+}
+
+$event = Event::from([
+    'title' => 'Meeting',
+    'startsAt' => '2024-06-15T14:00:00+00:00',
+]);
+
+$event->startsAt; // DateTimeImmutable instance
+$event->startsAt->format('Y-m-d'); // '2024-06-15'
+
+// toArray() and JSON serialize to RFC3339 format
+$array = $event->toArray();
+$array['startsAt']; // '2024-06-15T14:00:00+00:00'
+
+// With milliseconds, uses RFC3339_EXTENDED
+$event->startsAt = new \DateTimeImmutable('2024-06-15T14:00:00.123+00:00');
+$array = $event->toArray();
+$array['startsAt']; // '2024-06-15T14:00:00.123+00:00'
 ```
 
 #### Using entityClassName in Schemas

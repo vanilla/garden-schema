@@ -233,6 +233,15 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                     if (is_array($value)) {
                         $value = new $typeName($value);
                     }
+                } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
+                    // Convert to DateTimeImmutable if not already
+                    if ($value !== null && !$value instanceof \DateTimeImmutable) {
+                        if ($value instanceof \DateTimeInterface) {
+                            $value = \DateTimeImmutable::createFromInterface($value);
+                        } elseif (is_string($value)) {
+                            $value = new \DateTimeImmutable($value);
+                        }
+                    }
                 }
             } elseif (is_array($value)) {
                 // Handle arrays of nested entities via PropertySchema attribute
@@ -304,6 +313,9 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                     $schema = self::buildEnumSchema($typeName);
                 } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
                     $schema['type'] = 'object';
+                } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
+                    $schema['type'] = 'string';
+                    $schema['format'] = 'date-time';
                 } else {
                     throw new \InvalidArgumentException("Unsupported property type {$typeName}.");
                 }
@@ -472,6 +484,14 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
         }
         if ($value instanceof \BackedEnum) {
             return $value->value;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            // Use RFC3339_EXTENDED if there are milliseconds, otherwise RFC3339
+            $microseconds = (int) $value->format('u');
+            if ($microseconds > 0) {
+                return $value->format(\DateTimeInterface::RFC3339_EXTENDED);
+            }
+            return $value->format(\DateTimeInterface::RFC3339);
         }
         if ($value instanceof \ArrayObject) {
             // Preserve ArrayObject so empty objects serialize to {} not []
