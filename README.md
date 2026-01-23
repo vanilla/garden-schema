@@ -146,7 +146,7 @@ $recordSchema = Schema::parse([
 
 ### Enum Values
 
-You use a PHP `\BackedEnum` for validation. 
+You use a PHP `\BackedEnum` for validation.
 
 ```php
 enum MyEnum: string {
@@ -157,7 +157,7 @@ enum MyEnum: string {
 
 // Shorthand
 $schema = Schema::parse([
-    "numberField" => MyEnum::class, 
+    "numberField" => MyEnum::class,
 ]);
 
 // Long form
@@ -170,6 +170,255 @@ $schema = Schema::parse([
 
 $value = $schema->validate(["numberField" => 'one']);
 $value['numberField']; // MyEnum::One
+```
+
+### Entity Classes
+
+Entity classes allow you to define strongly-typed data objects that automatically generate schemas from their properties using reflection. Validated data is cast into entity instances.
+
+#### Defining an Entity
+
+Create a class extending `Garden\Schema\Entity` with public properties:
+
+```php
+use Garden\Schema\Entity;
+
+class User extends Entity {
+    public string $name;
+    public string $email;
+    public int $age;
+    public ?string $bio = null;  // Optional, nullable with default
+}
+```
+
+#### Using Entities
+
+Use `Entity::getSchema()` to get the generated schema, or `Entity::from()` to validate and create an instance:
+
+```php
+// Get the schema
+$schema = User::getSchema();
+
+// Validate and create an entity
+$user = User::from([
+    'name' => 'John',
+    'email' => 'john@example.com',
+    'age' => 30,
+]);
+
+$user->name; // 'John'
+$user->age;  // 30 (integer)
+```
+
+If you pass an existing entity instance to `from()`, it returns that instance without re-validating:
+
+```php
+$user = User::from(['name' => 'John', 'email' => 'john@example.com', 'age' => 30]);
+$same = User::from($user); // Returns $user, no validation
+```
+
+> **Note:** When an existing entity is passed, it is assumed to already be valid. If you've manually modified properties to invalid values, those won't be caught. Use `Entity::from($entity->toArray())` if you need to re-validate a modified entity.
+
+#### Property Type Mapping
+
+Entity properties are mapped to schema types as follows:
+
+| PHP Type | Schema Type |
+| -------- | ----------- |
+| `string` | `string` |
+| `int` | `integer` |
+| `float` | `number` |
+| `bool` | `boolean` |
+| `array` | `array` |
+| `BackedEnum` subclass | `string` or `integer` with `enumClassName` |
+| `Entity` subclass | Nested object schema with `entityClassName` |
+| Untyped | No type validation (accepts any value) |
+
+Properties with nullable types (`?string`) or default values are optional. All other typed properties are required.
+
+#### The PropertySchema Attribute
+
+Use `#[PropertySchema]` to customize property schemas. The provided schema array is merged with the auto-generated schema from the property's type, allowing you to add constraints while preserving type inference:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\PropertySchema;
+
+class Article extends Entity {
+    public string $title;
+
+    // Add constraints to auto-generated string type
+    #[PropertySchema(['minLength' => 10, 'maxLength' => 5000])]
+    public string $body;
+
+    // Add items constraint to auto-generated array type
+    #[PropertySchema(['items' => ['type' => 'string']])]
+    public array $tags;
+
+    // Multiple constraints
+    #[PropertySchema(['items' => ['type' => 'string'], 'minItems' => 1])]
+    public array $categories;
+}
+```
+
+#### The PropertyAltNames Attribute
+
+Use `#[PropertyAltNames]` to specify alternative property names that map to a property. This is useful for handling legacy field names, API versioning, or data from different sources:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\PropertyAltNames;
+
+class User extends Entity {
+    #[PropertyAltNames('user_name', 'userName', 'uname')]
+    public string $name;
+
+    #[PropertyAltNames('e-mail', 'emailAddress')]
+    public ?string $email = null;
+}
+
+// All of these work:
+$user1 = User::from(['name' => 'John']);           // Main property name
+$user2 = User::from(['user_name' => 'John']);      // First alt name
+$user3 = User::from(['userName' => 'John']);       // Second alt name
+$user4 = User::from(['uname' => 'John']);          // Third alt name
+
+// Main property name takes precedence
+$user5 = User::from(['name' => 'Main', 'user_name' => 'Alt']);
+$user5->name; // 'Main'
+
+// First matching alt name is used (in order defined)
+$user6 = User::from(['userName' => 'Second', 'uname' => 'Third']);
+$user6->name; // 'Second' (userName comes before uname in the attribute)
+```
+
+#### The ExcludeFromSchema Attribute
+
+Use `#[ExcludeFromSchema]` to exclude a property from schema generation and validation. This is useful for computed properties, caches, or internal state that shouldn't be part of the data model:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\ExcludeFromSchema;
+
+class Article extends Entity {
+    public string $title;
+    public string $body;
+
+    #[ExcludeFromSchema]
+    public string $slug = '';  // Computed from title
+
+    #[ExcludeFromSchema]
+    public ?array $cache = null;  // Internal cache
+}
+
+$article = Article::from([
+    'title' => 'Hello World',
+    'body' => 'Content here',
+    'slug' => 'ignored',  // This is ignored during validation
+]);
+
+$article->title; // 'Hello World'
+$article->slug;  // '' (default value, input was ignored)
+
+// Excluded properties can still be set directly
+$article->slug = 'hello-world';
+$article->cache = ['rendered' => '<p>Content here</p>'];
+
+// Excluded properties are not included in toArray() or JSON output
+$array = $article->toArray(); // ['title' => 'Hello World', 'body' => 'Content here']
+```
+
+#### Nested Entities
+
+Entities can reference other entities. Nested data is automatically validated and cast:
+
+```php
+class Address extends Entity {
+    public string $street;
+    public string $city;
+}
+
+class Person extends Entity {
+    public string $name;
+    public Address $address;
+    public ?Address $workAddress = null;
+}
+
+$person = Person::from([
+    'name' => 'Jane',
+    'address' => ['street' => '123 Main St', 'city' => 'Springfield'],
+]);
+
+$person->address; // Address instance
+$person->address->city; // 'Springfield'
+```
+
+#### Using entityClassName in Schemas
+
+You can reference entity classes directly in schema definitions, similar to `BackedEnum`:
+
+```php
+// Shorthand
+$schema = Schema::parse([
+    'user' => User::class,
+]);
+
+// Long form
+$schema = Schema::parse([
+    'user' => ['entityClassName' => User::class],
+]);
+
+// Array of entities
+$schema = Schema::parse([
+    'users:a' => User::class,
+]);
+
+$result = $schema->validate(['user' => ['name' => 'John', 'email' => 'j@x.com', 'age' => 25]]);
+$result['user']; // User instance
+```
+
+#### Converting to Arrays and JSON
+
+Entities implement `ArrayAccess` and `JsonSerializable`:
+
+```php
+$user = User::from(['name' => 'John', 'email' => 'john@example.com', 'age' => 30]);
+
+// ArrayAccess for reading
+$user['name']; // 'John'
+
+// ArrayAccess for writing (bypasses validation - use with care)
+$user['age'] = 31;
+
+// Convert to array (nested entities become arrays, enums become values)
+$array = $user->toArray();
+
+// JSON serialization uses toArray()
+$json = json_encode($user);
+
+// Round-trip: array -> entity -> array produces equivalent data
+$user2 = User::from($user->toArray());
+```
+
+> **Note:** Writing via `ArrayAccess` (e.g., `$user['age'] = 'not a number'`) and direct property assignment do NOT perform validation. Use `Entity::from()` for validated construction, or call `$entity->validate()` after modifications to verify the entity is valid.
+
+#### Validating After Modifications
+
+After modifying an entity directly, you can call `validate()` to verify it's still in a valid state:
+
+```php
+$user = User::from(['name' => 'John', 'email' => 'john@example.com', 'age' => 30]);
+
+// Modify directly (no validation)
+$user->name = 'Jane';
+$user['age'] = 25;
+
+// Validate current state - returns new validated entity or throws ValidationException
+$validatedUser = $user->validate();
+
+// Invalid modification
+$user->age = 'not a number';
+$user->validate(); // Throws ValidationException
 ```
 
 ### Non-Object Schemas
