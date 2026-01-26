@@ -20,43 +20,58 @@ use ReflectionUnionType;
  * Entities implement ArrayAccess for convenience. Note that offsetSet() and direct property
  * assignment do NOT perform validation. Use Entity::from() for validated construction, or
  * call $entity->validate() after modifications to verify the entity's current state.
+ *
+ * Entities support multiple schema variants for different API use cases:
+ * - Full: Complete entity with all properties (default)
+ * - Fragment: Reduced version for lists, omitting large fields
+ * - Mutable: Fields that can be modified by consumers
+ * - Create: Includes create-only fields
+ *
+ * Use ExcludeFromVariant and IncludeOnlyInVariant attributes to control which
+ * properties appear in each variant.
  */
 abstract class Entity implements \ArrayAccess, \JsonSerializable {
     /**
-     * @var array<class-string, Schema>
+     * Cache for generated schemas, keyed by "class::variant".
+     *
+     * @var array<string, Schema>
      */
     private static array $schemaCache = [];
 
     /**
      * Track classes currently being built to prevent infinite recursion with self-referencing entities.
      *
-     * @var array<class-string, bool>
+     * @var array<string, bool>
      */
     private static array $schemaBuilding = [];
 
     /**
      * Build and return the schema for this entity using reflection.
      *
+     * @param SchemaVariant $variant The schema variant to generate. Defaults to Full.
      * @return Schema
      */
-    public static function getSchema(): Schema {
+    public static function getSchema(SchemaVariant $variant = SchemaVariant::Full): Schema {
         $class = static::class;
-        if (isset(self::$schemaCache[$class])) {
-            return self::$schemaCache[$class];
+        $cacheKey = "{$class}::{$variant->value}";
+
+        if (isset(self::$schemaCache[$cacheKey])) {
+            return self::$schemaCache[$cacheKey];
         }
 
         // Detect self-referencing recursion
-        if (isset(self::$schemaBuilding[$class])) {
+        if (isset(self::$schemaBuilding[$cacheKey])) {
             throw new \RuntimeException("Circular reference detected while building schema for {$class}. Use getSchema() only after schema is fully built.");
         }
 
-        self::$schemaBuilding[$class] = true;
+        self::$schemaBuilding[$cacheKey] = true;
 
         try {
             $reflection = new ReflectionClass($class);
             $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
             $schemaProperties = [];
             $required = [];
+            $includedProperties = [];
 
             foreach ($properties as $property) {
                 if ($property->isStatic()) {
@@ -67,9 +82,15 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                     continue;
                 }
 
+                // Check if property should be included in this variant
+                if (!self::isPropertyInVariant($property, $variant)) {
+                    continue;
+                }
+
                 $propertyName = $property->getName();
                 $propertySchema = self::buildPropertySchema($property, $class);
                 $schemaProperties[$propertyName] = $propertySchema;
+                $includedProperties[] = $property;
 
                 if (self::isPropertyRequired($property)) {
                     $required[] = $propertyName;
@@ -87,7 +108,8 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
             $schema = new Schema($schemaArray);
 
             // Collect alt names and add filter for property name mapping
-            $altNameMappings = self::collectAltNameMappings($properties);
+            // Only include alt names for properties that are in this variant
+            $altNameMappings = self::collectAltNameMappings($includedProperties);
             if (!empty($altNameMappings)) {
                 $schema->addFilter('', function ($data) use ($altNameMappings) {
                     if (!is_array($data)) {
@@ -108,11 +130,46 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                 });
             }
 
-            self::$schemaCache[$class] = $schema;
+            self::$schemaCache[$cacheKey] = $schema;
             return $schema;
         } finally {
-            unset(self::$schemaBuilding[$class]);
+            unset(self::$schemaBuilding[$cacheKey]);
         }
+    }
+
+    /**
+     * Check if a property should be included in a specific schema variant.
+     *
+     * The logic is:
+     * 1. If IncludeOnlyInVariant is present, only include in those specific variants
+     * 2. If ExcludeFromVariant is present, exclude from those specific variants
+     * 3. Otherwise, include in all variants (default behavior)
+     *
+     * @param ReflectionProperty $property The property to check.
+     * @param SchemaVariant $variant The variant to check against.
+     * @return bool True if the property should be included in the variant.
+     */
+    private static function isPropertyInVariant(ReflectionProperty $property, SchemaVariant $variant): bool {
+        // Check for IncludeOnlyInVariant first (takes precedence)
+        $includeOnlyAttrs = $property->getAttributes(IncludeOnlyInVariant::class);
+        if (!empty($includeOnlyAttrs)) {
+            /** @var IncludeOnlyInVariant $includeOnly */
+            $includeOnly = $includeOnlyAttrs[0]->newInstance();
+            return $includeOnly->includesVariant($variant);
+        }
+
+        // Check for ExcludeFromVariant
+        $excludeAttrs = $property->getAttributes(ExcludeFromVariant::class);
+        foreach ($excludeAttrs as $excludeAttr) {
+            /** @var ExcludeFromVariant $exclude */
+            $exclude = $excludeAttr->newInstance();
+            if ($exclude->excludesVariant($variant)) {
+                return false;
+            }
+        }
+
+        // Default: include in all variants
+        return true;
     }
 
     /**
@@ -121,12 +178,19 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
      * Useful for testing or scenarios where entity definitions may change at runtime.
      *
      * @param class-string|null $class The class to clear cache for, or null to clear all.
+     * @param SchemaVariant|null $variant The specific variant to clear, or null to clear all variants for the class.
      */
-    public static function invalidateSchemaCache(?string $class = null): void {
+    public static function invalidateSchemaCache(?string $class = null, ?SchemaVariant $variant = null): void {
         if ($class === null) {
             self::$schemaCache = [];
+        } elseif ($variant === null) {
+            // Clear all variants for this class
+            foreach (SchemaVariant::cases() as $v) {
+                unset(self::$schemaCache["{$class}::{$v->value}"]);
+            }
         } else {
-            unset(self::$schemaCache[$class]);
+            // Clear specific variant for this class
+            unset(self::$schemaCache["{$class}::{$variant->value}"]);
         }
     }
 

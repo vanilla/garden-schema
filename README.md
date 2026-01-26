@@ -18,6 +18,10 @@ The Garden Schema is a simple data validation and cleaning library based on [Ope
 
 - Developers can use a shorter schema format in order to define schemas in code rapidly. We built this class to be as easy to use as possible. Avoid developer groans as they lock down their data.
 
+- **Entity classes** with automatic schema generation from PHP properties, supporting nested entities, enums, and date-times.
+
+- **Schema variants** for generating different schemas from a single Entity (Full, Fragment, Mutable, Create) to support common API patterns.
+
 - Add custom validator callbacks to support practically any validation scenario.
 
 - Override the validation class in order to customize the way errors are displayed for your own application.
@@ -328,6 +332,129 @@ $article->cache = ['rendered' => '<p>Content here</p>'];
 
 // Excluded properties are not included in toArray() or JSON output
 $array = $article->toArray(); // ['title' => 'Hello World', 'body' => 'Content here']
+```
+
+#### Schema Variants
+
+Entities support multiple schema variants for different API use cases. This allows a single Entity class to generate different schemas depending on the context:
+
+| Variant | Use Case |
+| ------- | -------- |
+| `Full` | Complete entity with all properties (default). Used for single-item GET responses. |
+| `Fragment` | Reduced version for lists. Omits large strings and detail fields. |
+| `Mutable` | Fields that can be modified by consumers. Used for PATCH requests. |
+| `Create` | Includes create-only fields. Used for POST requests. |
+
+Use `Entity::getSchema()` with a `SchemaVariant` parameter to get different variants:
+
+```php
+use Garden\Schema\SchemaVariant;
+
+// Get different schema variants
+$fullSchema     = Article::getSchema();                      // Default: Full
+$fullSchema     = Article::getSchema(SchemaVariant::Full);   // Explicit Full
+$fragmentSchema = Article::getSchema(SchemaVariant::Fragment);
+$mutableSchema  = Article::getSchema(SchemaVariant::Mutable);
+$createSchema   = Article::getSchema(SchemaVariant::Create);
+```
+
+By default, all properties are included in all variants. Use attributes to customize which properties appear in each variant.
+
+#### The ExcludeFromVariant Attribute
+
+Use `#[ExcludeFromVariant]` to exclude a property from specific schema variants:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\ExcludeFromVariant;
+use Garden\Schema\SchemaVariant;
+
+class Article extends Entity {
+    public int $id;
+    public string $title;
+
+    // Exclude from Fragment (too large for list responses)
+    #[ExcludeFromVariant(SchemaVariant::Fragment)]
+    public string $body;
+
+    // Exclude from Mutable (system-managed, not user-editable)
+    #[ExcludeFromVariant(SchemaVariant::Mutable)]
+    public \DateTimeImmutable $createdAt;
+
+    #[ExcludeFromVariant(SchemaVariant::Mutable)]
+    public \DateTimeImmutable $updatedAt;
+
+    // Exclude from multiple variants
+    #[ExcludeFromVariant(SchemaVariant::Fragment, SchemaVariant::Mutable)]
+    public string $internalNotes;
+}
+
+// Fragment schema won't include body or internalNotes
+$fragmentSchema = Article::getSchema(SchemaVariant::Fragment);
+
+// Mutable schema won't include createdAt, updatedAt, or internalNotes
+$mutableSchema = Article::getSchema(SchemaVariant::Mutable);
+```
+
+The attribute is repeatable, so you can also use multiple attributes:
+
+```php
+#[ExcludeFromVariant(SchemaVariant::Fragment)]
+#[ExcludeFromVariant(SchemaVariant::Mutable)]
+public string $internalNotes;
+```
+
+#### The IncludeOnlyInVariant Attribute
+
+Use `#[IncludeOnlyInVariant]` to include a property only in specific variants. Properties with this attribute are excluded from all other variants (including `Full` unless specified):
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\IncludeOnlyInVariant;
+use Garden\Schema\SchemaVariant;
+
+class User extends Entity {
+    public int $id;
+    public string $username;
+    public string $email;
+
+    // Only include in Create schema (for initial user setup)
+    #[IncludeOnlyInVariant(SchemaVariant::Create)]
+    public ?string $initialPassword;
+
+    // Include in both Create and Full schemas
+    #[IncludeOnlyInVariant(SchemaVariant::Create, SchemaVariant::Full)]
+    public ?string $inviteCode;
+}
+
+// Create schema includes initialPassword and inviteCode
+$createSchema = User::getSchema(SchemaVariant::Create);
+
+// Full schema includes inviteCode but NOT initialPassword
+$fullSchema = User::getSchema(SchemaVariant::Full);
+
+// Fragment and Mutable schemas include neither
+$fragmentSchema = User::getSchema(SchemaVariant::Fragment);
+```
+
+> **Note:** If both `#[IncludeOnlyInVariant]` and `#[ExcludeFromVariant]` are present on the same property, `#[IncludeOnlyInVariant]` takes precedence.
+
+#### Schema Variant Caching
+
+Each schema variant is cached separately. You can invalidate caches at different levels:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\SchemaVariant;
+
+// Invalidate a specific variant for a class
+Entity::invalidateSchemaCache(Article::class, SchemaVariant::Full);
+
+// Invalidate all variants for a class
+Entity::invalidateSchemaCache(Article::class);
+
+// Invalidate all cached schemas globally
+Entity::invalidateSchemaCache();
 ```
 
 #### Nested Entities
