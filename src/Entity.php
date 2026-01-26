@@ -26,9 +26,12 @@ use ReflectionUnionType;
  * - Fragment: Reduced version for lists, omitting large fields
  * - Mutable: Fields that can be modified by consumers
  * - Create: Includes create-only fields
+ * - Internal: For system/internal use
  *
  * Use ExcludeFromVariant and IncludeOnlyInVariant attributes to control which
- * properties appear in each variant.
+ * properties appear in each variant. You can also define custom variant enums.
+ *
+ * The serializationVariant controls which properties are included in toArray() and JSON output.
  */
 abstract class Entity implements \ArrayAccess, \JsonSerializable {
     /**
@@ -46,14 +49,26 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     private static array $schemaBuilding = [];
 
     /**
+     * The variant used for serialization (toArray/JSON).
+     * When set, only properties included in this variant will be serialized.
+     * This is propagated to nested entities during serialization.
+     *
+     * @var \BackedEnum|null
+     */
+    protected ?\BackedEnum $serializationVariant = null;
+
+    /**
      * Build and return the schema for this entity using reflection.
      *
-     * @param SchemaVariant $variant The schema variant to generate. Defaults to Full.
+     * @param \BackedEnum|null $variant The schema variant to generate. Defaults to SchemaVariant::Full.
+     *                                   You can use SchemaVariant or any custom BackedEnum.
      * @return Schema
      */
-    public static function getSchema(SchemaVariant $variant = SchemaVariant::Full): Schema {
+    public static function getSchema(?\BackedEnum $variant = null): Schema {
+        $variant ??= SchemaVariant::Full;
         $class = static::class;
-        $cacheKey = "{$class}::{$variant->value}";
+        $variantClass = $variant::class;
+        $cacheKey = "{$class}::{$variantClass}::{$variant->value}";
 
         if (isset(self::$schemaCache[$cacheKey])) {
             return self::$schemaCache[$cacheKey];
@@ -146,10 +161,10 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
      * 3. Otherwise, include in all variants (default behavior)
      *
      * @param ReflectionProperty $property The property to check.
-     * @param SchemaVariant $variant The variant to check against.
+     * @param \BackedEnum $variant The variant to check against.
      * @return bool True if the property should be included in the variant.
      */
-    private static function isPropertyInVariant(ReflectionProperty $property, SchemaVariant $variant): bool {
+    private static function isPropertyInVariant(ReflectionProperty $property, \BackedEnum $variant): bool {
         // Check for IncludeOnlyInVariant first (takes precedence)
         $includeOnlyAttrs = $property->getAttributes(IncludeOnlyInVariant::class);
         if (!empty($includeOnlyAttrs)) {
@@ -178,19 +193,24 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
      * Useful for testing or scenarios where entity definitions may change at runtime.
      *
      * @param class-string|null $class The class to clear cache for, or null to clear all.
-     * @param SchemaVariant|null $variant The specific variant to clear, or null to clear all variants for the class.
+     * @param \BackedEnum|null $variant The specific variant to clear, or null to clear all variants for the class.
      */
-    public static function invalidateSchemaCache(?string $class = null, ?SchemaVariant $variant = null): void {
+    public static function invalidateSchemaCache(?string $class = null, ?\BackedEnum $variant = null): void {
         if ($class === null) {
             self::$schemaCache = [];
         } elseif ($variant === null) {
-            // Clear all variants for this class
-            foreach (SchemaVariant::cases() as $v) {
-                unset(self::$schemaCache["{$class}::{$v->value}"]);
+            // Clear all variants for this class by matching prefix
+            $prefix = "{$class}::";
+            foreach (array_keys(self::$schemaCache) as $key) {
+                if (str_starts_with($key, $prefix)) {
+                    unset(self::$schemaCache[$key]);
+                }
             }
         } else {
             // Clear specific variant for this class
-            unset(self::$schemaCache["{$class}::{$variant->value}"]);
+            $variantClass = $variant::class;
+            $cacheKey = "{$class}::{$variantClass}::{$variant->value}";
+            unset(self::$schemaCache[$cacheKey]);
         }
     }
 
@@ -502,18 +522,50 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     }
 
     /**
+     * Set the serialization variant for this entity.
+     *
+     * When set, toArray() and JSON serialization will only include properties
+     * that are part of the specified variant.
+     *
+     * @param \BackedEnum|null $variant The variant to use for serialization, or null to include all properties.
+     * @return $this
+     */
+    public function setSerializationVariant(?\BackedEnum $variant): static {
+        $this->serializationVariant = $variant;
+        return $this;
+    }
+
+    /**
+     * Get the current serialization variant.
+     *
+     * @return \BackedEnum|null
+     */
+    public function getSerializationVariant(): ?\BackedEnum {
+        return $this->serializationVariant;
+    }
+
+    /**
      * Convert the entity to an array.
      *
      * Recursively converts nested entities and arrays of entities to arrays.
      * BackedEnum values are converted to their backing values.
      *
+     * If a variant is provided, only properties included in that variant will be serialized.
+     * The variant is propagated to nested entities.
+     *
+     * @param \BackedEnum|null $variant Optional variant to filter properties. If provided, sets the serializationVariant.
      * @return array
      */
-    public function toArray(): array {
+    public function toArray(?\BackedEnum $variant = null): array {
+        // If variant is explicitly passed, use it; otherwise use the instance's serializationVariant
+        $effectiveVariant = $variant ?? $this->serializationVariant;
+
         $result = [];
         $reflection = new ReflectionClass(static::class);
         $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
-        $schemaProperties = static::getSchema()->getSchemaArray()['properties'] ?? [];
+
+        // Get schema properties for the effective variant (or full schema if no variant)
+        $schemaProperties = static::getSchema($effectiveVariant)->getSchemaArray()['properties'] ?? [];
 
         foreach ($properties as $property) {
             if ($property->isStatic()) {
@@ -530,21 +582,22 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
             }
 
             $value = $this->{$name};
-            $result[$name] = self::valueToArray($value);
+            $result[$name] = $this->valueToArrayWithVariant($value, $effectiveVariant);
         }
 
         return $result;
     }
 
     /**
-     * Convert a value to its array representation.
+     * Convert a value to its array representation, propagating the variant to nested entities.
      *
-     * @param mixed $value
+     * @param mixed $value The value to convert.
+     * @param \BackedEnum|null $variant The variant to propagate to nested entities.
      * @return mixed
      */
-    private static function valueToArray($value) {
-        if ($value instanceof self) {
-            return $value->toArray();
+    private function valueToArrayWithVariant(mixed $value, ?\BackedEnum $variant): mixed {
+        if ($value instanceof Entity) {
+            return $value->toArray($variant);
         }
         if ($value instanceof \BackedEnum) {
             return $value->value;
@@ -562,12 +615,16 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
             // Recursively process values within the ArrayObject
             $result = new \ArrayObject();
             foreach ($value as $k => $v) {
-                $result[$k] = self::valueToArray($v);
+                $result[$k] = $this->valueToArrayWithVariant($v, $variant);
             }
             return $result;
         }
         if (is_array($value)) {
-            return array_map([self::class, 'valueToArray'], $value);
+            return array_map(fn($v) => $this->valueToArrayWithVariant($v, $variant), $value);
+        }
+
+        if ($value instanceof \JsonSerializable) {
+            return $value->jsonSerialize();
         }
         return $value;
     }
@@ -575,36 +632,41 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     /**
      * Specify data which should be serialized to JSON.
      *
+     * Uses the entity's serializationVariant if set.
+     *
      * @return array
      */
     #[\ReturnTypeWillChange]
     public function jsonSerialize() {
-        return $this->toArray();
+        return $this->toArray($this->serializationVariant);
     }
 
     /**
      * Whether an offset exists.
+     *
+     * Checks if the property exists and is initialized, regardless of schema variants.
      *
      * @param mixed $offset
      * @return bool
      */
     #[\ReturnTypeWillChange]
     public function offsetExists($offset) {
-        $schemaProperties = static::getSchema()->getSchemaArray()['properties'] ?? [];
-        if (!array_key_exists($offset, $schemaProperties)) {
-            return false;
-        }
-
         if (!property_exists(static::class, $offset)) {
             return false;
         }
 
         $reflection = new ReflectionProperty(static::class, $offset);
+        if (!$reflection->isPublic() || $reflection->isStatic()) {
+            return false;
+        }
+
         return $reflection->isInitialized($this);
     }
 
     /**
      * Offset to retrieve.
+     *
+     * Returns the property value if it exists and is initialized, regardless of schema variants.
      *
      * @param mixed $offset
      * @return mixed
@@ -621,15 +683,22 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     /**
      * Offset to set.
      *
+     * Sets the property value if it's a public instance property, regardless of schema variants.
+     *
      * @param mixed $offset
      * @param mixed $value
      */
     #[\ReturnTypeWillChange]
     public function offsetSet($offset, $value) {
-        $schemaProperties = static::getSchema()->getSchemaArray()['properties'] ?? [];
-        if (!array_key_exists($offset, $schemaProperties)) {
-            throw new \InvalidArgumentException("Property '$offset' is not defined in the schema.");
+        if (!property_exists(static::class, $offset)) {
+            throw new \InvalidArgumentException("Property '$offset' does not exist on " . static::class . ".");
         }
+
+        $reflection = new ReflectionProperty(static::class, $offset);
+        if (!$reflection->isPublic() || $reflection->isStatic()) {
+            throw new \InvalidArgumentException("Property '$offset' is not a public instance property.");
+        }
+
         $this->{$offset} = $value;
     }
 

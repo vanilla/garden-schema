@@ -10,6 +10,9 @@ namespace Garden\Schema\Tests;
 use Garden\Schema\Entity;
 use Garden\Schema\SchemaVariant;
 use Garden\Schema\Tests\Fixtures\ArticleEntity;
+use Garden\Schema\Tests\Fixtures\ChildEntity;
+use Garden\Schema\Tests\Fixtures\CustomVariant;
+use Garden\Schema\Tests\Fixtures\CustomVariantEntity;
 use Garden\Schema\Tests\Fixtures\MultiExcludeEntity;
 use PHPUnit\Framework\TestCase;
 
@@ -328,15 +331,270 @@ class SchemaVariantTest extends TestCase {
         $this->assertSame('fragment', SchemaVariant::Fragment->value);
         $this->assertSame('mutable', SchemaVariant::Mutable->value);
         $this->assertSame('create', SchemaVariant::Create->value);
+        $this->assertSame('internal', SchemaVariant::Internal->value);
     }
 
     public function testSchemaVariantEnumCases(): void {
         $cases = SchemaVariant::cases();
 
-        $this->assertCount(4, $cases);
+        $this->assertCount(5, $cases);
         $this->assertContains(SchemaVariant::Full, $cases);
         $this->assertContains(SchemaVariant::Fragment, $cases);
         $this->assertContains(SchemaVariant::Mutable, $cases);
         $this->assertContains(SchemaVariant::Create, $cases);
+        $this->assertContains(SchemaVariant::Internal, $cases);
+    }
+
+    //
+    // Custom Variant Enum Tests
+    //
+
+    public function testCustomVariantEnumWithGetSchema(): void {
+        $publicSchema = CustomVariantEntity::getSchema(CustomVariant::Public);
+        $adminSchema = CustomVariantEntity::getSchema(CustomVariant::Admin);
+        $internalSchema = CustomVariantEntity::getSchema(CustomVariant::Internal);
+
+        // Public should not have adminNotes or internalSecret
+        $publicProps = $publicSchema->getSchemaArray()['properties'];
+        $this->assertArrayHasKey('id', $publicProps);
+        $this->assertArrayHasKey('name', $publicProps);
+        $this->assertArrayNotHasKey('adminNotes', $publicProps);
+        $this->assertArrayNotHasKey('internalSecret', $publicProps);
+
+        // Admin should have adminNotes but not internalSecret
+        $adminProps = $adminSchema->getSchemaArray()['properties'];
+        $this->assertArrayHasKey('id', $adminProps);
+        $this->assertArrayHasKey('name', $adminProps);
+        $this->assertArrayHasKey('adminNotes', $adminProps);
+        $this->assertArrayNotHasKey('internalSecret', $adminProps);
+
+        // Internal should have everything
+        $internalProps = $internalSchema->getSchemaArray()['properties'];
+        $this->assertArrayHasKey('id', $internalProps);
+        $this->assertArrayHasKey('name', $internalProps);
+        $this->assertArrayHasKey('adminNotes', $internalProps);
+        $this->assertArrayHasKey('internalSecret', $internalProps);
+    }
+
+    public function testCustomVariantCachingSeparate(): void {
+        $public1 = CustomVariantEntity::getSchema(CustomVariant::Public);
+        $admin1 = CustomVariantEntity::getSchema(CustomVariant::Admin);
+        $public2 = CustomVariantEntity::getSchema(CustomVariant::Public);
+
+        $this->assertSame($public1, $public2);
+        $this->assertNotSame($public1, $admin1);
+    }
+
+    public function testCustomVariantInvalidateCacheSpecific(): void {
+        $public1 = CustomVariantEntity::getSchema(CustomVariant::Public);
+
+        Entity::invalidateSchemaCache(CustomVariantEntity::class, CustomVariant::Public);
+
+        $public2 = CustomVariantEntity::getSchema(CustomVariant::Public);
+
+        $this->assertNotSame($public1, $public2);
+    }
+
+    //
+    // Serialization Variant Tests
+    //
+
+    public function testToArrayWithVariant(): void {
+        $entity = new CustomVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+        $entity->adminNotes = 'Admin only note';
+        $entity->internalSecret = 'Top secret';
+
+        // Public variant should not include adminNotes or internalSecret
+        $publicArray = $entity->toArray(CustomVariant::Public);
+        $this->assertArrayHasKey('id', $publicArray);
+        $this->assertArrayHasKey('name', $publicArray);
+        $this->assertArrayNotHasKey('adminNotes', $publicArray);
+        $this->assertArrayNotHasKey('internalSecret', $publicArray);
+
+        // Admin variant should include adminNotes
+        $adminArray = $entity->toArray(CustomVariant::Admin);
+        $this->assertArrayHasKey('adminNotes', $adminArray);
+        $this->assertArrayNotHasKey('internalSecret', $adminArray);
+
+        // Internal variant should include everything
+        $internalArray = $entity->toArray(CustomVariant::Internal);
+        $this->assertArrayHasKey('adminNotes', $internalArray);
+        $this->assertArrayHasKey('internalSecret', $internalArray);
+    }
+
+    public function testSetSerializationVariant(): void {
+        $entity = new CustomVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+        $entity->adminNotes = 'Secret';
+        $entity->internalSecret = 'Top secret';
+
+        // Set serialization variant
+        $entity->setSerializationVariant(CustomVariant::Public);
+
+        // toArray() without argument should use the set variant
+        $array = $entity->toArray();
+        $this->assertArrayHasKey('id', $array);
+        $this->assertArrayHasKey('name', $array);
+        $this->assertArrayNotHasKey('adminNotes', $array);
+        $this->assertArrayNotHasKey('internalSecret', $array);
+    }
+
+    public function testGetSerializationVariant(): void {
+        $entity = new CustomVariantEntity();
+
+        $this->assertNull($entity->getSerializationVariant());
+
+        $entity->setSerializationVariant(CustomVariant::Admin);
+        $this->assertSame(CustomVariant::Admin, $entity->getSerializationVariant());
+
+        $entity->setSerializationVariant(null);
+        $this->assertNull($entity->getSerializationVariant());
+    }
+
+    public function testJsonSerializeUsesSerializationVariant(): void {
+        $entity = new CustomVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+        $entity->adminNotes = 'Secret';
+        $entity->internalSecret = 'Top secret';
+
+        // Without variant, should include all (via Full schema which has no exclusions for these)
+        $json = json_encode($entity);
+        $decoded = json_decode($json, true);
+        $this->assertArrayHasKey('adminNotes', $decoded);
+
+        // With variant set
+        $entity->setSerializationVariant(CustomVariant::Public);
+        $json = json_encode($entity);
+        $decoded = json_decode($json, true);
+        $this->assertArrayNotHasKey('adminNotes', $decoded);
+        $this->assertArrayNotHasKey('internalSecret', $decoded);
+    }
+
+    public function testToArrayVariantOverridesSerializationVariant(): void {
+        $entity = new CustomVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+        $entity->adminNotes = 'Secret';
+
+        // Set serialization variant to Public
+        $entity->setSerializationVariant(CustomVariant::Public);
+
+        // But explicitly request Admin variant in toArray
+        $array = $entity->toArray(CustomVariant::Admin);
+        $this->assertArrayHasKey('adminNotes', $array);
+    }
+
+    //
+    // Nested Entity Serialization Tests
+    //
+
+    public function testNestedEntitySerializationWithVariant(): void {
+        $child = new ChildEntity();
+        $child->id = 'child-1';
+
+        $parent = new CustomVariantEntity();
+        $parent->id = 1;
+        $parent->name = 'Parent';
+        $parent->adminNotes = 'Admin note';
+        $parent->child = $child;
+
+        // Serialize with Public variant
+        $array = $parent->toArray(CustomVariant::Public);
+
+        $this->assertArrayHasKey('child', $array);
+        $this->assertIsArray($array['child']);
+        $this->assertSame('child-1', $array['child']['id']);
+        $this->assertArrayNotHasKey('adminNotes', $array);
+    }
+
+    public function testNestedEntityArraySerializationWithVariant(): void {
+        // Use ArticleEntity with SchemaVariant to test nested arrays
+        $fragmentArray = ArticleEntity::getSchema(SchemaVariant::Fragment)->getSchemaArray();
+
+        // Fragment should not have body
+        $this->assertArrayNotHasKey('body', $fragmentArray['properties']);
+    }
+
+    //
+    // Internal Variant Tests
+    //
+
+    public function testInternalVariantIncludesAllStandardProperties(): void {
+        $schema = ArticleEntity::getSchema(SchemaVariant::Internal);
+        $properties = $schema->getSchemaArray()['properties'];
+
+        // Internal should include standard properties
+        $this->assertArrayHasKey('id', $properties);
+        $this->assertArrayHasKey('title', $properties);
+        $this->assertArrayHasKey('body', $properties);
+        $this->assertArrayHasKey('createdAt', $properties);
+    }
+
+    //
+    // Fluent API Tests
+    //
+
+    public function testSetSerializationVariantReturnsSelf(): void {
+        $entity = new CustomVariantEntity();
+        $result = $entity->setSerializationVariant(CustomVariant::Public);
+
+        $this->assertSame($entity, $result);
+    }
+
+    public function testFluentSetSerializationVariantChaining(): void {
+        $entity = new CustomVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+        $entity->adminNotes = 'Secret';
+
+        $array = $entity
+            ->setSerializationVariant(CustomVariant::Public)
+            ->toArray();
+
+        $this->assertArrayNotHasKey('adminNotes', $array);
+    }
+
+    //
+    // ArrayAccess Tests (independent of serialization variant)
+    //
+
+    public function testArrayAccessIgnoresSerializationVariant(): void {
+        $entity = new CustomVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+        $entity->adminNotes = 'Secret';
+
+        // Set a restrictive variant
+        $entity->setSerializationVariant(CustomVariant::Public);
+
+        // ArrayAccess should still work for all properties regardless of variant
+        $this->assertTrue(isset($entity['adminNotes']));
+        $this->assertSame('Secret', $entity['adminNotes']);
+
+        // Can still set properties not in the variant
+        $entity['adminNotes'] = 'Updated';
+        $this->assertSame('Updated', $entity->adminNotes);
+
+        // But toArray() respects the variant
+        $array = $entity->toArray();
+        $this->assertArrayNotHasKey('adminNotes', $array);
+    }
+
+    public function testArrayAccessWorksWithPublicProperties(): void {
+        $entity = new CustomVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+
+        // All public properties are accessible
+        $this->assertTrue(isset($entity['id']));
+        $this->assertTrue(isset($entity['name']));
+        $this->assertTrue(isset($entity['adminNotes'])); // Has default value
+
+        $entity['adminNotes'] = 'Note';
+        $this->assertSame('Note', $entity['adminNotes']);
     }
 }

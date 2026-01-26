@@ -344,6 +344,7 @@ Entities support multiple schema variants for different API use cases. This allo
 | `Fragment` | Reduced version for lists. Omits large strings and detail fields. |
 | `Mutable` | Fields that can be modified by consumers. Used for PATCH requests. |
 | `Create` | Includes create-only fields. Used for POST requests. |
+| `Internal` | For system/internal use. May include sensitive fields not exposed via API. |
 
 Use `Entity::getSchema()` with a `SchemaVariant` parameter to get different variants:
 
@@ -351,11 +352,12 @@ Use `Entity::getSchema()` with a `SchemaVariant` parameter to get different vari
 use Garden\Schema\SchemaVariant;
 
 // Get different schema variants
-$fullSchema     = Article::getSchema();                      // Default: Full
-$fullSchema     = Article::getSchema(SchemaVariant::Full);   // Explicit Full
+$fullSchema     = Article::getSchema();                       // Default: Full
+$fullSchema     = Article::getSchema(SchemaVariant::Full);    // Explicit Full
 $fragmentSchema = Article::getSchema(SchemaVariant::Fragment);
 $mutableSchema  = Article::getSchema(SchemaVariant::Mutable);
 $createSchema   = Article::getSchema(SchemaVariant::Create);
+$internalSchema = Article::getSchema(SchemaVariant::Internal);
 ```
 
 By default, all properties are included in all variants. Use attributes to customize which properties appear in each variant.
@@ -455,6 +457,91 @@ Entity::invalidateSchemaCache(Article::class);
 
 // Invalidate all cached schemas globally
 Entity::invalidateSchemaCache();
+```
+
+#### Custom Variant Enums
+
+You can define your own variant enums instead of using `SchemaVariant`. This is useful when you need domain-specific variants:
+
+```php
+// Define a custom variant enum
+enum AccessLevel: string {
+    case Public = 'public';
+    case Admin = 'admin';
+    case Internal = 'internal';
+}
+
+use Garden\Schema\Entity;
+use Garden\Schema\ExcludeFromVariant;
+use Garden\Schema\IncludeOnlyInVariant;
+
+class User extends Entity {
+    public int $id;
+    public string $name;
+
+    // Only visible to admins and internal
+    #[ExcludeFromVariant(AccessLevel::Public)]
+    public string $adminNotes = '';
+
+    // Only visible internally
+    #[IncludeOnlyInVariant(AccessLevel::Internal)]
+    public string $internalSecret = '';
+}
+
+// Use custom variants with getSchema()
+$publicSchema   = User::getSchema(AccessLevel::Public);
+$adminSchema    = User::getSchema(AccessLevel::Admin);
+$internalSchema = User::getSchema(AccessLevel::Internal);
+```
+
+Custom variants are cached separately and can be mixed with `SchemaVariant` on the same entity.
+
+#### Serialization Variants
+
+You can control which properties are included when converting an entity to an array or JSON by using serialization variants:
+
+```php
+$user = User::from([...]);
+$user->adminNotes = 'Secret note';
+
+// Serialize with a specific variant - only includes properties in that variant
+$publicArray = $user->toArray(AccessLevel::Public);  // Won't include adminNotes
+
+// Set a persistent serialization variant for the entity
+$user->setSerializationVariant(AccessLevel::Public);
+
+// Now toArray() and json_encode() will use the set variant
+$array = $user->toArray();        // Uses AccessLevel::Public
+$json = json_encode($user);       // Uses AccessLevel::Public
+
+// Get the current serialization variant
+$variant = $user->getSerializationVariant();  // AccessLevel::Public
+
+// Clear the serialization variant (reverts to full schema)
+$user->setSerializationVariant(null);
+
+// Explicit variant in toArray() overrides the set serialization variant
+$adminArray = $user->toArray(AccessLevel::Admin);  // Uses Admin regardless of set variant
+```
+
+The serialization variant is propagated to nested entities during serialization:
+
+```php
+class Article extends Entity {
+    public int $id;
+    public User $author;
+
+    #[ExcludeFromVariant(AccessLevel::Public)]
+    public string $editorNotes = '';
+}
+
+$article = Article::from([...]);
+$article->author->adminNotes = 'Author admin note';
+$article->editorNotes = 'Editor note';
+
+// Both Article and nested User will use Public variant
+$publicArray = $article->toArray(AccessLevel::Public);
+// $publicArray won't include editorNotes or author.adminNotes
 ```
 
 #### Nested Entities

@@ -17,6 +17,10 @@ namespace Garden\Schema;
  * - **Fragment**: Reduced version for lists, omitting large/detail fields
  * - **Mutable**: Fields that can be modified by consumers (for PATCH requests)
  * - **Create**: Includes create-only fields (for POST requests)
+ * - **Internal**: For internal/system use, may include sensitive fields not exposed via API
+ *
+ * You can also define your own variant enums by creating a BackedEnum and using it
+ * with the ExcludeFromVariant and IncludeOnlyInVariant attributes.
  */
 enum SchemaVariant: string {
     /**
@@ -42,4 +46,10 @@ enum SchemaVariant: string {
      * Used for POST requests. May include fields not present in other variants.
      */
     case Create = 'create';
+
+    /**
+     * Internal schema for system/internal use.
+     * May include sensitive fields not exposed via public API.
+     */
+    case Internal = 'internal';
 }

@@ -29,27 +29,39 @@ namespace Garden\Schema;
  * public ?string $inviteCode;
  * ```
  *
+ * You can also use custom variant enums:
+ *
+ * ```php
+ * enum MyVariant: string {
+ *     case Public = 'public';
+ *     case Admin = 'admin';
+ * }
+ *
+ * #[IncludeOnlyInVariant(MyVariant::Admin)]
+ * public string $adminOnlyField;
+ * ```
+ *
  * Note: This attribute cannot be combined with ExcludeFromVariant on the same property.
  * If both are present, IncludeOnlyInVariant takes precedence.
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 class IncludeOnlyInVariant {
     /**
-     * @var SchemaVariant[]
+     * @var \BackedEnum[]
      */
     private array $variants;
 
     /**
-     * @param SchemaVariant ...$variants The schema variants where this property should be included.
+     * @param \BackedEnum ...$variants The schema variants where this property should be included.
      */
-    public function __construct(SchemaVariant ...$variants) {
+    public function __construct(\BackedEnum ...$variants) {
         $this->variants = $variants;
     }
 
     /**
      * Get the variants where this property should be included.
      *
-     * @return SchemaVariant[]
+     * @return \BackedEnum[]
      */
     public function getVariants(): array {
         return $this->variants;
@@ -58,10 +70,15 @@ class IncludeOnlyInVariant {
     /**
      * Check if the property should be included in the given variant.
      *
-     * @param SchemaVariant $variant The variant to check.
+     * @param \BackedEnum $variant The variant to check.
      * @return bool True if the property should be included in this variant.
      */
-    public function includesVariant(SchemaVariant $variant): bool {
-        return in_array($variant, $this->variants, true);
+    public function includesVariant(\BackedEnum $variant): bool {
+        foreach ($this->variants as $included) {
+            if ($included::class === $variant::class && $included->value === $variant->value) {
+                return true;
+            }
+        }
+        return false;
     }
 }
