@@ -250,7 +250,7 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
      * @param mixed $value
      * @return static
      */
-    public static function from($value) {
+    public static function from($value): static {
         if ($value instanceof static) {
             return $value;
         }
@@ -267,7 +267,7 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
      * @param array $clean The validated data array.
      * @return static
      */
-    public static function fromValidated(array $clean) {
+    public static function fromValidated(array $clean): static {
         $entity = new static();
         $reflection = new ReflectionClass(static::class);
         $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
