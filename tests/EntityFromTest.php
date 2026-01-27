@@ -54,10 +54,10 @@ class EntityFromTest extends TestCase {
         $this->assertSame($entity, $result);
         $this->assertSame('manually-set', $result->id);
     }
-    
+
     public function testManuallySetAndValidateFails(): void {
         $entity = ChildEntity::from(['id' => 'my-id']);
-        
+
         // I can set the value and it's invalid
         $entity->id = '';
         $this->expectException(ValidationException::class);

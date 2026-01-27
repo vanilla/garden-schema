@@ -569,6 +569,85 @@ $person->address; // Address instance
 $person->address->city; // 'Springfield'
 ```
 
+#### Default Values for Nested Entities
+
+PHP doesn't allow default values for properties that require class instantiation. To provide default values for nested entity properties, implement the `EntityDefaultInterface`:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\EntityDefaultInterface;
+
+class Metadata extends Entity implements EntityDefaultInterface {
+    public string $version;
+    public bool $draft;
+
+    public static function default(): static {
+        $instance = new static();
+        $instance->version = '1.0';
+        $instance->draft = true;
+        return $instance;
+    }
+}
+
+class Article extends Entity {
+    public string $title;
+    public Metadata $metadata;        // Gets default when not provided
+    public ?Metadata $extraMeta;      // Also gets default when not provided
+}
+```
+
+When a property's type implements `EntityDefaultInterface`:
+
+1. **Schema includes the default**: The generated schema will have a `default` key with the serialized default values, useful for OpenAPI documentation.
+2. **Hydration uses the default**: When `from()` or `fromValidated()` is called without that property, the default instance is used.
+3. **Property is not required**: The property is automatically treated as optional in the schema.
+
+```php
+// Create without providing metadata - gets default
+$article = Article::from(['title' => 'Hello World']);
+
+$article->metadata->version; // '1.0'
+$article->metadata->draft;   // true
+
+// Explicit values override the default
+$article2 = Article::from([
+    'title' => 'Hello World',
+    'metadata' => ['version' => '2.0', 'draft' => false],
+]);
+
+$article2->metadata->version; // '2.0'
+```
+
+**Distinguishing absent values from explicit null:**
+
+For nullable properties, there's a distinction between not providing a value (uses default) and explicitly setting `null`:
+
+```php
+// Property absent → gets default
+$article = Article::from(['title' => 'Hello']);
+$article->extraMeta; // Metadata instance with defaults
+
+// Property explicitly null → stays null
+$article = Article::from(['title' => 'Hello', 'extraMeta' => null]);
+$article->extraMeta; // null
+```
+
+The generated schema includes the default:
+
+```json
+{
+  "properties": {
+    "title": {"type": "string"},
+    "metadata": {
+      "type": "object",
+      "default": {"version": "1.0", "draft": true},
+      "properties": {...}
+    }
+  },
+  "required": ["title"]
+}
+```
+
 #### ArrayObject Properties
 
 Properties typed as `ArrayObject` (or subclasses) are mapped to `object` in the schema. Arrays are automatically converted to `ArrayObject` instances during validation:

@@ -284,11 +284,24 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
 
             $name = $property->getName();
 
-            // Initialize nullable properties with null if not provided
+            // Handle properties not provided in the input
             if (!array_key_exists($name, $clean)) {
                 $type = self::getPropertyType($property);
-                if ($type !== null && $type->allowsNull() && !$property->hasDefaultValue()) {
-                    $entity->{$name} = null;
+                if ($type !== null) {
+                    // Check if the property type implements EntityDefaultInterface
+                    if (!$type->isBuiltin()) {
+                        $typeName = $type->getName();
+                        if (is_subclass_of($typeName, EntityDefaultInterface::class)) {
+                            /** @var EntityDefaultInterface $typeName */
+                            $entity->{$name} = $typeName::default();
+                            continue;
+                        }
+                    }
+
+                    // Initialize nullable properties with null if not provided
+                    if ($type->allowsNull() && !$property->hasDefaultValue()) {
+                        $entity->{$name} = null;
+                    }
                 }
                 continue;
             }
@@ -393,6 +406,13 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                         $schema = $typeName::getSchema()->getSchemaArray();
                         $schema['entityClassName'] = $typeName;
                     }
+
+                    // If the entity implements EntityDefaultInterface, include the default in schema
+                    if (is_subclass_of($typeName, EntityDefaultInterface::class)) {
+                        /** @var class-string<Entity&EntityDefaultInterface> $typeName */
+                        $defaultInstance = $typeName::default();
+                        $schema['default'] = $defaultInstance->toArray();
+                    }
                 } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
                     $schema = self::buildEnumSchema($typeName);
                 } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
@@ -489,6 +509,13 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
         }
         if ($type !== null && $type->allowsNull()) {
             return false;
+        }
+        // Properties whose type implements EntityDefaultInterface are not required
+        if ($type !== null && !$type->isBuiltin()) {
+            $typeName = $type->getName();
+            if (is_subclass_of($typeName, EntityDefaultInterface::class)) {
+                return false;
+            }
         }
         return true;
     }
