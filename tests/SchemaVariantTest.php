@@ -14,6 +14,8 @@ use Garden\Schema\Tests\Fixtures\ChildEntity;
 use Garden\Schema\Tests\Fixtures\CustomVariant;
 use Garden\Schema\Tests\Fixtures\CustomVariantEntity;
 use Garden\Schema\Tests\Fixtures\MultiExcludeEntity;
+use Garden\Schema\Tests\Fixtures\NestedVariantChildEntity;
+use Garden\Schema\Tests\Fixtures\ParentWithNestedVariantEntity;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -596,5 +598,242 @@ class SchemaVariantTest extends TestCase {
 
         $entity['adminNotes'] = 'Note';
         $this->assertSame('Note', $entity['adminNotes']);
+    }
+
+    //
+    // Nested Entity Schema with Variants Tests
+    //
+
+    public function testGetSchemaPassesVariantToNestedEntitySchema(): void {
+        // Public variant should exclude adminOnlyField and internalOnlyField from nested child
+        $publicSchema = ParentWithNestedVariantEntity::getSchema(CustomVariant::Public);
+        $publicProps = $publicSchema->getSchemaArray()['properties'];
+
+        // Parent fields
+        $this->assertArrayHasKey('id', $publicProps);
+        $this->assertArrayHasKey('name', $publicProps);
+        $this->assertArrayNotHasKey('parentAdminField', $publicProps);
+        $this->assertArrayNotHasKey('parentInternalField', $publicProps);
+
+        // Child entity schema should also be Public variant
+        $this->assertArrayHasKey('child', $publicProps);
+        $childSchema = $publicProps['child'];
+        $this->assertArrayHasKey('properties', $childSchema);
+        $childProps = $childSchema['properties'];
+
+        $this->assertArrayHasKey('id', $childProps);
+        $this->assertArrayHasKey('name', $childProps);
+        $this->assertArrayNotHasKey('adminOnlyField', $childProps);
+        $this->assertArrayNotHasKey('internalOnlyField', $childProps);
+    }
+
+    public function testGetSchemaPassesVariantToNestedEntitySchemaAdmin(): void {
+        // Admin variant should include adminOnlyField but not internalOnlyField
+        $adminSchema = ParentWithNestedVariantEntity::getSchema(CustomVariant::Admin);
+        $adminProps = $adminSchema->getSchemaArray()['properties'];
+
+        // Parent fields
+        $this->assertArrayHasKey('id', $adminProps);
+        $this->assertArrayHasKey('name', $adminProps);
+        $this->assertArrayHasKey('parentAdminField', $adminProps);
+        $this->assertArrayNotHasKey('parentInternalField', $adminProps);
+
+        // Child entity schema should also be Admin variant
+        $childSchema = $adminProps['child'];
+        $childProps = $childSchema['properties'];
+
+        $this->assertArrayHasKey('id', $childProps);
+        $this->assertArrayHasKey('name', $childProps);
+        $this->assertArrayHasKey('adminOnlyField', $childProps);
+        $this->assertArrayNotHasKey('internalOnlyField', $childProps);
+    }
+
+    public function testGetSchemaPassesVariantToNestedEntitySchemaInternal(): void {
+        // Internal variant should include all fields
+        $internalSchema = ParentWithNestedVariantEntity::getSchema(CustomVariant::Internal);
+        $internalProps = $internalSchema->getSchemaArray()['properties'];
+
+        // Parent fields
+        $this->assertArrayHasKey('id', $internalProps);
+        $this->assertArrayHasKey('name', $internalProps);
+        $this->assertArrayHasKey('parentAdminField', $internalProps);
+        $this->assertArrayHasKey('parentInternalField', $internalProps);
+
+        // Child entity schema should also be Internal variant
+        $childSchema = $internalProps['child'];
+        $childProps = $childSchema['properties'];
+
+        $this->assertArrayHasKey('id', $childProps);
+        $this->assertArrayHasKey('name', $childProps);
+        $this->assertArrayHasKey('adminOnlyField', $childProps);
+        $this->assertArrayHasKey('internalOnlyField', $childProps);
+    }
+
+    public function testNestedEntityArraySchemaGetsVariant(): void {
+        // Check that array of nested entities also gets the variant
+        $publicSchema = ParentWithNestedVariantEntity::getSchema(CustomVariant::Public);
+        $publicProps = $publicSchema->getSchemaArray()['properties'];
+
+        $this->assertArrayHasKey('children', $publicProps);
+        $childrenSchema = $publicProps['children'];
+
+        // The items schema should have the Public variant applied
+        $this->assertArrayHasKey('items', $childrenSchema);
+        $itemSchema = $childrenSchema['items'];
+
+        // Items should not have adminOnlyField or internalOnlyField in Public variant
+        // The entityClassName should still be present for hydration
+        $this->assertArrayHasKey('entityClassName', $itemSchema);
+        $this->assertSame(NestedVariantChildEntity::class, $itemSchema['entityClassName']);
+    }
+
+    //
+    // Entity::from() with Variant Tests
+    //
+
+    public function testFromWithVariantValidatesAgainstVariantSchema(): void {
+        // Public variant should not require parentAdminField
+        $entity = ParentWithNestedVariantEntity::from([
+            'id' => 1,
+            'name' => 'Test',
+            // parentAdminField is not provided (excluded from Public variant)
+        ], CustomVariant::Public);
+
+        $this->assertInstanceOf(ParentWithNestedVariantEntity::class, $entity);
+        $this->assertSame(1, $entity->id);
+        $this->assertSame('Test', $entity->name);
+        // parentAdminField should have its default value
+        $this->assertSame('', $entity->parentAdminField);
+    }
+
+    public function testFromWithVariantPassesVariantToNestedEntity(): void {
+        // When using Public variant, nested child should also use Public variant validation
+        $entity = ParentWithNestedVariantEntity::from([
+            'id' => 1,
+            'name' => 'Parent',
+            'child' => [
+                'id' => 2,
+                'name' => 'Child',
+                // adminOnlyField is not provided (excluded from Public variant)
+            ],
+        ], CustomVariant::Public);
+
+        $this->assertInstanceOf(ParentWithNestedVariantEntity::class, $entity);
+        $this->assertInstanceOf(NestedVariantChildEntity::class, $entity->child);
+        $this->assertSame(2, $entity->child->id);
+        $this->assertSame('Child', $entity->child->name);
+        // adminOnlyField should have its default value
+        $this->assertSame('', $entity->child->adminOnlyField);
+    }
+
+    public function testFromWithAdminVariantIncludesAdminFields(): void {
+        // Admin variant should allow and include admin fields
+        $entity = ParentWithNestedVariantEntity::from([
+            'id' => 1,
+            'name' => 'Parent',
+            'parentAdminField' => 'Admin Note',
+            'child' => [
+                'id' => 2,
+                'name' => 'Child',
+                'adminOnlyField' => 'Child Admin Note',
+            ],
+        ], CustomVariant::Admin);
+
+        $this->assertSame('Admin Note', $entity->parentAdminField);
+        $this->assertSame('Child Admin Note', $entity->child->adminOnlyField);
+    }
+
+    public function testFromWithInternalVariantIncludesAllFields(): void {
+        // Internal variant should allow and include all fields
+        $entity = ParentWithNestedVariantEntity::from([
+            'id' => 1,
+            'name' => 'Parent',
+            'parentAdminField' => 'Admin Note',
+            'parentInternalField' => 'Internal Note',
+            'child' => [
+                'id' => 2,
+                'name' => 'Child',
+                'adminOnlyField' => 'Child Admin Note',
+                'internalOnlyField' => 'Child Internal Note',
+            ],
+        ], CustomVariant::Internal);
+
+        $this->assertSame('Admin Note', $entity->parentAdminField);
+        $this->assertSame('Internal Note', $entity->parentInternalField);
+        $this->assertSame('Child Admin Note', $entity->child->adminOnlyField);
+        $this->assertSame('Child Internal Note', $entity->child->internalOnlyField);
+    }
+
+    public function testFromWithVariantAndNestedEntityArray(): void {
+        // Test from() with variant and array of nested entities
+        $entity = ParentWithNestedVariantEntity::from([
+            'id' => 1,
+            'name' => 'Parent',
+            'children' => [
+                ['id' => 10, 'name' => 'Child 1'],
+                ['id' => 20, 'name' => 'Child 2'],
+            ],
+        ], CustomVariant::Public);
+
+        $this->assertCount(2, $entity->children);
+        $this->assertInstanceOf(NestedVariantChildEntity::class, $entity->children[0]);
+        $this->assertSame(10, $entity->children[0]->id);
+        $this->assertSame('Child 1', $entity->children[0]->name);
+        $this->assertInstanceOf(NestedVariantChildEntity::class, $entity->children[1]);
+        $this->assertSame(20, $entity->children[1]->id);
+    }
+
+    public function testFromWithoutVariantUsesFullSchema(): void {
+        // Without variant, should use Full schema (default behavior)
+        $entity = ParentWithNestedVariantEntity::from([
+            'id' => 1,
+            'name' => 'Parent',
+            'parentAdminField' => 'Admin Note',
+            'child' => [
+                'id' => 2,
+                'name' => 'Child',
+                'adminOnlyField' => 'Child Admin Note',
+            ],
+        ]);
+
+        $this->assertSame('Admin Note', $entity->parentAdminField);
+        $this->assertSame('Child Admin Note', $entity->child->adminOnlyField);
+    }
+
+    //
+    // Entity::validate() with Variant Tests
+    //
+
+    public function testValidateWithVariant(): void {
+        $entity = new ParentWithNestedVariantEntity();
+        $entity->id = 1;
+        $entity->name = 'Test';
+        $entity->parentAdminField = 'Admin';
+        $entity->parentInternalField = 'Internal';
+
+        // Validate with Public variant - should pass even with extra fields
+        $validated = $entity->validate(CustomVariant::Public);
+
+        $this->assertInstanceOf(ParentWithNestedVariantEntity::class, $validated);
+        $this->assertSame(1, $validated->id);
+        $this->assertSame('Test', $validated->name);
+    }
+
+    public function testValidateWithVariantAndNestedEntity(): void {
+        $child = new NestedVariantChildEntity();
+        $child->id = 1;
+        $child->name = 'Child';
+        $child->adminOnlyField = 'Admin';
+
+        $parent = new ParentWithNestedVariantEntity();
+        $parent->id = 1;
+        $parent->name = 'Parent';
+        $parent->child = $child;
+
+        // Validate with Public variant
+        $validated = $parent->validate(CustomVariant::Public);
+
+        $this->assertInstanceOf(ParentWithNestedVariantEntity::class, $validated);
+        $this->assertInstanceOf(NestedVariantChildEntity::class, $validated->child);
     }
 }

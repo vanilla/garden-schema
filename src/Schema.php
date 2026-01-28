@@ -246,7 +246,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $node['enum'] = $this->extractParsedEnumValues($value['enumClassName']);
             }
 
-            if (isset($value['entityClassName']) && class_exists($value['entityClassName']) && is_subclass_of($value['entityClassName'], Entity::class)) {
+            if (isset($value['entityClassName']) && class_exists($value['entityClassName']) && is_subclass_of($value['entityClassName'], EntityInterface::class)) {
                 $entitySchema = $value['entityClassName']::getSchema()->getSchemaArray();
                 $node = array_replace_recursive($entitySchema, $node);
                 $node['entityClassName'] = $value['entityClassName'];
@@ -392,7 +392,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             } else {
                 $param = $resolvedEnumType;
             }
-        } elseif (is_string($value) && class_exists($value) && is_subclass_of($value, Entity::class)) {
+        } elseif (is_string($value) && class_exists($value) && is_subclass_of($value, EntityInterface::class)) {
             $resolvedEntityType = $value::getSchema()->getSchemaArray();
             $resolvedEntityType['entityClassName'] = $value;
             if (count($types) === 1 && $types[0] === 'array') {
@@ -1796,7 +1796,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
 
         // Cast to Entity if entityClassName is specified.
         $entityClassName = $field->val('entityClassName');
-        if ($entityClassName && class_exists($entityClassName) && is_subclass_of($entityClassName, Entity::class)) {
+        if ($entityClassName && class_exists($entityClassName) && is_subclass_of($entityClassName, EntityInterface::class)) {
             if (Invalid::isValid($value) && is_array($value)) {
                 return $entityClassName::fromValidated($value);
             }

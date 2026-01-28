@@ -33,29 +33,8 @@ use ReflectionUnionType;
  *
  * The serializationVariant controls which properties are included in toArray() and JSON output.
  */
-abstract class Entity implements \ArrayAccess, \JsonSerializable {
-    /**
-     * Cache for generated schemas, keyed by "class::variant".
-     *
-     * @var array<string, Schema>
-     */
-    private static array $schemaCache = [];
-
-    /**
-     * Track classes currently being built to prevent infinite recursion with self-referencing entities.
-     *
-     * @var array<string, bool>
-     */
-    private static array $schemaBuilding = [];
-
-    /**
-     * The variant used for serialization (toArray/JSON).
-     * When set, only properties included in this variant will be serialized.
-     * This is propagated to nested entities during serialization.
-     *
-     * @var \BackedEnum|null
-     */
-    protected ?\BackedEnum $serializationVariant = null;
+abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializable {
+    use EntityTrait;
 
     /**
      * Build and return the schema for this entity using reflection.
@@ -67,89 +46,84 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     public static function getSchema(?\BackedEnum $variant = null): Schema {
         $variant ??= SchemaVariant::Full;
         $class = static::class;
-        $variantClass = $variant::class;
-        $cacheKey = "{$class}::{$variantClass}::{$variant->value}";
 
-        if (isset(self::$schemaCache[$cacheKey])) {
-            return self::$schemaCache[$cacheKey];
-        }
+        return EntitySchemaCache::getOrCreate($class, $variant, function () use ($class, $variant) {
+            return self::buildSchema($class, $variant);
+        });
+    }
 
-        // Detect self-referencing recursion
-        if (isset(self::$schemaBuilding[$cacheKey])) {
-            throw new \RuntimeException("Circular reference detected while building schema for {$class}. Use getSchema() only after schema is fully built.");
-        }
+    /**
+     * Build a schema for the given class and variant.
+     *
+     * @param class-string $class The entity class to build a schema for.
+     * @param \BackedEnum $variant The schema variant to build.
+     * @return Schema
+     */
+    private static function buildSchema(string $class, \BackedEnum $variant): Schema {
+        $reflection = new ReflectionClass($class);
+        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
+        $schemaProperties = [];
+        $required = [];
+        $includedProperties = [];
 
-        self::$schemaBuilding[$cacheKey] = true;
-
-        try {
-            $reflection = new ReflectionClass($class);
-            $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
-            $schemaProperties = [];
-            $required = [];
-            $includedProperties = [];
-
-            foreach ($properties as $property) {
-                if ($property->isStatic()) {
-                    continue;
-                }
-
-                if (self::isPropertyExcluded($property)) {
-                    continue;
-                }
-
-                // Check if property should be included in this variant
-                if (!self::isPropertyInVariant($property, $variant)) {
-                    continue;
-                }
-
-                $propertyName = $property->getName();
-                $propertySchema = self::buildPropertySchema($property, $class);
-                $schemaProperties[$propertyName] = $propertySchema;
-                $includedProperties[] = $property;
-
-                if (self::isPropertyRequired($property)) {
-                    $required[] = $propertyName;
-                }
+        foreach ($properties as $property) {
+            if ($property->isStatic()) {
+                continue;
             }
 
-            $schemaArray = [
-                'type' => 'object',
-                'properties' => $schemaProperties,
-            ];
-            if (!empty($required)) {
-                $schemaArray['required'] = $required;
+            if (self::isPropertyExcluded($property)) {
+                continue;
             }
 
-            $schema = new Schema($schemaArray);
+            // Check if property should be included in this variant
+            if (!self::isPropertyInVariant($property, $variant)) {
+                continue;
+            }
 
-            // Collect alt names and add filter for property name mapping
-            // Only include alt names for properties that are in this variant
-            $altNameMappings = self::collectAltNameMappings($includedProperties);
-            if (!empty($altNameMappings)) {
-                $schema->addFilter('', function ($data) use ($altNameMappings) {
-                    if (!is_array($data)) {
-                        return $data;
-                    }
-                    foreach ($altNameMappings as $mainName => $altNames) {
-                        if (!array_key_exists($mainName, $data)) {
-                            foreach ($altNames as $altName) {
-                                if (array_key_exists($altName, $data)) {
-                                    $data[$mainName] = $data[$altName];
-                                    unset($data[$altName]);
-                                    break;
-                                }
+            $propertyName = $property->getName();
+            $propertySchema = self::buildPropertySchema($property, $class, $variant);
+            $schemaProperties[$propertyName] = $propertySchema;
+            $includedProperties[] = $property;
+
+            if (self::isPropertyRequired($property)) {
+                $required[] = $propertyName;
+            }
+        }
+
+        $schemaArray = [
+            'type' => 'object',
+            'properties' => $schemaProperties,
+        ];
+        if (!empty($required)) {
+            $schemaArray['required'] = $required;
+        }
+
+        $schema = new Schema($schemaArray);
+
+        // Collect alt names and add filter for property name mapping
+        // Only include alt names for properties that are in this variant
+        $altNameMappings = self::collectAltNameMappings($includedProperties);
+        if (!empty($altNameMappings)) {
+            $schema->addFilter('', function ($data) use ($altNameMappings) {
+                if (!is_array($data)) {
+                    return $data;
+                }
+                foreach ($altNameMappings as $mainName => $altNames) {
+                    if (!array_key_exists($mainName, $data)) {
+                        foreach ($altNames as $altName) {
+                            if (array_key_exists($altName, $data)) {
+                                $data[$mainName] = $data[$altName];
+                                unset($data[$altName]);
+                                break;
                             }
                         }
                     }
-                    return $data;
-                });
-            }
-
-            self::$schemaCache[$cacheKey] = $schema;
-            return $schema;
-        } finally {
-            unset(self::$schemaBuilding[$cacheKey]);
+                }
+                return $data;
+            });
         }
+
+        return $schema;
     }
 
     /**
@@ -197,20 +171,9 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
      */
     public static function invalidateSchemaCache(?string $class = null, ?\BackedEnum $variant = null): void {
         if ($class === null) {
-            self::$schemaCache = [];
-        } elseif ($variant === null) {
-            // Clear all variants for this class by matching prefix
-            $prefix = "{$class}::";
-            foreach (array_keys(self::$schemaCache) as $key) {
-                if (str_starts_with($key, $prefix)) {
-                    unset(self::$schemaCache[$key]);
-                }
-            }
+            EntitySchemaCache::invalidateAll();
         } else {
-            // Clear specific variant for this class
-            $variantClass = $variant::class;
-            $cacheKey = "{$class}::{$variantClass}::{$variant->value}";
-            unset(self::$schemaCache[$cacheKey]);
+            EntitySchemaCache::invalidate($class, $variant);
         }
     }
 
@@ -243,35 +206,21 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     }
 
     /**
-     * Validate and cast the value into an entity instance.
-     *
-     * If the value is already an instance of the target entity class, it is returned as-is.
-     *
-     * @param mixed $value
-     * @return static
-     */
-    public static function from($value): static {
-        if ($value instanceof static) {
-            return $value;
-        }
-        $clean = static::getSchema()->validate($value);
-        return static::fromValidated($clean);
-    }
-
-    /**
      * Hydrate an entity instance from already-validated data.
      *
      * This method skips validation and directly assigns properties.
      * Use this when the data has already been validated by the schema.
      *
      * @param array $clean The validated data array.
+     * @param \BackedEnum|null $variant The schema variant used for validation. Defaults to Full.
+     *                                   This is passed to nested entities during hydration.
      * @return static
      */
-    public static function fromValidated(array $clean): static {
+    public static function fromValidated(array $clean, ?\BackedEnum $variant = null): static {
         $entity = new static();
         $reflection = new ReflectionClass(static::class);
         $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
-        $schemaProperties = static::getSchema()->getSchemaArray()['properties'] ?? [];
+        $schemaProperties = static::getSchema($variant)->getSchemaArray()['properties'] ?? [];
 
         foreach ($properties as $property) {
             if ($property->isStatic()) {
@@ -318,7 +267,7 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                         continue;
                     }
                     if (!$value instanceof $typeName) {
-                        $value = $typeName::fromValidated($value);
+                        $value = $typeName::fromValidated($value, $variant);
                     }
                 } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
                     // Handle enum conversion if Schema didn't already convert it
@@ -345,12 +294,12 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                 $propertySchema = $schemaProperties[$name] ?? [];
                 $itemsEntityClass = $propertySchema['items']['entityClassName'] ?? null;
                 if ($itemsEntityClass && is_subclass_of($itemsEntityClass, self::class)) {
-                    $value = array_map(function ($item) use ($itemsEntityClass) {
+                    $value = array_map(function ($item) use ($itemsEntityClass, $variant) {
                         if ($item instanceof $itemsEntityClass) {
                             return $item;
                         }
                         if (is_array($item)) {
-                            return $itemsEntityClass::fromValidated($item);
+                            return $itemsEntityClass::fromValidated($item, $variant);
                         }
                         return $item;
                     }, $value);
@@ -364,27 +313,14 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     }
 
     /**
-     * Validate the entity's current state against its schema.
-     *
-     * This is useful after direct property modifications (which bypass validation) to verify
-     * that the entity is still in a valid state. Returns a new validated entity instance
-     * with the same data, or throws a ValidationException if invalid.
-     *
-     * @return static A new validated entity instance.
-     * @throws ValidationException If the entity's current state is invalid.
-     */
-    public function validate(): static {
-        return static::from($this->toArray());
-    }
-
-    /**
      * Build a schema array for a property.
      *
      * @param ReflectionProperty $property
      * @param class-string $currentClass The class currently being built (to detect self-reference).
+     * @param \BackedEnum $variant The schema variant being generated.
      * @return array
      */
-    private static function buildPropertySchema(ReflectionProperty $property, string $currentClass): array {
+    private static function buildPropertySchema(ReflectionProperty $property, string $currentClass, \BackedEnum $variant): array {
         $schema = [];
         $type = self::getPropertyType($property);
 
@@ -403,7 +339,7 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
                         $schema['type'] = 'object';
                         $schema['entityClassName'] = $typeName;
                     } else {
-                        $schema = $typeName::getSchema()->getSchemaArray();
+                        $schema = $typeName::getSchema($variant)->getSchemaArray();
                         $schema['entityClassName'] = $typeName;
                     }
 
@@ -549,29 +485,6 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
     }
 
     /**
-     * Set the serialization variant for this entity.
-     *
-     * When set, toArray() and JSON serialization will only include properties
-     * that are part of the specified variant.
-     *
-     * @param \BackedEnum|null $variant The variant to use for serialization, or null to include all properties.
-     * @return $this
-     */
-    public function setSerializationVariant(?\BackedEnum $variant): static {
-        $this->serializationVariant = $variant;
-        return $this;
-    }
-
-    /**
-     * Get the current serialization variant.
-     *
-     * @return \BackedEnum|null
-     */
-    public function getSerializationVariant(): ?\BackedEnum {
-        return $this->serializationVariant;
-    }
-
-    /**
      * Convert the entity to an array.
      *
      * Recursively converts nested entities and arrays of entities to arrays.
@@ -623,7 +536,7 @@ abstract class Entity implements \ArrayAccess, \JsonSerializable {
      * @return mixed
      */
     private function valueToArrayWithVariant(mixed $value, ?\BackedEnum $variant): mixed {
-        if ($value instanceof Entity) {
+        if ($value instanceof EntityInterface) {
             return $value->toArray($variant);
         }
         if ($value instanceof \BackedEnum) {

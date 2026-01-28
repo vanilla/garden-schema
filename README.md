@@ -443,7 +443,7 @@ $fragmentSchema = User::getSchema(SchemaVariant::Fragment);
 
 #### Schema Variant Caching
 
-Each schema variant is cached separately. You can invalidate caches at different levels:
+Each schema variant is cached separately using the `EntitySchemaCache` utility class. You can invalidate caches at different levels:
 
 ```php
 use Garden\Schema\Entity;
@@ -458,6 +458,45 @@ Entity::invalidateSchemaCache(Article::class);
 // Invalidate all cached schemas globally
 Entity::invalidateSchemaCache();
 ```
+
+##### Using EntitySchemaCache Directly
+
+The `EntitySchemaCache` class provides low-level cache management and can be used directly for advanced scenarios:
+
+```php
+use Garden\Schema\EntitySchemaCache;
+use Garden\Schema\Schema;
+use Garden\Schema\SchemaVariant;
+
+// Check if a schema is cached
+if (EntitySchemaCache::has(Article::class, SchemaVariant::Full)) {
+    $schema = EntitySchemaCache::get(Article::class, SchemaVariant::Full);
+}
+
+// Get or create a schema with a factory function
+$schema = EntitySchemaCache::getOrCreate(
+    MyEntity::class,
+    SchemaVariant::Full,
+    function () {
+        // Build and return the schema
+        return new Schema([
+            'type' => 'object',
+            'properties' => [...],
+        ]);
+    }
+);
+
+// Invalidate specific cache entries
+EntitySchemaCache::invalidate(Article::class, SchemaVariant::Full);
+EntitySchemaCache::invalidate(Article::class); // All variants for class
+EntitySchemaCache::invalidateAll(); // Everything
+
+// Debugging helpers
+$count = EntitySchemaCache::count();
+$all = EntitySchemaCache::getAll();
+```
+
+The cache automatically detects circular references during schema building and throws a `RuntimeException` if detected.
 
 #### Custom Variant Enums
 
@@ -780,6 +819,80 @@ $validatedUser = $user->validate();
 $user->age = 'not a number';
 $user->validate(); // Throws ValidationException
 ```
+
+#### The EntityInterface and EntityTrait
+
+If you have a class that already extends another class and cannot extend `Entity`, you can implement the `EntityInterface` directly. To reduce boilerplate, use the `EntityTrait` which provides default implementations for `from()`, `validate()`, `setSerializationVariant()`, and `getSerializationVariant()`.
+
+With `EntityTrait`, you only need to implement three methods:
+- `getSchema()` - Define how to build/retrieve the schema
+- `fromValidated()` - Define how to hydrate the entity from validated data
+- `toArray()` - Define how to serialize the entity to an array
+
+```php
+use Garden\Schema\EntityInterface;
+use Garden\Schema\EntityTrait;
+use Garden\Schema\Schema;
+use Garden\Schema\SchemaVariant;
+
+class MyModel extends SomeFrameworkModel implements EntityInterface {
+    use EntityTrait;
+
+    private static ?Schema $schema = null;
+
+    public int $id;
+    public string $name;
+
+    public static function getSchema(?\BackedEnum $variant = null): Schema {
+        // Implement your own schema generation or caching
+        if (self::$schema === null) {
+            self::$schema = new Schema([
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'name' => ['type' => 'string'],
+                ],
+                'required' => ['id', 'name'],
+            ]);
+        }
+        return self::$schema;
+    }
+
+    public static function fromValidated(array $clean, ?\BackedEnum $variant = null): static {
+        $entity = new static();
+        $entity->id = $clean['id'];
+        $entity->name = $clean['name'];
+        return $entity;
+    }
+
+    public function toArray(?\BackedEnum $variant = null): array {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+        ];
+    }
+}
+```
+
+The `EntityTrait` provides these methods automatically:
+- `from()` - Validates input and calls `fromValidated()`
+- `validate()` - Converts to array and re-validates
+- `setSerializationVariant()` / `getSerializationVariant()` - Manages the `$serializationVariant` property
+
+Classes implementing `EntityInterface` can be used anywhere an entity is expected:
+
+```php
+// Type hints work with the interface
+function processEntity(EntityInterface $entity): array {
+    return $entity->toArray();
+}
+
+// Works with both Entity subclasses and EntityInterface implementations
+$result = processEntity(new MyModel());
+$result = processEntity(User::from([...]));
+```
+
+> **Note:** The abstract `Entity` class provides a complete implementation with reflection-based schema generation, caching via `EntitySchemaCache`, `ArrayAccess`, and `JsonSerializable`. For most use cases, extending `Entity` is recommended. The `Entity` class itself uses `EntityTrait` internally.
 
 ### Non-Object Schemas
 
