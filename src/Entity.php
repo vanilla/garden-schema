@@ -614,8 +614,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     #[\ReturnTypeWillChange]
     public function &offsetGet($offset) {
         if (!$this->offsetExists($offset)) {
-            $null = null;
-            return $null;
+            return null;
         }
         return $this->{$offset};
     }
