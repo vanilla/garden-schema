@@ -2025,20 +2025,33 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return $value;
         }
 
-        if ($enumClass && is_string($value) && class_exists($enumClass) && is_subclass_of($enumClass, \BackedEnum::class)) {
-            $value = $enumClass::tryFrom($value);
-            if ($value === null) {
-                $validValues = array_column($enumClass::cases(), 'value');
-                $field->addError(
-                    'enum',
-                    [
-                        'messageCode' => '{field} must be one of: {enum}.',
-                        'enum' => $validValues,
-                    ]
-                );
-                return Invalid::value();
-            } else {
-                return $value;
+        if ($enumClass && class_exists($enumClass) && is_subclass_of($enumClass, \BackedEnum::class)) {
+            // Handle both string and integer values for BackedEnums.
+            // For integer-backed enums, coerce string values to int before tryFrom.
+            if (is_string($value) || is_int($value)) {
+                $reflection = new \ReflectionEnum($enumClass);
+                $backingType = $reflection->getBackingType();
+                $tryValue = $value;
+                if ($backingType !== null && $backingType->getName() === 'int' && is_string($value)) {
+                    // Coerce string to int for integer-backed enums
+                    if (is_numeric($value)) {
+                        $tryValue = (int)$value;
+                    }
+                }
+                $value = $enumClass::tryFrom($tryValue);
+                if ($value === null) {
+                    $validValues = array_column($enumClass::cases(), 'value');
+                    $field->addError(
+                        'enum',
+                        [
+                            'messageCode' => '{field} must be one of: {enum}.',
+                            'enum' => $validValues,
+                        ]
+                    );
+                    return Invalid::value();
+                } else {
+                    return $value;
+                }
             }
         }
 

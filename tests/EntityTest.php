@@ -93,6 +93,18 @@ class EntityTest extends TestCase {
         $this->assertSame(2, $entity->toArray()['priority']);
     }
 
+    public function testIntegerBackedEnumWithStringInput(): void {
+        // Regression test: string values should be coerced to int for integer-backed enums
+        // This commonly happens with JSON/form data where numbers arrive as strings
+        $entity = IntEnumEntity::from([
+            'name' => 'task',
+            'priority' => '2', // String input
+        ]);
+
+        $this->assertSame(IntEnum::Two, $entity->priority);
+        $this->assertSame(2, $entity->toArray()['priority']);
+    }
+
     public function testSelfReferencingEntity(): void {
         $entity = TreeNodeEntity::from([
             'value' => 'root',
