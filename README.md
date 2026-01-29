@@ -18,6 +18,10 @@ The Garden Schema is a simple data validation and cleaning library based on [Ope
 
 - Developers can use a shorter schema format in order to define schemas in code rapidly. We built this class to be as easy to use as possible. Avoid developer groans as they lock down their data.
 
+- **Entity classes** with automatic schema generation from PHP properties, supporting nested entities, enums, and date-times.
+
+- **Schema variants** for generating different schemas from a single Entity (Full, Fragment, Mutable, Create) to support common API patterns.
+
 - Add custom validator callbacks to support practically any validation scenario.
 
 - Override the validation class in order to customize the way errors are displayed for your own application.
@@ -146,7 +150,7 @@ $recordSchema = Schema::parse([
 
 ### Enum Values
 
-You use a PHP `\BackedEnum` for validation. 
+You use a PHP `\BackedEnum` for validation.
 
 ```php
 enum MyEnum: string {
@@ -157,7 +161,7 @@ enum MyEnum: string {
 
 // Shorthand
 $schema = Schema::parse([
-    "numberField" => MyEnum::class, 
+    "numberField" => MyEnum::class,
 ]);
 
 // Long form
@@ -171,6 +175,724 @@ $schema = Schema::parse([
 $value = $schema->validate(["numberField" => 'one']);
 $value['numberField']; // MyEnum::One
 ```
+
+### Entity Classes
+
+Entity classes allow you to define strongly-typed data objects that automatically generate schemas from their properties using reflection. Validated data is cast into entity instances.
+
+#### Defining an Entity
+
+Create a class extending `Garden\Schema\Entity` with public properties:
+
+```php
+use Garden\Schema\Entity;
+
+class User extends Entity {
+    public string $name;
+    public string $email;
+    public int $age;
+    public ?string $bio = null;  // Optional, nullable with default
+}
+```
+
+#### Using Entities
+
+Use `Entity::getSchema()` to get the generated schema, or `Entity::from()` to validate and create an instance:
+
+```php
+// Get the schema
+$schema = User::getSchema();
+
+// Validate and create an entity
+$user = User::from([
+    'name' => 'John',
+    'email' => 'john@example.com',
+    'age' => 30,
+]);
+
+$user->name; // 'John'
+$user->age;  // 30 (integer)
+```
+
+If you pass an existing entity instance to `from()`, it returns that instance without re-validating:
+
+```php
+$user = User::from(['name' => 'John', 'email' => 'john@example.com', 'age' => 30]);
+$same = User::from($user); // Returns $user, no validation
+```
+
+> **Note:** When an existing entity is passed, it is assumed to already be valid. If you've manually modified properties to invalid values, those won't be caught. Use `Entity::from($entity->toArray())` if you need to re-validate a modified entity.
+
+#### Property Type Mapping
+
+Entity properties are mapped to schema types as follows:
+
+| PHP Type | Schema Type |
+| -------- | ----------- |
+| `string` | `string` |
+| `int` | `integer` |
+| `float` | `number` |
+| `bool` | `boolean` |
+| `array` | `array` |
+| `ArrayObject` | `object` |
+| `DateTimeImmutable` | `string` with `format: date-time` |
+| `BackedEnum` subclass | `string` or `integer` with `enumClassName` |
+| `Entity` subclass | Nested object schema with `entityClassName` |
+| Untyped | No type validation (accepts any value) |
+
+Properties with nullable types (`?string`) or default values are optional. All other typed properties are required.
+
+#### The PropertySchema Attribute
+
+Use `#[PropertySchema]` to customize property schemas. The provided schema array is merged with the auto-generated schema from the property's type, allowing you to add constraints while preserving type inference:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\PropertySchema;
+
+class Article extends Entity {
+    public string $title;
+
+    // Add constraints to auto-generated string type
+    #[PropertySchema(['minLength' => 10, 'maxLength' => 5000])]
+    public string $body;
+
+    // Add items constraint to auto-generated array type
+    #[PropertySchema(['items' => ['type' => 'string']])]
+    public array $tags;
+
+    // Multiple constraints
+    #[PropertySchema(['items' => ['type' => 'string'], 'minItems' => 1])]
+    public array $categories;
+}
+```
+
+#### The PropertyAltNames Attribute
+
+Use `#[PropertyAltNames]` to specify alternative property names that map to a property. This is useful for handling legacy field names, API versioning, or data from different sources:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\PropertyAltNames;
+
+class User extends Entity {
+    #[PropertyAltNames('user_name', 'userName', 'uname')]
+    public string $name;
+
+    #[PropertyAltNames('e-mail', 'emailAddress')]
+    public ?string $email = null;
+}
+
+// All of these work:
+$user1 = User::from(['name' => 'John']);           // Main property name
+$user2 = User::from(['user_name' => 'John']);      // First alt name
+$user3 = User::from(['userName' => 'John']);       // Second alt name
+$user4 = User::from(['uname' => 'John']);          // Third alt name
+
+// Main property name takes precedence
+$user5 = User::from(['name' => 'Main', 'user_name' => 'Alt']);
+$user5->name; // 'Main'
+
+// First matching alt name is used (in order defined)
+$user6 = User::from(['userName' => 'Second', 'uname' => 'Third']);
+$user6->name; // 'Second' (userName comes before uname in the attribute)
+```
+
+#### The ExcludeFromSchema Attribute
+
+Use `#[ExcludeFromSchema]` to exclude a property from schema generation and validation. This is useful for computed properties, caches, or internal state that shouldn't be part of the data model:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\ExcludeFromSchema;
+
+class Article extends Entity {
+    public string $title;
+    public string $body;
+
+    #[ExcludeFromSchema]
+    public string $slug = '';  // Computed from title
+
+    #[ExcludeFromSchema]
+    public ?array $cache = null;  // Internal cache
+}
+
+$article = Article::from([
+    'title' => 'Hello World',
+    'body' => 'Content here',
+    'slug' => 'ignored',  // This is ignored during validation
+]);
+
+$article->title; // 'Hello World'
+$article->slug;  // '' (default value, input was ignored)
+
+// Excluded properties can still be set directly
+$article->slug = 'hello-world';
+$article->cache = ['rendered' => '<p>Content here</p>'];
+
+// Excluded properties are not included in toArray() or JSON output
+$array = $article->toArray(); // ['title' => 'Hello World', 'body' => 'Content here']
+```
+
+#### Schema Variants
+
+Entities support multiple schema variants for different API use cases. This allows a single Entity class to generate different schemas depending on the context:
+
+| Variant | Use Case |
+| ------- | -------- |
+| `Full` | Complete entity with all properties (default). Used for single-item GET responses. |
+| `Fragment` | Reduced version for lists. Omits large strings and detail fields. |
+| `Mutable` | Fields that can be modified by consumers. Used for PATCH requests. |
+| `Create` | Includes create-only fields. Used for POST requests. |
+| `Internal` | For system/internal use. May include sensitive fields not exposed via API. |
+
+Use `Entity::getSchema()` with a `SchemaVariant` parameter to get different variants:
+
+```php
+use Garden\Schema\SchemaVariant;
+
+// Get different schema variants
+$fullSchema     = Article::getSchema();                       // Default: Full
+$fullSchema     = Article::getSchema(SchemaVariant::Full);    // Explicit Full
+$fragmentSchema = Article::getSchema(SchemaVariant::Fragment);
+$mutableSchema  = Article::getSchema(SchemaVariant::Mutable);
+$createSchema   = Article::getSchema(SchemaVariant::Create);
+$internalSchema = Article::getSchema(SchemaVariant::Internal);
+```
+
+By default, all properties are included in all variants. Use attributes to customize which properties appear in each variant.
+
+#### The ExcludeFromVariant Attribute
+
+Use `#[ExcludeFromVariant]` to exclude a property from specific schema variants:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\ExcludeFromVariant;
+use Garden\Schema\SchemaVariant;
+
+class Article extends Entity {
+    public int $id;
+    public string $title;
+
+    // Exclude from Fragment (too large for list responses)
+    #[ExcludeFromVariant(SchemaVariant::Fragment)]
+    public string $body;
+
+    // Exclude from Mutable (system-managed, not user-editable)
+    #[ExcludeFromVariant(SchemaVariant::Mutable)]
+    public \DateTimeImmutable $createdAt;
+
+    #[ExcludeFromVariant(SchemaVariant::Mutable)]
+    public \DateTimeImmutable $updatedAt;
+
+    // Exclude from multiple variants
+    #[ExcludeFromVariant(SchemaVariant::Fragment, SchemaVariant::Mutable)]
+    public string $internalNotes;
+}
+
+// Fragment schema won't include body or internalNotes
+$fragmentSchema = Article::getSchema(SchemaVariant::Fragment);
+
+// Mutable schema won't include createdAt, updatedAt, or internalNotes
+$mutableSchema = Article::getSchema(SchemaVariant::Mutable);
+```
+
+The attribute is repeatable, so you can also use multiple attributes:
+
+```php
+#[ExcludeFromVariant(SchemaVariant::Fragment)]
+#[ExcludeFromVariant(SchemaVariant::Mutable)]
+public string $internalNotes;
+```
+
+#### The IncludeOnlyInVariant Attribute
+
+Use `#[IncludeOnlyInVariant]` to include a property only in specific variants. Properties with this attribute are excluded from all other variants (including `Full` unless specified):
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\IncludeOnlyInVariant;
+use Garden\Schema\SchemaVariant;
+
+class User extends Entity {
+    public int $id;
+    public string $username;
+    public string $email;
+
+    // Only include in Create schema (for initial user setup)
+    #[IncludeOnlyInVariant(SchemaVariant::Create)]
+    public ?string $initialPassword;
+
+    // Include in both Create and Full schemas
+    #[IncludeOnlyInVariant(SchemaVariant::Create, SchemaVariant::Full)]
+    public ?string $inviteCode;
+}
+
+// Create schema includes initialPassword and inviteCode
+$createSchema = User::getSchema(SchemaVariant::Create);
+
+// Full schema includes inviteCode but NOT initialPassword
+$fullSchema = User::getSchema(SchemaVariant::Full);
+
+// Fragment and Mutable schemas include neither
+$fragmentSchema = User::getSchema(SchemaVariant::Fragment);
+```
+
+> **Note:** If both `#[IncludeOnlyInVariant]` and `#[ExcludeFromVariant]` are present on the same property, `#[IncludeOnlyInVariant]` takes precedence.
+
+#### Schema Variant Caching
+
+Each schema variant is cached separately using the `EntitySchemaCache` utility class. You can invalidate caches at different levels:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\SchemaVariant;
+
+// Invalidate a specific variant for a class
+Entity::invalidateSchemaCache(Article::class, SchemaVariant::Full);
+
+// Invalidate all variants for a class
+Entity::invalidateSchemaCache(Article::class);
+
+// Invalidate all cached schemas globally
+Entity::invalidateSchemaCache();
+```
+
+##### Using EntitySchemaCache Directly
+
+The `EntitySchemaCache` class provides low-level cache management and can be used directly for advanced scenarios:
+
+```php
+use Garden\Schema\EntitySchemaCache;
+use Garden\Schema\Schema;
+use Garden\Schema\SchemaVariant;
+
+// Check if a schema is cached
+if (EntitySchemaCache::has(Article::class, SchemaVariant::Full)) {
+    $schema = EntitySchemaCache::get(Article::class, SchemaVariant::Full);
+}
+
+// Get or create a schema with a factory function
+$schema = EntitySchemaCache::getOrCreate(
+    MyEntity::class,
+    SchemaVariant::Full,
+    function () {
+        // Build and return the schema
+        return new Schema([
+            'type' => 'object',
+            'properties' => [...],
+        ]);
+    }
+);
+
+// Invalidate specific cache entries
+EntitySchemaCache::invalidate(Article::class, SchemaVariant::Full);
+EntitySchemaCache::invalidate(Article::class); // All variants for class
+EntitySchemaCache::invalidateAll(); // Everything
+
+// Debugging helpers
+$count = EntitySchemaCache::count();
+$all = EntitySchemaCache::getAll();
+```
+
+The cache automatically detects circular references during schema building and throws a `RuntimeException` if detected.
+
+#### Custom Variant Enums
+
+You can define your own variant enums instead of using `SchemaVariant`. This is useful when you need domain-specific variants:
+
+```php
+// Define a custom variant enum
+enum AccessLevel: string {
+    case Public = 'public';
+    case Admin = 'admin';
+    case Internal = 'internal';
+}
+
+use Garden\Schema\Entity;
+use Garden\Schema\ExcludeFromVariant;
+use Garden\Schema\IncludeOnlyInVariant;
+
+class User extends Entity {
+    public int $id;
+    public string $name;
+
+    // Only visible to admins and internal
+    #[ExcludeFromVariant(AccessLevel::Public)]
+    public string $adminNotes = '';
+
+    // Only visible internally
+    #[IncludeOnlyInVariant(AccessLevel::Internal)]
+    public string $internalSecret = '';
+}
+
+// Use custom variants with getSchema()
+$publicSchema   = User::getSchema(AccessLevel::Public);
+$adminSchema    = User::getSchema(AccessLevel::Admin);
+$internalSchema = User::getSchema(AccessLevel::Internal);
+```
+
+Custom variants are cached separately and can be mixed with `SchemaVariant` on the same entity.
+
+#### Serialization Variants
+
+You can control which properties are included when converting an entity to an array or JSON by using serialization variants:
+
+```php
+$user = User::from([...]);
+$user->adminNotes = 'Secret note';
+
+// Serialize with a specific variant - only includes properties in that variant
+$publicArray = $user->toArray(AccessLevel::Public);  // Won't include adminNotes
+
+// Set a persistent serialization variant for the entity
+$user->setSerializationVariant(AccessLevel::Public);
+
+// Now toArray() and json_encode() will use the set variant
+$array = $user->toArray();        // Uses AccessLevel::Public
+$json = json_encode($user);       // Uses AccessLevel::Public
+
+// Get the current serialization variant
+$variant = $user->getSerializationVariant();  // AccessLevel::Public
+
+// Clear the serialization variant (reverts to full schema)
+$user->setSerializationVariant(null);
+
+// Explicit variant in toArray() overrides the set serialization variant
+$adminArray = $user->toArray(AccessLevel::Admin);  // Uses Admin regardless of set variant
+```
+
+The serialization variant is propagated to nested entities during serialization:
+
+```php
+class Article extends Entity {
+    public int $id;
+    public User $author;
+
+    #[ExcludeFromVariant(AccessLevel::Public)]
+    public string $editorNotes = '';
+}
+
+$article = Article::from([...]);
+$article->author->adminNotes = 'Author admin note';
+$article->editorNotes = 'Editor note';
+
+// Both Article and nested User will use Public variant
+$publicArray = $article->toArray(AccessLevel::Public);
+// $publicArray won't include editorNotes or author.adminNotes
+```
+
+#### Nested Entities
+
+Entities can reference other entities. Nested data is automatically validated and cast:
+
+```php
+class Address extends Entity {
+    public string $street;
+    public string $city;
+}
+
+class Person extends Entity {
+    public string $name;
+    public Address $address;
+    public ?Address $workAddress = null;
+}
+
+$person = Person::from([
+    'name' => 'Jane',
+    'address' => ['street' => '123 Main St', 'city' => 'Springfield'],
+]);
+
+$person->address; // Address instance
+$person->address->city; // 'Springfield'
+```
+
+#### Default Values for Nested Entities
+
+PHP doesn't allow default values for properties that require class instantiation. To provide default values for nested entity properties, implement the `EntityDefaultInterface`:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\EntityDefaultInterface;
+
+class Metadata extends Entity implements EntityDefaultInterface {
+    public string $version;
+    public bool $draft;
+
+    public static function default(): static {
+        $instance = new static();
+        $instance->version = '1.0';
+        $instance->draft = true;
+        return $instance;
+    }
+}
+
+class Article extends Entity {
+    public string $title;
+    public Metadata $metadata;        // Gets default when not provided
+    public ?Metadata $extraMeta;      // Also gets default when not provided
+}
+```
+
+When a property's type implements `EntityDefaultInterface`:
+
+1. **Schema includes the default**: The generated schema will have a `default` key with the serialized default values, useful for OpenAPI documentation.
+2. **Hydration uses the default**: When `from()` or `fromValidated()` is called without that property, the default instance is used.
+3. **Property is not required**: The property is automatically treated as optional in the schema.
+
+```php
+// Create without providing metadata - gets default
+$article = Article::from(['title' => 'Hello World']);
+
+$article->metadata->version; // '1.0'
+$article->metadata->draft;   // true
+
+// Explicit values override the default
+$article2 = Article::from([
+    'title' => 'Hello World',
+    'metadata' => ['version' => '2.0', 'draft' => false],
+]);
+
+$article2->metadata->version; // '2.0'
+```
+
+**Distinguishing absent values from explicit null:**
+
+For nullable properties, there's a distinction between not providing a value (uses default) and explicitly setting `null`:
+
+```php
+// Property absent → gets default
+$article = Article::from(['title' => 'Hello']);
+$article->extraMeta; // Metadata instance with defaults
+
+// Property explicitly null → stays null
+$article = Article::from(['title' => 'Hello', 'extraMeta' => null]);
+$article->extraMeta; // null
+```
+
+The generated schema includes the default:
+
+```json
+{
+  "properties": {
+    "title": {"type": "string"},
+    "metadata": {
+      "type": "object",
+      "default": {"version": "1.0", "draft": true},
+      "properties": {...}
+    }
+  },
+  "required": ["title"]
+}
+```
+
+#### ArrayObject Properties
+
+Properties typed as `ArrayObject` (or subclasses) are mapped to `object` in the schema. Arrays are automatically converted to `ArrayObject` instances during validation:
+
+```php
+use Garden\Schema\Entity;
+
+class Config extends Entity {
+    public string $name;
+    public \ArrayObject $settings;
+    public ?\ArrayObject $metadata = null;
+}
+
+$config = Config::from([
+    'name' => 'app',
+    'settings' => ['debug' => true, 'timeout' => 30],
+]);
+
+$config->settings; // ArrayObject instance
+$config->settings['debug']; // true
+$config->settings['timeout'] = 60; // Modify in place
+```
+
+`ArrayObject` instances are preserved in `toArray()` and JSON serialization to ensure empty objects serialize as `{}` (JSON object) rather than `[]` (JSON array):
+
+```php
+$config = Config::from([
+    'name' => 'app',
+    'settings' => [],  // Empty
+]);
+
+json_encode($config); // {"name":"app","settings":{},"metadata":null}
+```
+
+#### DateTimeImmutable Properties
+
+Properties typed as `DateTimeImmutable` are mapped to `string` with `format: date-time` in the schema. Date-time strings are automatically converted to `DateTimeImmutable` instances, and serialized to RFC3339 format (or RFC3339_EXTENDED if milliseconds are present):
+
+```php
+use Garden\Schema\Entity;
+
+class Event extends Entity {
+    public string $title;
+    public \DateTimeImmutable $startsAt;
+    public ?\DateTimeImmutable $endsAt = null;
+}
+
+$event = Event::from([
+    'title' => 'Meeting',
+    'startsAt' => '2024-06-15T14:00:00+00:00',
+]);
+
+$event->startsAt; // DateTimeImmutable instance
+$event->startsAt->format('Y-m-d'); // '2024-06-15'
+
+// toArray() and JSON serialize to RFC3339 format
+$array = $event->toArray();
+$array['startsAt']; // '2024-06-15T14:00:00+00:00'
+
+// With milliseconds, uses RFC3339_EXTENDED
+$event->startsAt = new \DateTimeImmutable('2024-06-15T14:00:00.123+00:00');
+$array = $event->toArray();
+$array['startsAt']; // '2024-06-15T14:00:00.123+00:00'
+```
+
+#### Using entityClassName in Schemas
+
+You can reference entity classes directly in schema definitions, similar to `BackedEnum`:
+
+```php
+// Shorthand
+$schema = Schema::parse([
+    'user' => User::class,
+]);
+
+// Long form
+$schema = Schema::parse([
+    'user' => ['entityClassName' => User::class],
+]);
+
+// Array of entities
+$schema = Schema::parse([
+    'users:a' => User::class,
+]);
+
+$result = $schema->validate(['user' => ['name' => 'John', 'email' => 'j@x.com', 'age' => 25]]);
+$result['user']; // User instance
+```
+
+#### Converting to Arrays and JSON
+
+Entities implement `ArrayAccess` and `JsonSerializable`:
+
+```php
+$user = User::from(['name' => 'John', 'email' => 'john@example.com', 'age' => 30]);
+
+// ArrayAccess for reading
+$user['name']; // 'John'
+
+// ArrayAccess for writing (bypasses validation - use with care)
+$user['age'] = 31;
+
+// Convert to array (nested entities become arrays, enums become values)
+$array = $user->toArray();
+
+// JSON serialization uses toArray()
+$json = json_encode($user);
+
+// Round-trip: array -> entity -> array produces equivalent data
+$user2 = User::from($user->toArray());
+```
+
+> **Note:** Writing via `ArrayAccess` (e.g., `$user['age'] = 'not a number'`) and direct property assignment do NOT perform validation. Use `Entity::from()` for validated construction, or call `$entity->validate()` after modifications to verify the entity is valid.
+
+#### Validating After Modifications
+
+After modifying an entity directly, you can call `validate()` to verify it's still in a valid state:
+
+```php
+$user = User::from(['name' => 'John', 'email' => 'john@example.com', 'age' => 30]);
+
+// Modify directly (no validation)
+$user->name = 'Jane';
+$user['age'] = 25;
+
+// Validate current state - returns new validated entity or throws ValidationException
+$validatedUser = $user->validate();
+
+// Invalid modification
+$user->age = 'not a number';
+$user->validate(); // Throws ValidationException
+```
+
+#### The EntityInterface and EntityTrait
+
+If you have a class that already extends another class and cannot extend `Entity`, you can implement the `EntityInterface` directly. To reduce boilerplate, use the `EntityTrait` which provides default implementations for `from()`, `validate()`, `setSerializationVariant()`, and `getSerializationVariant()`.
+
+With `EntityTrait`, you only need to implement three methods:
+- `getSchema()` - Define how to build/retrieve the schema
+- `fromValidated()` - Define how to hydrate the entity from validated data
+- `toArray()` - Define how to serialize the entity to an array
+
+```php
+use Garden\Schema\EntityInterface;
+use Garden\Schema\EntityTrait;
+use Garden\Schema\Schema;
+use Garden\Schema\SchemaVariant;
+
+class MyModel extends SomeFrameworkModel implements EntityInterface {
+    use EntityTrait;
+
+    private static ?Schema $schema = null;
+
+    public int $id;
+    public string $name;
+
+    public static function getSchema(?\BackedEnum $variant = null): Schema {
+        // Implement your own schema generation or caching
+        if (self::$schema === null) {
+            self::$schema = new Schema([
+                'type' => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'name' => ['type' => 'string'],
+                ],
+                'required' => ['id', 'name'],
+            ]);
+        }
+        return self::$schema;
+    }
+
+    public static function fromValidated(array $clean, ?\BackedEnum $variant = null): static {
+        $entity = new static();
+        $entity->id = $clean['id'];
+        $entity->name = $clean['name'];
+        return $entity;
+    }
+
+    public function toArray(?\BackedEnum $variant = null): array {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+        ];
+    }
+}
+```
+
+The `EntityTrait` provides these methods automatically:
+- `from()` - Validates input and calls `fromValidated()`
+- `validate()` - Converts to array and re-validates
+- `setSerializationVariant()` / `getSerializationVariant()` - Manages the `$serializationVariant` property
+
+Classes implementing `EntityInterface` can be used anywhere an entity is expected:
+
+```php
+// Type hints work with the interface
+function processEntity(EntityInterface $entity): array {
+    return $entity->toArray();
+}
+
+// Works with both Entity subclasses and EntityInterface implementations
+$result = processEntity(new MyModel());
+$result = processEntity(User::from([...]));
+```
+
+> **Note:** The abstract `Entity` class provides a complete implementation with reflection-based schema generation, caching via `EntitySchemaCache`, `ArrayAccess`, and `JsonSerializable`. For most use cases, extending `Entity` is recommended. The `Entity` class itself uses `EntityTrait` internally.
 
 ### Non-Object Schemas
 

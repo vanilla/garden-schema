@@ -245,6 +245,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             if (isset($value['enumClassName']) && class_exists($value['enumClassName']) && is_subclass_of($value['enumClassName'], \BackedEnum::class)) {
                 $node['enum'] = $this->extractParsedEnumValues($value['enumClassName']);
             }
+
+            if (isset($value['entityClassName']) && class_exists($value['entityClassName']) && is_subclass_of($value['entityClassName'], EntityInterface::class)) {
+                $entitySchema = $value['entityClassName']::getSchema()->getSchemaArray();
+                $node = array_replace_recursive($entitySchema, $node);
+                $node['entityClassName'] = $value['entityClassName'];
+            }
         }
 
         return $node;
@@ -385,6 +391,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                 $param = ['type' => 'array', 'items' => $resolvedEnumType];
             } else {
                 $param = $resolvedEnumType;
+            }
+        } elseif (is_string($value) && class_exists($value) && is_subclass_of($value, EntityInterface::class)) {
+            $resolvedEntityType = $value::getSchema()->getSchemaArray();
+            $resolvedEntityType['entityClassName'] = $value;
+            if (count($types) === 1 && $types[0] === 'array') {
+                $param = ['type' => 'array', 'items' => $resolvedEntityType];
+            } else {
+                $param = $resolvedEntityType;
             }
         }  elseif (isset($value['type'])) {
             $param = $value + $param;
@@ -1296,6 +1310,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return int|Invalid Returns the cleaned value or **null** if validation fails.
      */
     protected function validateInteger($value, ValidationField $field) {
+        $enumClassName = $field->val('enumClassName');
+        if (!empty($enumClassName) && class_exists($enumClassName)) {
+            return $this->validateEnum($value, $field);
+        }
+
         if ($field->val('format') === 'timestamp') {
             return $this->validateTimestamp($value, $field);
         }
@@ -1443,9 +1462,9 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     protected function validateString($value, ValidationField $field) {
         $enumClassName = $field->val('enumClassName');
         if (!empty($enumClassName) && class_exists($enumClassName)) {
-            return $this->validateEnum($value, $field);  
+            return $this->validateEnum($value, $field);
         }
-        
+
         if ($field->val('format') === 'date-time') {
             // Skip format validation for optional fields with empty strings
             // Determine if this field is optional by checking parent schema's required array
@@ -1739,6 +1758,12 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @throws RefNotFoundException Throws an exception when a schema `$ref` is not found.
      */
     protected function validateObject($value, ValidationField $field) {
+        // If entityClassName is specified and value is already that entity type, accept it.
+        $entityClassName = $field->val('entityClassName');
+        if ($entityClassName && $value instanceof $entityClassName) {
+            return $value;
+        }
+
         if (!$this->isArray($value) || isset($value[0])) {
             $field->addTypeError($value, 'object');
             return Invalid::value();
@@ -1767,6 +1792,14 @@ class Schema implements \JsonSerializable, \ArrayAccess {
                     'minItems' => $minProperties,
                 ]
             );
+        }
+
+        // Cast to Entity if entityClassName is specified.
+        $entityClassName = $field->val('entityClassName');
+        if ($entityClassName && class_exists($entityClassName) && is_subclass_of($entityClassName, EntityInterface::class)) {
+            if (Invalid::isValid($value) && is_array($value)) {
+                return $entityClassName::fromValidated($value);
+            }
         }
 
         return $value;
@@ -1991,21 +2024,34 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             // We are an enum variant.
             return $value;
         }
-        
-        if ($enumClass && is_string($value) && class_exists($enumClass) && is_subclass_of($enumClass, \BackedEnum::class)) {
-            $value = $enumClass::tryFrom($value);
-            if ($value === null) {
-                $validValues = array_column($enumClass::cases(), 'value');
-                $field->addError(
-                    'enum',
-                    [
-                        'messageCode' => '{field} must be one of: {enum}.',
-                        'enum' => $validValues,
-                    ]
-                );
-                return Invalid::value();
-            } else {
-                return $value;
+
+        if ($enumClass && class_exists($enumClass) && is_subclass_of($enumClass, \BackedEnum::class)) {
+            // Handle both string and integer values for BackedEnums.
+            // For integer-backed enums, coerce string values to int before tryFrom.
+            if (is_string($value) || is_int($value)) {
+                $reflection = new \ReflectionEnum($enumClass);
+                $backingType = $reflection->getBackingType();
+                $tryValue = $value;
+                if ($backingType !== null && $backingType->getName() === 'int' && is_string($value)) {
+                    // Coerce string to int for integer-backed enums
+                    if (is_numeric($value)) {
+                        $tryValue = (int)$value;
+                    }
+                }
+                $value = $enumClass::tryFrom($tryValue);
+                if ($value === null) {
+                    $validValues = array_column($enumClass::cases(), 'value');
+                    $field->addError(
+                        'enum',
+                        [
+                            'messageCode' => '{field} must be one of: {enum}.',
+                            'enum' => $validValues,
+                        ]
+                    );
+                    return Invalid::value();
+                } else {
+                    return $value;
+                }
             }
         }
 
