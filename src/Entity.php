@@ -260,8 +260,19 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
 
             if ($type !== null && !$type->isBuiltin()) {
                 $typeName = $type->getName();
-                // Handle single nested entity
-                if (is_subclass_of($typeName, self::class)) {
+                // Handle properties typed as the EntityInterface interface itself
+                // We can't call fromValidated() on an interface, so only assign existing instances
+                if ($typeName === EntityInterface::class) {
+                    if ($value === null) {
+                        $entity->{$name} = null;
+                    } elseif ($value instanceof EntityInterface) {
+                        $entity->{$name} = $value;
+                    }
+                    // Skip assignment for non-EntityInterface values (e.g., arrays)
+                    // since we don't know which concrete class to instantiate
+                    continue;
+                } elseif (is_subclass_of($typeName, EntityInterface::class)) {
+                    // Handle nested entities - both Entity subclasses and other EntityInterface implementations
                     if ($value === null) {
                         $entity->{$name} = null;
                         continue;
@@ -332,7 +343,12 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                     $schema['type'] = $schemaType;
                 }
             } else {
-                if (is_subclass_of($typeName, self::class)) {
+                if ($typeName === EntityInterface::class) {
+                    // Handle properties typed as the EntityInterface interface itself
+                    // Since we don't know the concrete type, just mark as generic object
+                    $schema['type'] = 'object';
+                } elseif (is_subclass_of($typeName, EntityInterface::class)) {
+                    // Handle nested entities - both Entity subclasses and other EntityInterface implementations
                     // For self-referencing entities, don't recursively get the full schema
                     // Just mark with entityClassName and let Schema handle it lazily
                     if ($typeName === $currentClass) {
