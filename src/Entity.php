@@ -335,6 +335,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         $schema = [];
         $type = self::getPropertyType($property);
 
+        // Check for NestedVariant attribute to determine which variant to use for nested entities
+        $nestedVariant = self::getNestedVariantForProperty($property, $variant);
+
         if ($type !== null) {
             $typeName = $type->getName();
             if ($type->isBuiltin()) {
@@ -355,7 +358,8 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                         $schema['type'] = 'object';
                         $schema['entityClassName'] = $typeName;
                     } else {
-                        $schema = $typeName::getSchema($variant)->getSchemaArray();
+                        // Use the resolved nested variant for the child entity's schema
+                        $schema = $typeName::getSchema($nestedVariant)->getSchemaArray();
                         $schema['entityClassName'] = $typeName;
                     }
 
@@ -391,7 +395,31 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
             $schema = array_replace_recursive($schema, $attributeSchema);
         }
 
+        // Store the nested variant in schema metadata if different from parent variant
+        // This allows toArray() to read it without reflection on every call
+        if ($nestedVariant !== $variant) {
+            $schema['x-nested-serialization-variant'] = $nestedVariant;
+        }
+
         return $schema;
+    }
+
+    /**
+     * Get the variant to use for a nested entity's schema based on NestedVariant attribute.
+     *
+     * @param ReflectionProperty $property The property to check.
+     * @param \BackedEnum $parentVariant The parent entity's schema variant.
+     * @return \BackedEnum The resolved variant for the nested entity schema.
+     */
+    private static function getNestedVariantForProperty(ReflectionProperty $property, \BackedEnum $parentVariant): \BackedEnum {
+        $attributes = $property->getAttributes(NestedVariant::class);
+        if (empty($attributes)) {
+            return $parentVariant;
+        }
+
+        /** @var NestedVariant $nestedVariant */
+        $nestedVariant = $attributes[0]->newInstance();
+        return $nestedVariant->resolveVariant($parentVariant) ?? $parentVariant;
     }
 
     /**
@@ -507,7 +535,8 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * BackedEnum values are converted to their backing values.
      *
      * If a variant is provided, only properties included in that variant will be serialized.
-     * The variant is propagated to nested entities.
+     * The variant is propagated to nested entities, unless a property has a #[NestedVariant]
+     * attribute that specifies a different variant for that nested entity.
      *
      * @param \BackedEnum|null $variant Optional variant to filter properties. If provided, sets the serializationVariant.
      * @return array
@@ -517,28 +546,26 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         $effectiveVariant = $variant ?? $this->serializationVariant;
 
         $result = [];
-        $reflection = new ReflectionClass(static::class);
-        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
 
         // Get schema properties for the effective variant (or full schema if no variant)
+        // This is cached, so no reflection overhead here
         $schemaProperties = static::getSchema($effectiveVariant)->getSchemaArray()['properties'] ?? [];
 
-        foreach ($properties as $property) {
-            if ($property->isStatic()) {
+        // get_object_vars returns only initialized properties, avoiding reflection
+        $initializedProperties = get_object_vars($this);
+
+        foreach ($schemaProperties as $name => $propertySchema) {
+            if (!array_key_exists($name, $initializedProperties)) {
                 continue;
             }
 
-            $name = $property->getName();
-            if (!array_key_exists($name, $schemaProperties)) {
-                continue;
-            }
+            $value = $initializedProperties[$name];
 
-            if (!$property->isInitialized($this)) {
-                continue;
-            }
+            // Read nested variant from cached schema metadata (set during schema generation)
+            // This avoids reflection on every toArray() call
+            $nestedVariant = $propertySchema['x-nested-serialization-variant'] ?? $effectiveVariant;
 
-            $value = $this->{$name};
-            $result[$name] = $this->valueToArrayWithVariant($value, $effectiveVariant);
+            $result[$name] = $this->valueToArrayWithVariant($value, $nestedVariant);
         }
 
         return $result;

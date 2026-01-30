@@ -583,6 +583,92 @@ $publicArray = $article->toArray(AccessLevel::Public);
 // $publicArray won't include editorNotes or author.adminNotes
 ```
 
+#### The NestedVariant Attribute
+
+By default, when serializing an entity, nested entities inherit the same variant as their parent. Use `#[NestedVariant]` to specify a different variant for a specific nested entity property:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\ExcludeFromVariant;
+use Garden\Schema\NestedVariant;
+use Garden\Schema\SchemaVariant;
+
+class Author extends Entity {
+    public int $id;
+    public string $name;
+    public string $email;
+
+    #[ExcludeFromVariant(SchemaVariant::Fragment)]
+    public string $bio = '';  // Only in Full variant
+}
+
+class Article extends Entity {
+    public int $id;
+    public string $title;
+
+    #[ExcludeFromVariant(SchemaVariant::Fragment)]
+    public string $body = '';
+
+    // Author is always serialized as Fragment, even when Article is Full
+    #[NestedVariant(SchemaVariant::Fragment)]
+    public ?Author $author = null;
+}
+
+$article = Article::from([
+    'id' => 1,
+    'title' => 'Hello World',
+    'body' => 'Full content...',
+    'author' => [
+        'id' => 10,
+        'name' => 'John Doe',
+        'email' => 'john@example.com',
+        'bio' => 'Author biography...',
+    ],
+]);
+
+// Serialize article as Full
+$array = $article->toArray(SchemaVariant::Full);
+// Article has body (Full), but author does NOT have bio (Fragment)
+// $array = [
+//     'id' => 1,
+//     'title' => 'Hello World',
+//     'body' => 'Full content...',
+//     'author' => [
+//         'id' => 10,
+//         'name' => 'John Doe',
+//         'email' => 'john@example.com',
+//         // bio is excluded - author uses Fragment variant
+//     ],
+// ]
+```
+
+This is useful for:
+- **Preventing deeply nested expansions**: When a parent entity is Full, you may want related entities to be Fragments to avoid large payloads
+- **List responses with embedded references**: Include minimal information about related entities
+- **Consistent API responses**: Ensure nested entities always use a specific representation
+
+The `#[NestedVariant]` attribute also affects schema generation. When generating the parent's schema, the nested entity's schema will use the specified variant:
+
+```php
+$schema = Article::getSchema(SchemaVariant::Full);
+// The 'author' property in the schema will use Fragment schema (no bio property)
+```
+
+Arrays of entities also respect `#[NestedVariant]`:
+
+```php
+class Article extends Entity {
+    public int $id;
+
+    #[NestedVariant(SchemaVariant::Fragment)]
+    #[PropertySchema(['items' => ['entityClassName' => Author::class]])]
+    public array $contributors = [];
+}
+
+// All contributors will be serialized as Fragment
+$array = $article->toArray(SchemaVariant::Full);
+```
+
 #### Nested Entities
 
 Entities can reference other entities. Nested data is automatically validated and cast:
