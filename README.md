@@ -236,6 +236,7 @@ Entity properties are mapped to schema types as follows:
 | `array` | `array` |
 | `ArrayObject` | `object` |
 | `DateTimeImmutable` | `string` with `format: date-time` |
+| `UuidInterface` | `string` with `format: uuid` |
 | `BackedEnum` subclass | `string` or `integer` with `enumClassName` |
 | `Entity` subclass | Nested object schema with `entityClassName` |
 | Untyped | No type validation (accepts any value) |
@@ -838,6 +839,56 @@ $array = $event->toArray();
 $array['startsAt']; // '2024-06-15T14:00:00.123+00:00'
 ```
 
+#### UuidInterface Properties
+
+Properties typed as `Ramsey\Uuid\UuidInterface` are mapped to `string` with `format: uuid` in the schema. UUID strings are automatically validated and converted to `UuidInterface` instances. Binary 16-byte UUIDs are also supported:
+
+```php
+use Garden\Schema\Entity;
+use Ramsey\Uuid\UuidInterface;
+
+class Resource extends Entity {
+    public string $name;
+    public UuidInterface $id;
+    public ?UuidInterface $parentId = null;
+}
+
+// From UUID string
+$resource = Resource::from([
+    'name' => 'My Resource',
+    'id' => '550e8400-e29b-41d4-a716-446655440000',
+]);
+
+$resource->id; // UuidInterface instance
+$resource->id->toString(); // '550e8400-e29b-41d4-a716-446655440000'
+
+// From binary bytes (16 bytes)
+$uuid = \Ramsey\Uuid\Uuid::uuid4();
+$resource2 = Resource::from([
+    'name' => 'Binary Resource',
+    'id' => $uuid->getBytes(),
+]);
+$resource2->id->toString(); // Same as $uuid->toString()
+
+// toArray() and JSON serialize to string format
+$array = $resource->toArray();
+$array['id']; // '550e8400-e29b-41d4-a716-446655440000'
+
+// Invalid UUIDs throw ValidationException
+Resource::from(['name' => 'Bad', 'id' => 'not-a-uuid']); // Throws ValidationException
+```
+
+You can also use UUID format in schema definitions:
+
+```php
+$schema = Schema::parse([
+    'id:s' => ['format' => 'uuid'],
+]);
+
+$valid = $schema->validate(['id' => '550e8400-e29b-41d4-a716-446655440000']);
+$valid['id']; // UuidInterface instance
+```
+
 #### Using entityClassName in Schemas
 
 You can reference entity classes directly in schema definitions, similar to `BackedEnum`:
@@ -1368,7 +1419,7 @@ The **Schema** object is a wrapper for an [OpenAPI Schema](https://github.com/OA
 | [enum](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.23)                  | any | Specify an array of valid values.                                                                                                         |
 | [type](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.25)                  | any | Specify a type of an array of types to validate a value.                                                                                  |
 | [default](http://json-schema.org/latest/json-schema-validation.html#rfc.section.7.3)                | object | Applies to a schema that is in an object property.                                                                                        |
-| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3)                 | string | Support for date-time, email, ipv4, ipv6, ip, uri.                                                                                        |
+| [format](http://json-schema.org/latest/json-schema-validation.html#rfc.section.8.3)                 | string | Support for date-time, email, ipv4, ipv6, ip, uri, uuid.                                                                                  |
 | [oneOf](http://json-schema.org/latest/json-schema-validation.html#rfc.section.6.7.3)                | object | Works with the `discriminator` property to validate against a dynamic schema.                                                             |
 
 ## OpenAPI Schema Support

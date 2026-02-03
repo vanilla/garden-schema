@@ -7,6 +7,8 @@
 
 namespace Garden\Schema;
 
+use Ramsey\Uuid\Uuid;
+use Ramsey\Uuid\UuidInterface;
 use ReflectionClass;
 use ReflectionEnum;
 use ReflectionIntersectionType;
@@ -299,6 +301,20 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                             $value = new \DateTimeImmutable($value);
                         }
                     }
+                } elseif ($typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class)) {
+                    // Convert to UUID if not already
+                    if ($value !== null && !$value instanceof UuidInterface) {
+                        if (is_string($value)) {
+                            // First check if it's a valid UUID string format (36 chars with dashes, or 32 hex chars)
+                            if (Uuid::isValid($value)) {
+                                $value = Uuid::fromString($value);
+                            } elseif (strlen($value) === 16 && !ctype_print($value)) {
+                                // If not a valid string format, try parsing as 16-byte binary
+                                // Only accept as bytes if it contains non-printable characters (actual binary data)
+                                $value = Uuid::fromBytes($value);
+                            }
+                        }
+                    }
                 }
             } elseif (is_array($value)) {
                 // Handle arrays of nested entities via PropertySchema attribute
@@ -376,6 +392,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
                     $schema['type'] = 'string';
                     $schema['format'] = 'date-time';
+                } elseif ($typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class)) {
+                    $schema['type'] = 'string';
+                    $schema['format'] = 'uuid';
                 } else {
                     throw new \InvalidArgumentException("Unsupported property type {$typeName}.");
                 }
@@ -584,6 +603,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         }
         if ($value instanceof \BackedEnum) {
             return $value->value;
+        }
+        if ($value instanceof UuidInterface) {
+            return $value->toString();
         }
         if ($value instanceof \DateTimeInterface) {
             // Use RFC3339_EXTENDED if there are milliseconds, otherwise RFC3339
