@@ -7,6 +7,7 @@
 
 namespace Garden\Schema;
 
+use Garden\Utils\ArrayUtils;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use ReflectionClass;
@@ -61,9 +62,11 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * @param \BackedEnum $variant The schema variant to build.
      * @return Schema
      */
-    private static function buildSchema(string $class, \BackedEnum $variant): Schema {
+    protected static function buildSchema(string $class, \BackedEnum $variant): Schema {
         $reflection = new ReflectionClass($class);
-        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
+        // Get all properties, not just public - non-public properties with PropertySchema will be schema-only
+        $properties = $reflection->getProperties();
+        $properties = self::sortPropertiesBySchemaOrder($properties);
         $schemaProperties = [];
         $required = [];
         $includedProperties = [];
@@ -77,6 +80,18 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 continue;
             }
 
+            // For non-public properties, only include if they have a PropertySchema attribute.
+            // This allows schema-only properties that appear in getSchema() but won't be encoded/decoded
+            // (since we can't set private/protected properties from a parent class).
+            $isSchemaOnly = false;
+            if (!$property->isPublic()) {
+                $hasPropertySchema = !empty($property->getAttributes(PropertySchemaInterface::class, \ReflectionAttribute::IS_INSTANCEOF));
+                if (!$hasPropertySchema) {
+                    continue;
+                }
+                $isSchemaOnly = true;
+            }
+
             // Check if property should be included in this variant
             if (!self::isPropertyInVariant($property, $variant)) {
                 continue;
@@ -84,10 +99,17 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
 
             $propertyName = $property->getName();
             $propertySchema = self::buildPropertySchema($property, $class, $variant);
+
+            // Mark schema-only properties so toArray() can skip them
+            if ($isSchemaOnly) {
+                $propertySchema['x-schema-only'] = true;
+            }
+
             $schemaProperties[$propertyName] = $propertySchema;
             $includedProperties[] = $property;
 
-            if (self::isPropertyRequired($property)) {
+            // Schema-only properties can't be set from outside, so they should never be required
+            if (!$isSchemaOnly && self::isPropertyRequired($property)) {
                 $required[] = $propertyName;
             }
         }
@@ -110,14 +132,69 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 if (!is_array($data)) {
                     return $data;
                 }
-                foreach ($altNameMappings as $mainName => $altNames) {
+                foreach ($altNameMappings as $mainName => $config) {
                     if (!array_key_exists($mainName, $data)) {
+                        $altNames = $config['altNames'];
+                        $useDotNotation = $config['useDotNotation'];
+
                         foreach ($altNames as $altName) {
-                            if (array_key_exists($altName, $data)) {
+                            // Check if we should use dot notation for nested path lookup
+                            if ($useDotNotation && str_contains($altName, '.')) {
+                                // Use a unique sentinel to detect if path exists
+                                $sentinel = new \stdClass();
+                                $value = ArrayUtils::getByPath($altName, $data, $sentinel);
+                                if ($value !== $sentinel) {
+                                    $data[$mainName] = $value;
+                                    break;
+                                }
+                            } elseif (array_key_exists($altName, $data)) {
                                 $data[$mainName] = $data[$altName];
                                 unset($data[$altName]);
                                 break;
                             }
+                        }
+                    }
+                }
+                return $data;
+            });
+        }
+
+        // Collect sub-property mappings and add filter for nested property construction
+        $subPropertyMappings = self::collectSubPropertyMappings($includedProperties);
+        if (!empty($subPropertyMappings)) {
+            $schema->addFilter('', function ($data) use ($subPropertyMappings) {
+                if (!is_array($data)) {
+                    return $data;
+                }
+                foreach ($subPropertyMappings as $targetProperty => $config) {
+                    $keys = $config['keys'];
+                    $mapping = $config['mapping'];
+
+                    // Initialize target array if it doesn't exist
+                    if (!array_key_exists($targetProperty, $data)) {
+                        $data[$targetProperty] = [];
+                    }
+
+                    // Ensure target is an array we can modify
+                    if (!is_array($data[$targetProperty])) {
+                        continue;
+                    }
+
+                    // Copy flat keys from root data
+                    foreach ($keys as $key) {
+                        $sentinel = new \stdClass();
+                        $value = ArrayUtils::getByPath($key, $data, $sentinel);
+                        if ($value !== $sentinel) {
+                            ArrayUtils::setByPath($key, $data[$targetProperty], $value);
+                        }
+                    }
+
+                    // Apply source-to-target mappings
+                    foreach ($mapping as $sourcePath => $targetPath) {
+                        $sentinel = new \stdClass();
+                        $value = ArrayUtils::getByPath($sourcePath, $data, $sentinel);
+                        if ($value !== $sentinel) {
+                            ArrayUtils::setByPath($targetPath, $data[$targetProperty], $value);
                         }
                     }
                 }
@@ -150,9 +227,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         }
 
         // Check for ExcludeFromVariant
-        $excludeAttrs = $property->getAttributes(ExcludeFromVariant::class);
+        $excludeAttrs = $property->getAttributes(ExcludeFromVariantInterface::class, \ReflectionAttribute::IS_INSTANCEOF);
         foreach ($excludeAttrs as $excludeAttr) {
-            /** @var ExcludeFromVariant $exclude */
+            /** @var ExcludeFromVariantInterface $exclude */
             $exclude = $excludeAttr->newInstance();
             if ($exclude->excludesVariant($variant)) {
                 return false;
@@ -183,7 +260,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * Collect alternative name mappings from PropertyAltNames attributes.
      *
      * @param ReflectionProperty[] $properties
-     * @return array<string, string[]> Map of property name to alternative names.
+     * @return array<string, array{altNames: string[], useDotNotation: bool}> Map of property name to alt name config.
      */
     private static function collectAltNameMappings(array $properties): array {
         $mappings = [];
@@ -200,7 +277,42 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 $attr = $attributes[0]->newInstance();
                 $altNames = $attr->getAltNames();
                 if (!empty($altNames)) {
-                    $mappings[$property->getName()] = $altNames;
+                    $mappings[$property->getName()] = [
+                        'altNames' => $altNames,
+                        'useDotNotation' => $attr->useDotNotation(),
+                    ];
+                }
+            }
+        }
+        return $mappings;
+    }
+
+    /**
+     * Collect sub-property mappings from MapSubProperties attributes.
+     *
+     * @param ReflectionProperty[] $properties
+     * @return array<string, array{keys: string[], mapping: array<string, string>}> Map of property name to mapping config.
+     */
+    private static function collectSubPropertyMappings(array $properties): array {
+        $mappings = [];
+        foreach ($properties as $property) {
+            if ($property->isStatic()) {
+                continue;
+            }
+            if (self::isPropertyExcluded($property)) {
+                continue;
+            }
+            $attributes = $property->getAttributes(MapSubProperties::class);
+            if (!empty($attributes)) {
+                /** @var MapSubProperties $attr */
+                $attr = $attributes[0]->newInstance();
+                $keys = $attr->getKeys();
+                $mapping = $attr->getMapping();
+                if (!empty($keys) || !empty($mapping)) {
+                    $mappings[$property->getName()] = [
+                        'keys' => $keys,
+                        'mapping' => $mapping,
+                    ];
                 }
             }
         }
@@ -410,8 +522,10 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         }
 
         $attributeSchema = self::getPropertySchemaAttribute($property);
-        if (!empty($attributeSchema)) {
-            $schema = array_replace_recursive($schema, $attributeSchema);
+        if ($attributeSchema !== null) {
+            $baseSchema = new Schema($schema);
+            $baseSchema->merge($attributeSchema);
+            $schema = $baseSchema->getSchemaArray();
         }
 
         // Store the nested variant in schema metadata if different from parent variant
@@ -498,25 +612,69 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     /**
      * Determine if a property is required.
      *
+     * A property is required if it must always be present in validated data.
+     * Properties with defaults are still required because the schema will apply the default.
+     *
      * @param ReflectionProperty $property
      * @return bool
      */
     private static function isPropertyRequired(ReflectionProperty $property): bool {
+        // Check for explicit Required attribute first - this overrides nullability
+        $requiredAttributes = $property->getAttributes(Required::class);
+        if (!empty($requiredAttributes)) {
+            return true;
+        }
+
         $type = self::getPropertyType($property);
-        if ($property->hasDefaultValue()) {
+
+        // Properties without a type hint are implicitly mixed/nullable, so optional
+        if ($type === null) {
             return false;
         }
-        if ($type !== null && $type->allowsNull()) {
+
+        // Nullable properties are optional
+        if ($type->allowsNull()) {
             return false;
         }
-        // Properties whose type implements EntityDefaultInterface are not required
-        if ($type !== null && !$type->isBuiltin()) {
-            $typeName = $type->getName();
-            if (is_subclass_of($typeName, EntityDefaultInterface::class)) {
-                return false;
+
+        // Properties with defaults are still required - the schema will apply the default
+        // This ensures they're always present in the output
+
+        return true;
+    }
+
+    /**
+     * Sort properties by SchemaOrder attribute.
+     *
+     * Properties with a SchemaOrder attribute come first, sorted by their order
+     * value in ascending order. Properties without SchemaOrder retain their original
+     * declaration order and appear after all ordered properties.
+     *
+     * @param ReflectionProperty[] $properties
+     * @return ReflectionProperty[]
+     */
+    private static function sortPropertiesBySchemaOrder(array $properties): array {
+        // Separate properties with and without SchemaOrder
+        $ordered = [];
+        $unordered = [];
+
+        foreach ($properties as $property) {
+            $attributes = $property->getAttributes(SchemaOrder::class);
+            if (!empty($attributes)) {
+                /** @var SchemaOrder $schemaOrder */
+                $schemaOrder = $attributes[0]->newInstance();
+                $ordered[] = ['property' => $property, 'order' => $schemaOrder->getOrder()];
+            } else {
+                $unordered[] = $property;
             }
         }
-        return true;
+
+        // Sort the ordered properties by their order value (ascending)
+        usort($ordered, fn($a, $b) => $a['order'] <=> $b['order']);
+
+        // Combine: ordered properties first, then unordered in their original order
+        $result = array_map(fn($item) => $item['property'], $ordered);
+        return array_merge($result, $unordered);
     }
 
     /**
@@ -531,20 +689,35 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     }
 
     /**
-     * Extract the PropertySchema attribute as a schema array.
+     * Extract and merge all PropertySchema attributes into a single Schema.
+     *
+     * Multiple PropertySchema attributes (including subclasses) are merged in order
+     * using Schema::merge(). This allows stacking multiple schema customizations
+     * and creating reusable schema helper attributes.
      *
      * @param ReflectionProperty $property
-     * @return array
+     * @return Schema|null Returns the merged schema, or null if no attributes found.
      */
-    private static function getPropertySchemaAttribute(ReflectionProperty $property): array {
-        $attributes = $property->getAttributes(PropertySchema::class);
+    private static function getPropertySchemaAttribute(ReflectionProperty $property): ?Schema {
+        $attributes = $property->getAttributes(PropertySchemaInterface::class, \ReflectionAttribute::IS_INSTANCEOF);
         if (empty($attributes)) {
-            return [];
+            return null;
         }
 
-        /** @var PropertySchema $attribute */
-        $attribute = $attributes[0]->newInstance();
-        return $attribute->getSchema();
+        $mergedSchema = null;
+        foreach ($attributes as $attribute) {
+            /** @var PropertySchemaInterface $propertySchemaAttr */
+            $propertySchemaAttr = $attribute->newInstance();
+            $attributeSchema = $propertySchemaAttr->getSchema();
+
+            if ($mergedSchema === null) {
+                $mergedSchema = $attributeSchema;
+            } else {
+                $mergedSchema->merge($attributeSchema);
+            }
+        }
+
+        return $mergedSchema;
     }
 
     /**
@@ -578,6 +751,12 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 continue;
             }
 
+            // Skip schema-only properties (private/protected with PropertySchema attribute)
+            // These are in the schema for documentation but can't be encoded/decoded
+            if (!empty($propertySchema['x-schema-only'])) {
+                continue;
+            }
+
             $value = $initializedProperties[$name];
 
             // Read nested variant from cached schema metadata (set during schema generation)
@@ -585,6 +764,145 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
             $nestedVariant = $propertySchema['x-nested-serialization-variant'] ?? $effectiveVariant;
 
             $result[$name] = $this->valueToArrayWithVariant($value, $nestedVariant);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Convert the entity to an array using alternative property names.
+     *
+     * This method does a toArray() and then reverses the PropertyAltNames and MapSubProperties
+     * mappings. This allows you to decode an entity from alt names and serialize it back to
+     * the original structure.
+     *
+     * For PropertyAltNames: Uses the primaryAltName instead of the main property name.
+     * For MapSubProperties: Extracts values from nested properties back to their original locations.
+     *
+     * @param \BackedEnum|null $variant Optional variant to filter properties. If provided, sets the serializationVariant.
+     * @return array
+     */
+    public function toAltArray(?\BackedEnum $variant = null): array {
+        $effectiveVariant = $variant ?? $this->serializationVariant;
+
+        // Start with the normal toArray output
+        $result = $this->toArray($effectiveVariant);
+
+        // Get reflection info for this class
+        $reflection = new ReflectionClass(static::class);
+        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
+
+        // Collect alt name mappings and sub-property mappings for properties in this variant
+        $altNameMappings = [];
+        $subPropertyMappings = [];
+
+        foreach ($properties as $property) {
+            if ($property->isStatic()) {
+                continue;
+            }
+            if (self::isPropertyExcluded($property)) {
+                continue;
+            }
+            if (!self::isPropertyInVariant($property, $effectiveVariant ?? SchemaVariant::Full)) {
+                continue;
+            }
+
+            if (!$property->isInitialized($this)) {
+                continue;
+            }
+
+            $propertyName = $property->getName();
+
+            // Collect PropertyAltNames
+            $altNameAttrs = $property->getAttributes(PropertyAltNames::class);
+            if (!empty($altNameAttrs)) {
+                /** @var PropertyAltNames $attr */
+                $attr = $altNameAttrs[0]->newInstance();
+                $primaryAltName = $attr->getPrimaryAltName();
+                if ($primaryAltName !== null) {
+                    $altNameMappings[$propertyName] = [
+                        'primaryAltName' => $primaryAltName,
+                        'useDotNotation' => $attr->useDotNotation(),
+                    ];
+                }
+            }
+
+            // Collect MapSubProperties
+            $mapSubAttrs = $property->getAttributes(MapSubProperties::class);
+            if (!empty($mapSubAttrs)) {
+                /** @var MapSubProperties $attr */
+                $attr = $mapSubAttrs[0]->newInstance();
+                $keys = $attr->getKeys();
+                $mapping = $attr->getMapping();
+                if (!empty($keys) || !empty($mapping)) {
+                    $subPropertyMappings[$propertyName] = [
+                        'keys' => $keys,
+                        'mapping' => $mapping,
+                    ];
+                }
+            }
+        }
+
+        // Apply reverse MapSubProperties mappings first (extract from nested to root)
+        foreach ($subPropertyMappings as $targetProperty => $config) {
+            if (!array_key_exists($targetProperty, $result)) {
+                continue;
+            }
+
+            $nestedData = $result[$targetProperty];
+            if (!is_array($nestedData) && !$nestedData instanceof \ArrayObject) {
+                continue;
+            }
+
+            // Convert ArrayObject to array for processing
+            if ($nestedData instanceof \ArrayObject) {
+                $nestedData = $nestedData->getArrayCopy();
+            }
+
+            $keys = $config['keys'];
+            $mapping = $config['mapping'];
+
+            // Reverse the keys: extract from nested property back to root
+            foreach ($keys as $key) {
+                $sentinel = new \stdClass();
+                $value = ArrayUtils::getByPath($key, $nestedData, $sentinel);
+                if ($value !== $sentinel) {
+                    ArrayUtils::setByPath($key, $result, $value);
+                }
+            }
+
+            // Reverse the mapping: extract from target paths back to source paths
+            foreach ($mapping as $sourcePath => $targetPath) {
+                $sentinel = new \stdClass();
+                $value = ArrayUtils::getByPath($targetPath, $nestedData, $sentinel);
+                if ($value !== $sentinel) {
+                    ArrayUtils::setByPath($sourcePath, $result, $value);
+                }
+            }
+
+            // Remove the nested property from result (it was constructed, not original)
+            unset($result[$targetProperty]);
+        }
+
+        // Apply reverse PropertyAltNames mappings (rename properties to alt names)
+        foreach ($altNameMappings as $propertyName => $config) {
+            if (!array_key_exists($propertyName, $result)) {
+                continue;
+            }
+
+            $primaryAltName = $config['primaryAltName'];
+            $useDotNotation = $config['useDotNotation'];
+            $value = $result[$propertyName];
+
+            // Remove the main property name
+            unset($result[$propertyName]);
+
+            // Set the value at the alt name location
+            if ($useDotNotation && str_contains($primaryAltName, '.')) {
+                ArrayUtils::setByPath($primaryAltName, $result, $value);
+            } else {
+                $result[$primaryAltName] = $value;
+            }
         }
 
         return $result;

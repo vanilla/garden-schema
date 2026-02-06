@@ -268,6 +268,46 @@ class Article extends Entity {
 }
 ```
 
+#### Helper Attributes
+
+Garden Schema provides several helper attributes that extend `PropertySchema` for common constraints:
+
+| Attribute | Description |
+| --------- | ----------- |
+| `#[Required]` | Marks a nullable property as required (must be explicitly provided) |
+| `#[MinLength(n)]` | Sets minimum string length |
+| `#[MaxLength(n)]` | Sets maximum string length |
+| `#[MinItems(n)]` | Sets minimum array item count |
+
+##### The Required Attribute
+
+Use `#[Required]` to mark a nullable property as required. This is useful when you have a property that accepts `null` as a valid value, but must always be explicitly provided:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\Required;
+
+class User extends Entity {
+    public string $name;
+
+    // Nullable but required - consumers must explicitly provide a value (including null)
+    #[Required]
+    public ?string $nickname;
+
+    // Nullable and optional - can be omitted entirely (defaults to null)
+    public ?string $bio = null;
+}
+
+// This throws ValidationException - nickname is required
+User::from(['name' => 'John']);
+
+// This works - nickname is explicitly null
+User::from(['name' => 'John', 'nickname' => null]);
+
+// This works - nickname has a value
+User::from(['name' => 'John', 'nickname' => 'Johnny']);
+```
+
 #### The PropertyAltNames Attribute
 
 Use `#[PropertyAltNames]` to specify alternative property names that map to a property. This is useful for handling legacy field names, API versioning, or data from different sources:
@@ -277,27 +317,168 @@ use Garden\Schema\Entity;
 use Garden\Schema\PropertyAltNames;
 
 class User extends Entity {
-    #[PropertyAltNames('user_name', 'userName', 'uname')]
+    // Single alt name - primaryAltName is inferred
+    #[PropertyAltNames('user_name')]
     public string $name;
 
-    #[PropertyAltNames('e-mail', 'emailAddress')]
+    // Multiple alt names - primaryAltName is required
+    #[PropertyAltNames(['e-mail', 'emailAddress'], primaryAltName: 'e-mail')]
     public ?string $email = null;
 }
 
 // All of these work:
 $user1 = User::from(['name' => 'John']);           // Main property name
-$user2 = User::from(['user_name' => 'John']);      // First alt name
-$user3 = User::from(['userName' => 'John']);       // Second alt name
-$user4 = User::from(['uname' => 'John']);          // Third alt name
+$user2 = User::from(['user_name' => 'John']);      // Alt name
 
 // Main property name takes precedence
-$user5 = User::from(['name' => 'Main', 'user_name' => 'Alt']);
-$user5->name; // 'Main'
-
-// First matching alt name is used (in order defined)
-$user6 = User::from(['userName' => 'Second', 'uname' => 'Third']);
-$user6->name; // 'Second' (userName comes before uname in the attribute)
+$user3 = User::from(['name' => 'Main', 'user_name' => 'Alt']);
+$user3->name; // 'Main'
 ```
+
+When multiple alt names are provided, you must specify the `primaryAltName` parameter. This determines which alt name is used when serializing back via `toAltArray()`.
+
+##### Dot Notation for Nested Values
+
+When `useDotNotation` is enabled (the default), alt names containing dots are treated as nested paths:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\PropertyAltNames;
+
+class Config extends Entity {
+    #[PropertyAltNames(
+        ['settings.displayName', 'meta.name', 'name'],
+        primaryAltName: 'settings.displayName'
+    )]
+    public string $displayName;
+}
+
+// All of these work:
+$config1 = Config::from(['displayName' => 'Direct']);
+$config2 = Config::from(['settings' => ['displayName' => 'Nested']]);
+$config3 = Config::from(['meta' => ['name' => 'Deep Nested']]);
+$config4 = Config::from(['name' => 'Fallback']);
+
+// Disable dot notation if you need literal dots in property names
+class LiteralDots extends Entity {
+    #[PropertyAltNames(['some.literal.key'], useDotNotation: false)]
+    public string $value;
+}
+```
+
+##### Serializing Back to Alt Names with toAltArray()
+
+Use `toAltArray()` to serialize an entity back using the alternative property names. This is useful when you need to round-trip data that was originally in an alternative format:
+
+```php
+$entity = User::from(['user_name' => 'John', 'e-mail' => 'john@example.com']);
+
+// Regular toArray() uses main property names
+$array = $entity->toArray();
+// ['name' => 'John', 'email' => 'john@example.com']
+
+// toAltArray() uses the primary alt names
+$altArray = $entity->toAltArray();
+// ['user_name' => 'John', 'e-mail' => 'john@example.com']
+
+// With dot notation, creates nested structures
+$config = Config::from(['displayName' => 'Test']);
+$altArray = $config->toAltArray();
+// ['settings' => ['displayName' => 'Test']]
+```
+
+`toAltArray()` also reverses `MapSubProperties` mappings, extracting nested values back to their original locations:
+
+```php
+$article = Article::from([
+    'postID' => 1,
+    'title' => 'Hello',
+    'authorID' => 123,
+    'authorName' => 'John',
+]);
+
+// toArray() includes the constructed nested property
+$array = $article->toArray();
+// ['postID' => 1, 'title' => 'Hello', 'author' => ['authorID' => 123, 'authorName' => 'John']]
+
+// toAltArray() extracts back to original flat structure
+$altArray = $article->toAltArray();
+// ['postID' => 1, 'title' => 'Hello', 'authorID' => 123, 'authorName' => 'John']
+```
+
+#### The MapSubProperties Attribute
+
+Use `#[MapSubProperties]` to construct nested entity or ArrayObject properties from data scattered across the input. This is useful when your input data has a flat structure but your entity has nested objects:
+
+```php
+use Garden\Schema\Entity;
+use Garden\Schema\MapSubProperties;
+
+class Author extends Entity {
+    public int $authorID;
+    public string $authorName;
+    public ?string $email = null;
+    public ?string $bio = null;
+}
+
+class Article extends Entity {
+    public int $articleID;
+    public string $title;
+
+    #[MapSubProperties(
+        keys: ['authorID', 'authorName'],
+        mapping: ['metadata.authorEmail' => 'email', 'metadata.authorBio' => 'bio']
+    )]
+    public Author $author;
+}
+
+// Input with flat structure and nested metadata:
+$article = Article::from([
+    'articleID' => 1,
+    'title' => 'My Article',
+    'authorID' => 123,
+    'authorName' => 'John Doe',
+    'metadata' => [
+        'authorEmail' => 'john@example.com',
+        'authorBio' => 'A prolific writer',
+    ],
+]);
+
+// The author property is automatically populated:
+$article->author->authorID;   // 123
+$article->author->authorName; // 'John Doe'
+$article->author->email;      // 'john@example.com'
+$article->author->bio;        // 'A prolific writer'
+```
+
+The attribute has two parameters:
+
+- **`keys`**: An array of property names to copy from the root data into the target property. These can use dot notation for nested source paths (e.g., `'user.id'` copies from `$data['user']['id']`).
+
+- **`mapping`**: An associative array mapping source paths to target paths. Both source and target support dot notation:
+  - Source path: Where to read the value from in the input data
+  - Target path: Where to write the value in the nested property
+
+```php
+#[MapSubProperties(
+    keys: ['user.id', 'user.name'],           // Copy nested source to same path in target
+    mapping: [
+        'profile.avatar' => 'image.url',       // Remap nested source to different target path
+        'settings.theme' => 'preferences.theme'
+    ]
+)]
+public \ArrayObject $userData;
+```
+
+**Key behaviors:**
+
+1. **Values are copied, not moved**: The original data remains in place; values are copied into the nested structure.
+
+2. **Missing paths are silently skipped**: If a source path doesn't exist, that mapping is simply skipped without error.
+
+3. **Additive behavior**: If the target property already has data, new values are merged in rather than replacing the entire structure.
+
+4. **Applied before validation**: The mapping happens as a filter before schema validation, so the constructed nested object is then validated against its schema.
 
 #### The ExcludeFromSchema Attribute
 

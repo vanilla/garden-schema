@@ -58,14 +58,20 @@ trait EntityTrait {
      *
      * @param mixed $value The data to validate and convert to an entity.
      * @param \BackedEnum|null $variant The schema variant to validate against. Defaults to Full.
+     * @param bool $sparseValidation Whether to perform sparse validation. Defaults to false.
+     *
      * @return static
      * @throws ValidationException If validation fails.
      */
-    public static function from(mixed $value, ?\BackedEnum $variant = null): static {
+    public static function from(mixed $value, ?\BackedEnum $variant = null, bool $sparseValidation = false): static {
         if ($value instanceof static) {
             return $value;
         }
-        $clean = static::getSchema($variant)->validate($value);
+        $schema = static::getSchema($variant);
+        if ($sparseValidation) {
+            $schema = $schema->withSparse();
+        }
+        $clean = $schema->validate($value);
         return static::fromValidated($clean, $variant);
     }
 

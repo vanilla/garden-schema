@@ -33,6 +33,7 @@ class EntitySchemaTest extends TestCase {
         $required = $schemaArray['required'];
         sort($required);
         // raw is untyped so PHP gives it an implicit default of null, making it optional
+        // withDefault has a default value but is still required (schema will apply the default)
         $expectedRequired = [
             'child',
             'count',
@@ -42,6 +43,7 @@ class EntitySchemaTest extends TestCase {
             'ratio',
             'status',
             'tags',
+            'withDefault',
         ];
         sort($expectedRequired);
         $this->assertSame($expectedRequired, $required);

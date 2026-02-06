@@ -60,4 +60,15 @@ class EntityPropertyAltNamesTest extends TestCase {
         // user_name is first in the attribute, so it should be used
         $this->assertSame('First', $entity->name);
     }
+
+    public function testPropertyAltNamesSingleStringParameter(): void {
+        // Test that single string parameter works (not wrapped in array)
+        $entity = AltNamesEntity::from([
+            'name' => 'Test User',
+            'nick_name' => 'Testy',
+            'count' => 35,
+        ]);
+
+        $this->assertSame('Testy', $entity->nickname);
+    }
 }
