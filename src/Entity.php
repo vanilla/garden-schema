@@ -40,6 +40,28 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     use EntityTrait;
 
     /**
+     * Cache for field name maps, keyed by class name.
+     *
+     * Each entry contains bidirectional mappings between canonical property names
+     * and their primary alternative names, plus MapSubProperties configuration.
+     *
+     * @var array<string, array{
+     *     canonicalToAlt: array<string, string>,
+     *     altToCanonical: array<string, string>,
+     *     altNameDotNotation: array<string, bool>,
+     *     subPropertyMappings: array<string, array{keys: string[], mapping: array<string, string>}>
+     * }>
+     */
+    private static array $fieldNameMaps = [];
+
+    /**
+     * Canonical property names that were set via update().
+     *
+     * @var string[]
+     */
+    private array $updatedFields = [];
+
+    /**
      * Build and return the schema for this entity using reflection.
      *
      * @param \BackedEnum|null $variant The schema variant to generate. Defaults to SchemaVariant::Full.
@@ -51,7 +73,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         $class = static::class;
 
         return EntitySchemaCache::getOrCreate($class, $variant, function () use ($class, $variant) {
-            return self::buildSchema($class, $variant);
+            return static::buildSchema($class, $variant);
         });
     }
 
@@ -170,7 +192,29 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                     $keys = $config['keys'];
                     $mapping = $config['mapping'];
 
-                    // Initialize target array if it doesn't exist
+                    // Collect values from source keys and mappings first
+                    $sentinel = new \stdClass();
+                    $collected = [];
+
+                    foreach ($keys as $key) {
+                        $value = ArrayUtils::getByPath($key, $data, $sentinel);
+                        if ($value !== $sentinel) {
+                            $collected[] = ['type' => 'key', 'key' => $key, 'value' => $value];
+                        }
+                    }
+
+                    foreach ($mapping as $sourcePath => $targetPath) {
+                        $value = ArrayUtils::getByPath($sourcePath, $data, $sentinel);
+                        if ($value !== $sentinel) {
+                            $collected[] = ['type' => 'mapping', 'targetPath' => $targetPath, 'value' => $value];
+                        }
+                    }
+
+                    // Only create/populate the target property if at least one source was found
+                    if (empty($collected) && !array_key_exists($targetProperty, $data)) {
+                        continue;
+                    }
+
                     if (!array_key_exists($targetProperty, $data)) {
                         $data[$targetProperty] = [];
                     }
@@ -180,21 +224,11 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                         continue;
                     }
 
-                    // Copy flat keys from root data
-                    foreach ($keys as $key) {
-                        $sentinel = new \stdClass();
-                        $value = ArrayUtils::getByPath($key, $data, $sentinel);
-                        if ($value !== $sentinel) {
-                            ArrayUtils::setByPath($key, $data[$targetProperty], $value);
-                        }
-                    }
-
-                    // Apply source-to-target mappings
-                    foreach ($mapping as $sourcePath => $targetPath) {
-                        $sentinel = new \stdClass();
-                        $value = ArrayUtils::getByPath($sourcePath, $data, $sentinel);
-                        if ($value !== $sentinel) {
-                            ArrayUtils::setByPath($targetPath, $data[$targetProperty], $value);
+                    foreach ($collected as $item) {
+                        if ($item['type'] === 'key') {
+                            ArrayUtils::setByPath($item['key'], $data[$targetProperty], $item['value']);
+                        } else {
+                            ArrayUtils::setByPath($item['targetPath'], $data[$targetProperty], $item['value']);
                         }
                     }
                 }
@@ -251,9 +285,163 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     public static function invalidateSchemaCache(?string $class = null, ?\BackedEnum $variant = null): void {
         if ($class === null) {
             EntitySchemaCache::invalidateAll();
+            self::$fieldNameMaps = [];
         } else {
             EntitySchemaCache::invalidate($class, $variant);
+            unset(self::$fieldNameMaps[$class]);
         }
+    }
+
+    /**
+     * Get the cached field name map for this entity class.
+     *
+     * The map is built once per class from reflection and cached statically.
+     * It contains bidirectional mappings between canonical property names and their
+     * primary alt names (from PropertyAltNames), as well as MapSubProperties configuration.
+     *
+     * @return array{
+     *     canonicalToAlt: array<string, string>,
+     *     altToCanonical: array<string, string>,
+     *     altNameDotNotation: array<string, bool>,
+     *     subPropertyMappings: array<string, array{keys: string[], mapping: array<string, string>}>
+     * }
+     */
+    private static function getFieldNameMap(): array {
+        $class = static::class;
+        if (!isset(self::$fieldNameMaps[$class])) {
+            self::$fieldNameMaps[$class] = self::buildFieldNameMap($class);
+        }
+        return self::$fieldNameMaps[$class];
+    }
+
+    /**
+     * Build the field name map from reflection for the given class.
+     *
+     * Scans all public, non-static, non-excluded properties for PropertyAltNames
+     * and MapSubProperties attributes to build bidirectional name mappings.
+     *
+     * @param class-string $class The entity class to build the map for.
+     * @return array{
+     *     canonicalToAlt: array<string, string>,
+     *     altToCanonical: array<string, string>,
+     *     altNameDotNotation: array<string, bool>,
+     *     subPropertyMappings: array<string, array{keys: string[], mapping: array<string, string>}>
+     * }
+     */
+    private static function buildFieldNameMap(string $class): array {
+        $reflection = new ReflectionClass($class);
+        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
+
+        $canonicalToAlt = [];
+        $altToCanonical = [];
+        $altNameDotNotation = [];
+        $subPropertyMappings = [];
+
+        foreach ($properties as $property) {
+            if ($property->isStatic()) {
+                continue;
+            }
+            if (self::isPropertyExcluded($property)) {
+                continue;
+            }
+
+            $name = $property->getName();
+
+            // Collect PropertyAltNames mappings
+            $altNameAttrs = $property->getAttributes(PropertyAltNames::class);
+            if (!empty($altNameAttrs)) {
+                /** @var PropertyAltNames $attr */
+                $attr = $altNameAttrs[0]->newInstance();
+                $primaryAltName = $attr->getPrimaryAltName();
+                if ($primaryAltName !== null) {
+                    $canonicalToAlt[$name] = $primaryAltName;
+                    $altToCanonical[$primaryAltName] = $name;
+                    $altNameDotNotation[$name] = $attr->useDotNotation();
+                }
+            }
+
+            // Collect MapSubProperties configuration and derive field name mappings
+            $mapSubAttrs = $property->getAttributes(MapSubProperties::class);
+            if (!empty($mapSubAttrs)) {
+                /** @var MapSubProperties $attr */
+                $attr = $mapSubAttrs[0]->newInstance();
+                $keys = $attr->getKeys();
+                $mapping = $attr->getMapping();
+                if (!empty($keys) || !empty($mapping)) {
+                    $subPropertyMappings[$name] = [
+                        'keys' => $keys,
+                        'mapping' => $mapping,
+                    ];
+
+                    // Keys: flat key at root (alt) <-> targetProperty.key (canonical)
+                    // e.g. 'authorID' (alt) <-> 'author.authorID' (canonical)
+                    foreach ($keys as $key) {
+                        $canonicalPath = $name . '.' . $key;
+                        $canonicalToAlt[$canonicalPath] = $key;
+                        $altToCanonical[$key] = $canonicalPath;
+                    }
+
+                    // Mapping: sourcePath (alt) <-> targetProperty.targetPath (canonical)
+                    // e.g. 'metadata.authorEmail' (alt) <-> 'author.email' (canonical)
+                    foreach ($mapping as $sourcePath => $targetPath) {
+                        $canonicalPath = $name . '.' . $targetPath;
+                        $canonicalToAlt[$canonicalPath] = $sourcePath;
+                        $altToCanonical[$sourcePath] = $canonicalPath;
+                    }
+                }
+            }
+        }
+
+        return [
+            'canonicalToAlt' => $canonicalToAlt,
+            'altToCanonical' => $altToCanonical,
+            'altNameDotNotation' => $altNameDotNotation,
+            'subPropertyMappings' => $subPropertyMappings,
+        ];
+    }
+
+    /**
+     * Convert a single field name between canonical and primary alt name formats.
+     *
+     * Uses PropertyAltNames and MapSubProperties attributes to determine the mapping.
+     *
+     * For PropertyAltNames, the canonical name is the PHP property name and the alt name
+     * is the primary alt name (e.g. 'name' <-> 'user_name').
+     *
+     * For MapSubProperties, keys and mappings produce dot-notation canonical paths:
+     * - Keys: 'authorID' (alt) <-> 'author.authorID' (canonical)
+     * - Mappings: 'metadata.authorEmail' (alt) <-> 'author.email' (canonical)
+     *
+     * If the field name has no mapping for the target format, the original name is returned unchanged.
+     *
+     * @param string $fieldName The field name to convert.
+     * @param EntityFieldFormat $targetFormat The target format to convert to.
+     * @return string The converted field name, or the original if no mapping exists.
+     */
+    public static function convertFieldName(string $fieldName, EntityFieldFormat $targetFormat): string {
+        $fieldNameMap = static::getFieldNameMap();
+
+        return match ($targetFormat) {
+            EntityFieldFormat::Canonical => $fieldNameMap['altToCanonical'][$fieldName] ?? $fieldName,
+            EntityFieldFormat::PrimaryAltName => $fieldNameMap['canonicalToAlt'][$fieldName] ?? $fieldName,
+        };
+    }
+
+    /**
+     * Convert an array of field names between canonical and primary alt name formats.
+     *
+     * Uses the PropertyAltNames attribute to determine the mappings. Field names with
+     * no mapping for the target format are returned unchanged.
+     *
+     * @param string[] $fieldNames The field names to convert.
+     * @param EntityFieldFormat $targetFormat The target format to convert to.
+     * @return string[] The converted field names.
+     */
+    public static function convertFieldNames(array $fieldNames, EntityFieldFormat $targetFormat): array {
+        return array_map(
+            fn(string $name) => static::convertFieldName($name, $targetFormat),
+            $fieldNames,
+        );
     }
 
     /**
@@ -731,9 +919,15 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * attribute that specifies a different variant for that nested entity.
      *
      * @param \BackedEnum|null $variant Optional variant to filter properties. If provided, sets the serializationVariant.
+     * @param EntityFieldFormat $format The format to use for the field names.
+     *
      * @return array
      */
-    public function toArray(?\BackedEnum $variant = null): array {
+    public function toArray(?\BackedEnum $variant = null, EntityFieldFormat $format = EntityFieldFormat::Canonical): array {
+        if ($format === EntityFieldFormat::PrimaryAltName) {
+            return $this->toAltArray($variant);
+        }
+
         // If variant is explicitly passed, use it; otherwise use the instance's serializationVariant
         $effectiveVariant = $variant ?? $this->serializationVariant;
 
@@ -788,60 +982,11 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         // Start with the normal toArray output
         $result = $this->toArray($effectiveVariant);
 
-        // Get reflection info for this class
-        $reflection = new ReflectionClass(static::class);
-        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
-
-        // Collect alt name mappings and sub-property mappings for properties in this variant
-        $altNameMappings = [];
-        $subPropertyMappings = [];
-
-        foreach ($properties as $property) {
-            if ($property->isStatic()) {
-                continue;
-            }
-            if (self::isPropertyExcluded($property)) {
-                continue;
-            }
-            if (!self::isPropertyInVariant($property, $effectiveVariant ?? SchemaVariant::Full)) {
-                continue;
-            }
-
-            if (!$property->isInitialized($this)) {
-                continue;
-            }
-
-            $propertyName = $property->getName();
-
-            // Collect PropertyAltNames
-            $altNameAttrs = $property->getAttributes(PropertyAltNames::class);
-            if (!empty($altNameAttrs)) {
-                /** @var PropertyAltNames $attr */
-                $attr = $altNameAttrs[0]->newInstance();
-                $primaryAltName = $attr->getPrimaryAltName();
-                if ($primaryAltName !== null) {
-                    $altNameMappings[$propertyName] = [
-                        'primaryAltName' => $primaryAltName,
-                        'useDotNotation' => $attr->useDotNotation(),
-                    ];
-                }
-            }
-
-            // Collect MapSubProperties
-            $mapSubAttrs = $property->getAttributes(MapSubProperties::class);
-            if (!empty($mapSubAttrs)) {
-                /** @var MapSubProperties $attr */
-                $attr = $mapSubAttrs[0]->newInstance();
-                $keys = $attr->getKeys();
-                $mapping = $attr->getMapping();
-                if (!empty($keys) || !empty($mapping)) {
-                    $subPropertyMappings[$propertyName] = [
-                        'keys' => $keys,
-                        'mapping' => $mapping,
-                    ];
-                }
-            }
-        }
+        // Use the cached field name map instead of reflection
+        $fieldNameMap = static::getFieldNameMap();
+        $canonicalToAlt = $fieldNameMap['canonicalToAlt'];
+        $altNameDotNotation = $fieldNameMap['altNameDotNotation'];
+        $subPropertyMappings = $fieldNameMap['subPropertyMappings'];
 
         // Apply reverse MapSubProperties mappings first (extract from nested to root)
         foreach ($subPropertyMappings as $targetProperty => $config) {
@@ -885,13 +1030,12 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         }
 
         // Apply reverse PropertyAltNames mappings (rename properties to alt names)
-        foreach ($altNameMappings as $propertyName => $config) {
+        foreach ($canonicalToAlt as $propertyName => $primaryAltName) {
             if (!array_key_exists($propertyName, $result)) {
                 continue;
             }
 
-            $primaryAltName = $config['primaryAltName'];
-            $useDotNotation = $config['useDotNotation'];
+            $useDotNotation = $altNameDotNotation[$propertyName] ?? true;
             $value = $result[$propertyName];
 
             // Remove the main property name
@@ -905,6 +1049,71 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
             }
         }
 
+        return $result;
+    }
+
+    /**
+     * Get the schema for the entity's mutation.
+     *
+     * @return Schema
+     */
+    public function getMutationSchema(): Schema {
+        return static::getSchema(SchemaVariant::Mutable)->withSparse();
+    }
+
+    /**
+     * Apply partial updates to the entity.
+     *
+     * Validates the updates against the Mutable variant schema (sparse), maps field
+     * names from alt names and sub-property mappings (just like from()), sets the
+     * properties on the entity, tracks which canonical fields were updated, and
+     * validates the full entity state.
+     *
+     * @param array $updates The partial update data. Keys can be canonical names,
+     *                       alt names, or mapped sub-property paths.
+     * @return static
+     * @throws ValidationException If the update data is invalid or the resulting entity state is invalid.
+     */
+    public function update(array $updates): static {
+        // Validate against the Mutable schema with sparse validation
+        // This handles alt name mapping and sub-property mapping via schema filters
+        $schema = $this->getMutationSchema();
+        $clean = $schema->validate($updates);
+
+        // Apply validated values and track which fields were updated
+        foreach ($clean as $name => $value) {
+            $this->{$name} = $value;
+            if (!in_array($name, $this->updatedFields, true)) {
+                $this->updatedFields[] = $name;
+            }
+        }
+
+        // Validate the full entity state
+        $this->validate();
+
+        return $this;
+    }
+
+    /**
+     * Get the fields that were set via update(), as an array.
+     *
+     * Returns only the properties that were modified through update() calls,
+     * with values converted to their array representation (entities become arrays,
+     * enums become values, etc.).
+     *
+     * @param EntityFieldFormat $format The format for field names in the output.
+     * @return array
+     */
+    public function getUpdatedArray(EntityFieldFormat $format = EntityFieldFormat::Canonical): array {
+        $result = [];
+        foreach ($this->updatedFields as $name) {
+            $value = $this->valueToArrayWithVariant($this->{$name}, null);
+            $outputName = match ($format) {
+                EntityFieldFormat::Canonical => $name,
+                EntityFieldFormat::PrimaryAltName => static::convertFieldName($name, EntityFieldFormat::PrimaryAltName),
+            };
+            $result[$outputName] = $value;
+        }
         return $result;
     }
 

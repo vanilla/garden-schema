@@ -72,7 +72,9 @@ trait EntityTrait {
             $schema = $schema->withSparse();
         }
         $clean = $schema->validate($value);
-        return static::fromValidated($clean, $variant);
+        $result = static::fromValidated($clean, $variant);
+        $result->setSerializationVariant($variant);
+        return $result;
     }
 
     /**

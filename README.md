@@ -406,6 +406,49 @@ $altArray = $article->toAltArray();
 // ['postID' => 1, 'title' => 'Hello', 'authorID' => 123, 'authorName' => 'John']
 ```
 
+##### Converting Field Names Programmatically
+
+Use `convertFieldName()` and `convertFieldNames()` to convert between canonical property names and their primary alt names without creating or serializing an entity. These methods use a statically cached field name map built from `PropertyAltNames` attributes, so they are efficient for repeated use.
+
+The `EntityFieldFormat` enum specifies the target format:
+
+- **`Canonical`**: The PHP property name as declared on the Entity class.
+- **`PrimaryAltName`**: The primary alternative name from the `PropertyAltNames` attribute.
+
+```php
+use Garden\Schema\EntityFieldFormat;
+
+// Convert a single field name
+User::convertFieldName('name', EntityFieldFormat::PrimaryAltName);  // 'user_name'
+User::convertFieldName('user_name', EntityFieldFormat::Canonical);  // 'name'
+
+// Fields without alt names are returned unchanged
+User::convertFieldName('age', EntityFieldFormat::PrimaryAltName);   // 'age'
+
+// Convert multiple field names at once
+User::convertFieldNames(
+    ['name', 'email', 'age'],
+    EntityFieldFormat::PrimaryAltName
+);
+// ['user_name', 'e-mail', 'age']
+
+// Round-trip conversion
+$alt = User::convertFieldName('name', EntityFieldFormat::PrimaryAltName);  // 'user_name'
+$canonical = User::convertFieldName($alt, EntityFieldFormat::Canonical);   // 'name'
+```
+
+Dot-notation alt names are also supported:
+
+```php
+Config::convertFieldName('displayName', EntityFieldFormat::PrimaryAltName);
+// 'attributes.displayName'
+
+Config::convertFieldName('attributes.displayName', EntityFieldFormat::Canonical);
+// 'displayName'
+```
+
+This is useful for translating field names in contexts such as database queries, sorting parameters, or API filters where you need to map between internal property names and external field names without full entity hydration.
+
 #### The MapSubProperties Attribute
 
 Use `#[MapSubProperties]` to construct nested entity or ArrayObject properties from data scattered across the input. This is useful when your input data has a flat structure but your entity has nested objects:
@@ -1136,6 +1179,69 @@ $validatedUser = $user->validate();
 // Invalid modification
 $user->age = 'not a number';
 $user->validate(); // Throws ValidationException
+```
+
+#### Partial Updates with update()
+
+Use `update()` to apply partial, validated updates to an existing entity. It validates the input against the `Mutable` schema variant (sparse), maps field names from alt names and sub-property mappings (just like `from()`), sets the properties on the entity, tracks which fields were updated, and validates the full entity state:
+
+```php
+use Garden\Schema\SchemaVariant;
+
+$article = Article::from([
+    'id' => 1,
+    'title' => 'Original Title',
+    'slug' => 'original-slug',
+    'body' => 'Original body.',
+    'createdAt' => '2024-01-01T00:00:00+00:00',
+    'updatedAt' => '2024-01-01T00:00:00+00:00',
+    'authorId' => 100,
+]);
+
+// Update only mutable fields — non-mutable fields (id, createdAt, etc.) are ignored
+$article->update(['title' => 'New Title', 'body' => 'New body.']);
+
+$article->title; // 'New Title'
+$article->body;  // 'New body.'
+$article->id;    // 1 (unchanged)
+```
+
+Alt names and `MapSubProperties` mappings work the same as in `from()`:
+
+```php
+// Using alt names
+$user->update(['user_name' => 'Jane']); // maps to $user->name
+
+// Using mapped sub-property keys
+$post->update(['authorID' => 200, 'authorName' => 'Jane']); // maps into $post->author
+```
+
+If the update data is invalid or the resulting entity state is invalid, a `ValidationException` is thrown.
+
+##### Retrieving Updated Fields with getUpdatedArray()
+
+After calling `update()`, use `getUpdatedArray()` to get only the fields that were modified. This is useful for building database UPDATE statements or audit logs:
+
+```php
+$article->update(['title' => 'New Title', 'body' => 'New body.']);
+
+// Canonical property names (default)
+$article->getUpdatedArray();
+// ['title' => 'New Title', 'body' => 'New body.']
+
+// Primary alt names
+$article->getUpdatedArray(EntityFieldFormat::PrimaryAltName);
+// ['article_title' => 'New Title', 'article_body' => 'New body.']
+```
+
+Multiple `update()` calls accumulate tracked fields:
+
+```php
+$article->update(['title' => 'First']);
+$article->update(['body' => 'Second']);
+
+$article->getUpdatedArray();
+// ['title' => 'First', 'body' => 'Second']
 ```
 
 #### The EntityInterface and EntityTrait

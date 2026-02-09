@@ -2275,6 +2275,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             } else {
                 $schemas[$schema] = $sparseSchema = new Schema();
                 $sparseSchema->schema = $schema->withSparseInternal($schema->schema, $schemas);
+                $sparseSchema->filters = $schema->filters;
+                $sparseSchema->validators = $schema->validators;
+                $sparseSchema->flags = $schema->flags;
+                $sparseSchema->validationFactory = $schema->validationFactory;
+                $sparseSchema->refLookup = $schema->refLookup;
                 if ($id = $sparseSchema->getID()) {
                     $sparseSchema->setID($id.'Sparse');
                 }
@@ -2284,6 +2289,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         unset($schema['required']);
+        unset($schema['default']);
 
         if (isset($schema['items'])) {
             $schema['items'] = $this->withSparseInternal($schema['items'], $schemas);
