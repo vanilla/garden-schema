@@ -3,6 +3,7 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Entity;
+use Garden\Schema\EntityFieldFormat;
 use Garden\Schema\MapSubProperties;
 use Garden\Schema\Tests\Fixtures\BlogPostEntity;
 use Garden\Schema\Tests\Fixtures\SimpleAuthorEntity;
@@ -224,6 +225,6 @@ class MapSubPropertiesTest extends TestCase {
         $entity = BlogPostEntity::from($input);
 
         $this->assertEquals($expectedToArray, $entity->toArray());
-        $this->assertEquals($expectedToAltArray, $entity->toAltArray());
+        $this->assertEquals($expectedToAltArray, $entity->toArray(format: EntityFieldFormat::PrimaryAltName));
     }
 }

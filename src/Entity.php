@@ -924,10 +924,22 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * @return array
      */
     public function toArray(?\BackedEnum $variant = null, EntityFieldFormat $format = EntityFieldFormat::Canonical): array {
-        if ($format === EntityFieldFormat::PrimaryAltName) {
-            return $this->toAltArray($variant);
-        }
+        return match ($format) {
+            EntityFieldFormat::Canonical => $this->toCanonicalArray($variant),
+            EntityFieldFormat::PrimaryAltName => $this->toAltArray($variant),
+        };
+    }
 
+    /**
+     * Convert the entity to an array using canonical property names.
+     *
+     * This contains the core serialization logic. Recursively converts nested entities
+     * and arrays of entities to arrays. BackedEnum values are converted to their backing values.
+     *
+     * @param \BackedEnum|null $variant Optional variant to filter properties.
+     * @return array
+     */
+    protected function toCanonicalArray(?\BackedEnum $variant = null): array {
         // If variant is explicitly passed, use it; otherwise use the instance's serializationVariant
         $effectiveVariant = $variant ?? $this->serializationVariant;
 
@@ -966,21 +978,21 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     /**
      * Convert the entity to an array using alternative property names.
      *
-     * This method does a toArray() and then reverses the PropertyAltNames and MapSubProperties
+     * This method does a toCanonicalArray() and then reverses the PropertyAltNames and MapSubProperties
      * mappings. This allows you to decode an entity from alt names and serialize it back to
      * the original structure.
      *
      * For PropertyAltNames: Uses the primaryAltName instead of the main property name.
      * For MapSubProperties: Extracts values from nested properties back to their original locations.
      *
-     * @param \BackedEnum|null $variant Optional variant to filter properties. If provided, sets the serializationVariant.
+     * @param \BackedEnum|null $variant Optional variant to filter properties.
      * @return array
      */
-    public function toAltArray(?\BackedEnum $variant = null): array {
+    protected function toAltArray(?\BackedEnum $variant = null): array {
         $effectiveVariant = $variant ?? $this->serializationVariant;
 
-        // Start with the normal toArray output
-        $result = $this->toArray($effectiveVariant);
+        // Start with the canonical array output
+        $result = $this->toCanonicalArray($effectiveVariant);
 
         // Use the cached field name map instead of reflection
         $fieldNameMap = static::getFieldNameMap();

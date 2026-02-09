@@ -3,6 +3,7 @@
 namespace Garden\Schema\Tests;
 
 use Garden\Schema\Entity;
+use Garden\Schema\EntityFieldFormat;
 use Garden\Schema\MapSubProperties;
 use Garden\Schema\PropertyAltNames;
 use Garden\Schema\Tests\Fixtures\AltNamesEntity;
@@ -25,7 +26,7 @@ class ToAltArrayTest extends TestCase {
             'count' => 5,
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // name should be serialized as user_name (the primary alt name)
         $this->assertArrayHasKey('user_name', $altArray);
@@ -45,7 +46,7 @@ class ToAltArrayTest extends TestCase {
             'count' => 10,
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // name -> user_name
         $this->assertArrayHasKey('user_name', $altArray);
@@ -71,7 +72,7 @@ class ToAltArrayTest extends TestCase {
             'id' => 1,
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // displayName should be nested at attributes.displayName
         $this->assertArrayHasKey('attributes', $altArray);
@@ -95,7 +96,7 @@ class ToAltArrayTest extends TestCase {
             'id' => 2,
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // deepValue should be nested at deeply.nested.value.here
         $this->assertArrayHasKey('deeply', $altArray);
@@ -110,7 +111,7 @@ class ToAltArrayTest extends TestCase {
             'id' => 3,
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // noDotNotation should use literal key simple_name (not nested)
         $this->assertArrayHasKey('simple_name', $altArray);
@@ -125,7 +126,7 @@ class ToAltArrayTest extends TestCase {
             'count' => 1,
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // null values should still be mapped
         $this->assertArrayHasKey('e-mail', $altArray);
@@ -144,7 +145,7 @@ class ToAltArrayTest extends TestCase {
             'authorName' => 'John Doe',
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // authorID and authorName should be extracted back to root level
         $this->assertArrayHasKey('authorID', $altArray);
@@ -175,7 +176,7 @@ class ToAltArrayTest extends TestCase {
             ],
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // Mapped values should be extracted to their source paths
         $this->assertArrayHasKey('metadata', $altArray);
@@ -197,7 +198,7 @@ class ToAltArrayTest extends TestCase {
             'authorName' => 'Alice',
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // Optional values (email, bio) are null on the entity, so they get extracted as null
         // This creates the metadata structure with null values
@@ -222,7 +223,7 @@ class ToAltArrayTest extends TestCase {
         $entity = AltNamesEntity::from($originalData);
 
         // Encode back to alt names
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // Should match original data (only with the values that were set)
         $this->assertSame('John', $altArray['user_name']);
@@ -248,7 +249,7 @@ class ToAltArrayTest extends TestCase {
         $entity = DotNotationEntity::from($originalData);
 
         // Encode back to nested structure
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // Should recreate the nested structure
         $this->assertSame('Test User', $altArray['attributes']['displayName']);
@@ -272,7 +273,7 @@ class ToAltArrayTest extends TestCase {
         $entity = BlogPostEntity::from($originalData);
 
         // Encode back (toAltArray should extract back to original structure)
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // Should recreate the original structure
         $this->assertSame(1, $altArray['postID']);
@@ -310,7 +311,7 @@ class ToAltArrayTest extends TestCase {
             'id' => 1,
         ]);
 
-        $altArray = $entity->toAltArray();
+        $altArray = $entity->toArray(format: EntityFieldFormat::PrimaryAltName);
 
         // PropertyAltNames should rename name -> user_name
         $this->assertArrayHasKey('user_name', $altArray);

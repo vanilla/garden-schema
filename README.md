@@ -335,7 +335,7 @@ $user3 = User::from(['name' => 'Main', 'user_name' => 'Alt']);
 $user3->name; // 'Main'
 ```
 
-When multiple alt names are provided, you must specify the `primaryAltName` parameter. This determines which alt name is used when serializing back via `toAltArray()`.
+When multiple alt names are provided, you must specify the `primaryAltName` parameter. This determines which alt name is used when serializing back via `toArray(form: EntityFieldFormat::PrimaryAltName)`.
 
 ##### Dot Notation for Nested Values
 
@@ -366,28 +366,30 @@ class LiteralDots extends Entity {
 }
 ```
 
-##### Serializing Back to Alt Names with toAltArray()
+##### Serializing Back to Alt Names
 
-Use `toAltArray()` to serialize an entity back using the alternative property names. This is useful when you need to round-trip data that was originally in an alternative format:
+Use `toArray(form: EntityFieldFormat::PrimaryAltName)` to serialize an entity back using the alternative property names. This is useful when you need to round-trip data that was originally in an alternative format:
 
 ```php
+use Garden\Schema\EntityFieldFormat;
+
 $entity = User::from(['user_name' => 'John', 'e-mail' => 'john@example.com']);
 
-// Regular toArray() uses main property names
+// Regular toArray() uses main property names (canonical)
 $array = $entity->toArray();
 // ['name' => 'John', 'email' => 'john@example.com']
 
-// toAltArray() uses the primary alt names
-$altArray = $entity->toAltArray();
+// toArray with PrimaryAltName format uses the primary alt names
+$altArray = $entity->toArray(form: EntityFieldFormat::PrimaryAltName);
 // ['user_name' => 'John', 'e-mail' => 'john@example.com']
 
 // With dot notation, creates nested structures
 $config = Config::from(['displayName' => 'Test']);
-$altArray = $config->toAltArray();
+$altArray = $config->toArray(form: EntityFieldFormat::PrimaryAltName);
 // ['settings' => ['displayName' => 'Test']]
 ```
 
-`toAltArray()` also reverses `MapSubProperties` mappings, extracting nested values back to their original locations:
+Using `EntityFieldFormat::PrimaryAltName` also reverses `MapSubProperties` mappings, extracting nested values back to their original locations:
 
 ```php
 $article = Article::from([
@@ -401,8 +403,8 @@ $article = Article::from([
 $array = $article->toArray();
 // ['postID' => 1, 'title' => 'Hello', 'author' => ['authorID' => 123, 'authorName' => 'John']]
 
-// toAltArray() extracts back to original flat structure
-$altArray = $article->toAltArray();
+// PrimaryAltName format extracts back to original flat structure
+$altArray = $article->toArray(form: EntityFieldFormat::PrimaryAltName);
 // ['postID' => 1, 'title' => 'Hello', 'authorID' => 123, 'authorName' => 'John']
 ```
 
