@@ -30,6 +30,10 @@ namespace Garden\Schema;
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY)]
 class SchemaOrder {
+
+    /**
+     * @param int $order The order value for this property.
+     */
     public function __construct(
         private int $order,
     ) {}
