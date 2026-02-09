@@ -148,91 +148,24 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
 
         // Collect alt names and add filter for property name mapping
         // Only include alt names for properties that are in this variant
-        $altNameMappings = self::collectAltNameMappings($includedProperties);
-        if (!empty($altNameMappings)) {
-            $schema->addFilter('', function ($data) use ($altNameMappings) {
+        $altNameMapping = CollectedAltNameMapping::collect($includedProperties);
+        if (!$altNameMapping->isEmpty()) {
+            $schema->addFilter('', function ($data) use ($altNameMapping) {
                 if (!is_array($data)) {
                     return $data;
                 }
-                foreach ($altNameMappings as $mainName => $config) {
-                    if (!array_key_exists($mainName, $data)) {
-                        $altNames = $config['altNames'];
-                        $useDotNotation = $config['useDotNotation'];
-
-                        foreach ($altNames as $altName) {
-                            // Check if we should use dot notation for nested path lookup
-                            if ($useDotNotation && str_contains($altName, '.')) {
-                                // Use a unique sentinel to detect if path exists
-                                $sentinel = new \stdClass();
-                                $value = ArrayUtils::getByPath($altName, $data, $sentinel);
-                                if ($value !== $sentinel) {
-                                    $data[$mainName] = $value;
-                                    break;
-                                }
-                            } elseif (array_key_exists($altName, $data)) {
-                                $data[$mainName] = $data[$altName];
-                                unset($data[$altName]);
-                                break;
-                            }
-                        }
-                    }
-                }
-                return $data;
+                return $altNameMapping->mapProperties($data);
             });
         }
 
         // Collect sub-property mappings and add filter for nested property construction
-        $subPropertyMappings = self::collectSubPropertyMappings($includedProperties);
-        if (!empty($subPropertyMappings)) {
+        $subPropertyMappings = CollectedSubPropertyMappings::collect($includedProperties);
+        if (!$subPropertyMappings->isEmpty()) {
             $schema->addFilter('', function ($data) use ($subPropertyMappings) {
                 if (!is_array($data)) {
                     return $data;
                 }
-                foreach ($subPropertyMappings as $targetProperty => $config) {
-                    $keys = $config['keys'];
-                    $mapping = $config['mapping'];
-
-                    // Collect values from source keys and mappings first
-                    $sentinel = new \stdClass();
-                    $collected = [];
-
-                    foreach ($keys as $key) {
-                        $value = ArrayUtils::getByPath($key, $data, $sentinel);
-                        if ($value !== $sentinel) {
-                            $collected[] = ['type' => 'key', 'key' => $key, 'value' => $value];
-                        }
-                    }
-
-                    foreach ($mapping as $sourcePath => $targetPath) {
-                        $value = ArrayUtils::getByPath($sourcePath, $data, $sentinel);
-                        if ($value !== $sentinel) {
-                            $collected[] = ['type' => 'mapping', 'targetPath' => $targetPath, 'value' => $value];
-                        }
-                    }
-
-                    // Only create/populate the target property if at least one source was found
-                    if (empty($collected) && !array_key_exists($targetProperty, $data)) {
-                        continue;
-                    }
-
-                    if (!array_key_exists($targetProperty, $data)) {
-                        $data[$targetProperty] = [];
-                    }
-
-                    // Ensure target is an array we can modify
-                    if (!is_array($data[$targetProperty])) {
-                        continue;
-                    }
-
-                    foreach ($collected as $item) {
-                        if ($item['type'] === 'key') {
-                            ArrayUtils::setByPath($item['key'], $data[$targetProperty], $item['value']);
-                        } else {
-                            ArrayUtils::setByPath($item['targetPath'], $data[$targetProperty], $item['value']);
-                        }
-                    }
-                }
-                return $data;
+                return $subPropertyMappings->mapProperties($data);
             });
         }
 
@@ -442,69 +375,6 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
             fn(string $name) => static::convertFieldName($name, $targetFormat),
             $fieldNames,
         );
-    }
-
-    /**
-     * Collect alternative name mappings from PropertyAltNames attributes.
-     *
-     * @param ReflectionProperty[] $properties
-     * @return array<string, array{altNames: string[], useDotNotation: bool}> Map of property name to alt name config.
-     */
-    private static function collectAltNameMappings(array $properties): array {
-        $mappings = [];
-        foreach ($properties as $property) {
-            if ($property->isStatic()) {
-                continue;
-            }
-            if (self::isPropertyExcluded($property)) {
-                continue;
-            }
-            $attributes = $property->getAttributes(PropertyAltNames::class);
-            if (!empty($attributes)) {
-                /** @var PropertyAltNames $attr */
-                $attr = $attributes[0]->newInstance();
-                $altNames = $attr->getAltNames();
-                if (!empty($altNames)) {
-                    $mappings[$property->getName()] = [
-                        'altNames' => $altNames,
-                        'useDotNotation' => $attr->useDotNotation(),
-                    ];
-                }
-            }
-        }
-        return $mappings;
-    }
-
-    /**
-     * Collect sub-property mappings from MapSubProperties attributes.
-     *
-     * @param ReflectionProperty[] $properties
-     * @return array<string, array{keys: string[], mapping: array<string, string>}> Map of property name to mapping config.
-     */
-    private static function collectSubPropertyMappings(array $properties): array {
-        $mappings = [];
-        foreach ($properties as $property) {
-            if ($property->isStatic()) {
-                continue;
-            }
-            if (self::isPropertyExcluded($property)) {
-                continue;
-            }
-            $attributes = $property->getAttributes(MapSubProperties::class);
-            if (!empty($attributes)) {
-                /** @var MapSubProperties $attr */
-                $attr = $attributes[0]->newInstance();
-                $keys = $attr->getKeys();
-                $mapping = $attr->getMapping();
-                if (!empty($keys) || !empty($mapping)) {
-                    $mappings[$property->getName()] = [
-                        'keys' => $keys,
-                        'mapping' => $mapping,
-                    ];
-                }
-            }
-        }
-        return $mappings;
     }
 
     /**

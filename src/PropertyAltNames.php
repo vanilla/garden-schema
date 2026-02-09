@@ -7,6 +7,8 @@
 
 namespace Garden\Schema;
 
+use Garden\Utils\ArrayUtils;
+
 /**
  * Attribute to specify alternative property names that map to a property.
  *
@@ -98,5 +100,33 @@ class PropertyAltNames {
      */
     public function getPrimaryAltName(): ?string {
         return $this->primaryAltName;
+    }
+
+    /**
+     * Try to resolve a value from the data array using the alt names.
+     *
+     * Iterates through alt names in order and returns the first match.
+     * For non-dot-notation matches, the matched alt name key is removed from $data.
+     * For dot-notation matches, the nested value is read but the source is left intact.
+     *
+     * @param array &$data The data to search in. May be modified if a non-dot-notation match is found.
+     * @param mixed $default Default to return if no alt name matches.
+     * @return mixed The resolved value, or $default if not found.
+     */
+    public function resolveFromData(array &$data, mixed $default = null): mixed {
+        foreach ($this->altNames as $altName) {
+            if ($this->useDotNotation && str_contains($altName, '.')) {
+                $sentinel = new \stdClass();
+                $value = ArrayUtils::getByPath($altName, $data, $sentinel);
+                if ($value !== $sentinel) {
+                    return $value;
+                }
+            } elseif (array_key_exists($altName, $data)) {
+                $value = $data[$altName];
+                unset($data[$altName]);
+                return $value;
+            }
+        }
+        return $default;
     }
 }

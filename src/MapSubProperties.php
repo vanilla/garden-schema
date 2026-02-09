@@ -7,6 +7,8 @@
 
 namespace Garden\Schema;
 
+use Garden\Utils\ArrayUtils;
+
 /**
  * Attribute to map properties from the root data into a nested property structure.
  *
@@ -89,5 +91,38 @@ class MapSubProperties {
      */
     public function getMapping(): array {
         return $this->mapping;
+    }
+
+    /**
+     * Apply the sub-property mappings from source data into the target array.
+     *
+     * Iterates through keys and mappings, extracting values from $sourceData
+     * via dot-notation paths and writing them into $target.
+     *
+     * @param array $sourceData The root data to extract values from.
+     * @param array &$target The target array to populate.
+     * @return bool Whether any values were found and applied.
+     */
+    public function applyMappings(array $sourceData, array &$target): bool {
+        $sentinel = new \stdClass();
+        $found = false;
+
+        foreach ($this->keys as $key) {
+            $value = ArrayUtils::getByPath($key, $sourceData, $sentinel);
+            if ($value !== $sentinel) {
+                ArrayUtils::setByPath($key, $target, $value);
+                $found = true;
+            }
+        }
+
+        foreach ($this->mapping as $sourcePath => $targetPath) {
+            $value = ArrayUtils::getByPath($sourcePath, $sourceData, $sentinel);
+            if ($value !== $sentinel) {
+                ArrayUtils::setByPath($targetPath, $target, $value);
+                $found = true;
+            }
+        }
+
+        return $found;
     }
 }
