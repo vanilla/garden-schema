@@ -7,7 +7,6 @@
 
 namespace Garden\Schema;
 
-use Garden\Utils\ArrayUtils;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use ReflectionClass;
@@ -42,15 +41,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     /**
      * Cache for field name maps, keyed by class name.
      *
-     * Each entry contains bidirectional mappings between canonical property names
-     * and their primary alternative names, plus MapSubProperties configuration.
-     *
-     * @var array<string, array{
-     *     canonicalToAlt: array<string, string>,
-     *     altToCanonical: array<string, string>,
-     *     altNameDotNotation: array<string, bool>,
-     *     subPropertyMappings: array<string, array{keys: string[], mapping: array<string, string>}>
-     * }>
+     * @var array<string, EntityFieldNameMap>
      */
     private static array $fieldNameMaps = [];
 
@@ -230,107 +221,16 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      *
      * The map is built once per class from reflection and cached statically.
      * It contains bidirectional mappings between canonical property names and their
-     * primary alt names (from PropertyAltNames), as well as MapSubProperties configuration.
+     * primary alt names (from PropertyAltNames), as well as MapSubProperties instances.
      *
-     * @return array{
-     *     canonicalToAlt: array<string, string>,
-     *     altToCanonical: array<string, string>,
-     *     altNameDotNotation: array<string, bool>,
-     *     subPropertyMappings: array<string, array{keys: string[], mapping: array<string, string>}>
-     * }
+     * @return EntityFieldNameMap
      */
-    private static function getFieldNameMap(): array {
+    private static function getFieldNameMap(): EntityFieldNameMap {
         $class = static::class;
         if (!isset(self::$fieldNameMaps[$class])) {
-            self::$fieldNameMaps[$class] = self::buildFieldNameMap($class);
+            self::$fieldNameMaps[$class] = EntityFieldNameMap::build($class);
         }
         return self::$fieldNameMaps[$class];
-    }
-
-    /**
-     * Build the field name map from reflection for the given class.
-     *
-     * Scans all public, non-static, non-excluded properties for PropertyAltNames
-     * and MapSubProperties attributes to build bidirectional name mappings.
-     *
-     * @param class-string $class The entity class to build the map for.
-     * @return array{
-     *     canonicalToAlt: array<string, string>,
-     *     altToCanonical: array<string, string>,
-     *     altNameDotNotation: array<string, bool>,
-     *     subPropertyMappings: array<string, array{keys: string[], mapping: array<string, string>}>
-     * }
-     */
-    private static function buildFieldNameMap(string $class): array {
-        $reflection = new ReflectionClass($class);
-        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
-
-        $canonicalToAlt = [];
-        $altToCanonical = [];
-        $altNameDotNotation = [];
-        $subPropertyMappings = [];
-
-        foreach ($properties as $property) {
-            if ($property->isStatic()) {
-                continue;
-            }
-            if (self::isPropertyExcluded($property)) {
-                continue;
-            }
-
-            $name = $property->getName();
-
-            // Collect PropertyAltNames mappings
-            $altNameAttrs = $property->getAttributes(PropertyAltNames::class);
-            if (!empty($altNameAttrs)) {
-                /** @var PropertyAltNames $attr */
-                $attr = $altNameAttrs[0]->newInstance();
-                $primaryAltName = $attr->getPrimaryAltName();
-                if ($primaryAltName !== null) {
-                    $canonicalToAlt[$name] = $primaryAltName;
-                    $altToCanonical[$primaryAltName] = $name;
-                    $altNameDotNotation[$name] = $attr->useDotNotation();
-                }
-            }
-
-            // Collect MapSubProperties configuration and derive field name mappings
-            $mapSubAttrs = $property->getAttributes(MapSubProperties::class);
-            if (!empty($mapSubAttrs)) {
-                /** @var MapSubProperties $attr */
-                $attr = $mapSubAttrs[0]->newInstance();
-                $keys = $attr->getKeys();
-                $mapping = $attr->getMapping();
-                if (!empty($keys) || !empty($mapping)) {
-                    $subPropertyMappings[$name] = [
-                        'keys' => $keys,
-                        'mapping' => $mapping,
-                    ];
-
-                    // Keys: flat key at root (alt) <-> targetProperty.key (canonical)
-                    // e.g. 'authorID' (alt) <-> 'author.authorID' (canonical)
-                    foreach ($keys as $key) {
-                        $canonicalPath = $name . '.' . $key;
-                        $canonicalToAlt[$canonicalPath] = $key;
-                        $altToCanonical[$key] = $canonicalPath;
-                    }
-
-                    // Mapping: sourcePath (alt) <-> targetProperty.targetPath (canonical)
-                    // e.g. 'metadata.authorEmail' (alt) <-> 'author.email' (canonical)
-                    foreach ($mapping as $sourcePath => $targetPath) {
-                        $canonicalPath = $name . '.' . $targetPath;
-                        $canonicalToAlt[$canonicalPath] = $sourcePath;
-                        $altToCanonical[$sourcePath] = $canonicalPath;
-                    }
-                }
-            }
-        }
-
-        return [
-            'canonicalToAlt' => $canonicalToAlt,
-            'altToCanonical' => $altToCanonical,
-            'altNameDotNotation' => $altNameDotNotation,
-            'subPropertyMappings' => $subPropertyMappings,
-        ];
     }
 
     /**
@@ -352,12 +252,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * @return string The converted field name, or the original if no mapping exists.
      */
     public static function convertFieldName(string $fieldName, EntityFieldFormat $targetFormat): string {
-        $fieldNameMap = static::getFieldNameMap();
-
-        return match ($targetFormat) {
-            EntityFieldFormat::Canonical => $fieldNameMap['altToCanonical'][$fieldName] ?? $fieldName,
-            EntityFieldFormat::PrimaryAltName => $fieldNameMap['canonicalToAlt'][$fieldName] ?? $fieldName,
-        };
+        return static::getFieldNameMap()->convertFieldName($fieldName, $targetFormat);
     }
 
     /**
@@ -861,77 +756,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     protected function toAltArray(?\BackedEnum $variant = null): array {
         $effectiveVariant = $variant ?? $this->serializationVariant;
 
-        // Start with the canonical array output
+        // Start with the canonical array output, then reverse all mappings
         $result = $this->toCanonicalArray($effectiveVariant);
-
-        // Use the cached field name map instead of reflection
-        $fieldNameMap = static::getFieldNameMap();
-        $canonicalToAlt = $fieldNameMap['canonicalToAlt'];
-        $altNameDotNotation = $fieldNameMap['altNameDotNotation'];
-        $subPropertyMappings = $fieldNameMap['subPropertyMappings'];
-
-        // Apply reverse MapSubProperties mappings first (extract from nested to root)
-        foreach ($subPropertyMappings as $targetProperty => $config) {
-            if (!array_key_exists($targetProperty, $result)) {
-                continue;
-            }
-
-            $nestedData = $result[$targetProperty];
-            if (!is_array($nestedData) && !$nestedData instanceof \ArrayObject) {
-                continue;
-            }
-
-            // Convert ArrayObject to array for processing
-            if ($nestedData instanceof \ArrayObject) {
-                $nestedData = $nestedData->getArrayCopy();
-            }
-
-            $keys = $config['keys'];
-            $mapping = $config['mapping'];
-
-            // Reverse the keys: extract from nested property back to root
-            foreach ($keys as $key) {
-                $sentinel = new \stdClass();
-                $value = ArrayUtils::getByPath($key, $nestedData, $sentinel);
-                if ($value !== $sentinel) {
-                    ArrayUtils::setByPath($key, $result, $value);
-                }
-            }
-
-            // Reverse the mapping: extract from target paths back to source paths
-            foreach ($mapping as $sourcePath => $targetPath) {
-                $sentinel = new \stdClass();
-                $value = ArrayUtils::getByPath($targetPath, $nestedData, $sentinel);
-                if ($value !== $sentinel) {
-                    ArrayUtils::setByPath($sourcePath, $result, $value);
-                }
-            }
-
-            // Remove the nested property from result (it was constructed, not original)
-            unset($result[$targetProperty]);
-        }
-
-        // Apply reverse PropertyAltNames mappings (rename properties to alt names)
-        foreach ($canonicalToAlt as $propertyName => $primaryAltName) {
-            if (!array_key_exists($propertyName, $result)) {
-                continue;
-            }
-
-            $useDotNotation = $altNameDotNotation[$propertyName] ?? true;
-            $value = $result[$propertyName];
-
-            // Remove the main property name
-            unset($result[$propertyName]);
-
-            // Set the value at the alt name location
-            if ($useDotNotation && str_contains($primaryAltName, '.')) {
-                ArrayUtils::setByPath($primaryAltName, $result, $value);
-            } else {
-                $result[$primaryAltName] = $value;
-            }
-        }
-
-        return $result;
+        return static::getFieldNameMap()->reverseMapToAlt($result);
     }
 
     /**

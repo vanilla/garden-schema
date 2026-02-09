@@ -125,4 +125,63 @@ class MapSubProperties {
 
         return $found;
     }
+
+    /**
+     * Reverse the sub-property mappings: extract values from nested data back to the root result.
+     *
+     * This is the inverse of applyMappings(). Keys are extracted from their nested
+     * location back to the root. Mapped paths are extracted from their target paths
+     * back to their original source paths.
+     *
+     * @param array $nestedData The nested property data to extract values from.
+     * @param array &$result The root result array to write values into.
+     */
+    public function reverseMappings(array $nestedData, array &$result): void {
+        $sentinel = new \stdClass();
+
+        foreach ($this->keys as $key) {
+            $value = ArrayUtils::getByPath($key, $nestedData, $sentinel);
+            if ($value !== $sentinel) {
+                ArrayUtils::setByPath($key, $result, $value);
+            }
+        }
+
+        foreach ($this->mapping as $sourcePath => $targetPath) {
+            $value = ArrayUtils::getByPath($targetPath, $nestedData, $sentinel);
+            if ($value !== $sentinel) {
+                ArrayUtils::setByPath($sourcePath, $result, $value);
+            }
+        }
+    }
+
+    /**
+     * Derive bidirectional field name entries for this attribute's keys and mappings.
+     *
+     * Keys produce: flat key (alt) <-> targetProperty.key (canonical)
+     * Mappings produce: sourcePath (alt) <-> targetProperty.targetPath (canonical)
+     *
+     * @param string $targetPropertyName The canonical name of the property this attribute is on.
+     * @return array{canonicalToAlt: array<string, string>, altToCanonical: array<string, string>}
+     */
+    public function deriveFieldNameEntries(string $targetPropertyName): array {
+        $canonicalToAlt = [];
+        $altToCanonical = [];
+
+        foreach ($this->keys as $key) {
+            $canonicalPath = $targetPropertyName . '.' . $key;
+            $canonicalToAlt[$canonicalPath] = $key;
+            $altToCanonical[$key] = $canonicalPath;
+        }
+
+        foreach ($this->mapping as $sourcePath => $targetPath) {
+            $canonicalPath = $targetPropertyName . '.' . $targetPath;
+            $canonicalToAlt[$canonicalPath] = $sourcePath;
+            $altToCanonical[$sourcePath] = $canonicalPath;
+        }
+
+        return [
+            'canonicalToAlt' => $canonicalToAlt,
+            'altToCanonical' => $altToCanonical,
+        ];
+    }
 }
