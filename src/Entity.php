@@ -64,7 +64,14 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         $class = static::class;
 
         return EntitySchemaCache::getOrCreate($class, $variant, function () use ($class, $variant) {
-            return static::buildSchema($class, $variant);
+            $result = static::buildSchema($class, $variant);
+            $allCanonicalProperties = array_keys($result->getSchemaArray()['properties'] ?? []);
+            foreach (static::getFieldNameMap()->canonicalToAlt as $canonicalName => $altName) {
+                if ($altName !== $canonicalName && in_array($altName, $allCanonicalProperties)) {
+                    throw new \InvalidArgumentException("Conflict found for on properties '{$canonicalName}' and '{$altName}'. Property '{$canonicalName}' has a primary alt name of '{$altName}', but there is already a property with the canonical name '{$altName}'. ");
+                }
+            }
+            return $result;
         });
     }
 
@@ -228,7 +235,8 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     private static function getFieldNameMap(): EntityFieldNameMap {
         $class = static::class;
         if (!isset(self::$fieldNameMaps[$class])) {
-            self::$fieldNameMaps[$class] = EntityFieldNameMap::build($class);
+            $map = EntityFieldNameMap::build($class);
+            self::$fieldNameMaps[$class] = $map;
         }
         return self::$fieldNameMaps[$class];
     }

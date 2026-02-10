@@ -6,6 +6,7 @@ use Garden\Schema\Entity;
 use Garden\Schema\Schema;
 use Garden\Schema\Tests\Fixtures\BasicEntity;
 use Garden\Schema\Tests\Fixtures\ChildEntity;
+use Garden\Schema\Tests\Fixtures\ConflictedEntity;
 use Garden\Schema\Tests\Fixtures\EntityWithChildrenArray;
 use Garden\Schema\Tests\Fixtures\IntEnum;
 use Garden\Schema\Tests\Fixtures\IntEnumEntity;
@@ -234,5 +235,14 @@ class EntityTest extends TestCase {
 
         $this->assertNotSame($childSchema1, $childSchema2);
         $this->assertNotSame($treeSchema1, $treeSchema2);
+    }
+
+    /**
+     * Test that a conflicted entity throws an exception when getting the schema.
+     */
+    public function testConflictedEntity(): void {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Conflict found for on properties 'name' and 'user_name'. Property 'name' has a primary alt name of 'user_name', but there is already a property with the canonical name 'user_name'.");
+        ConflictedEntity::getSchema();
     }
 }
