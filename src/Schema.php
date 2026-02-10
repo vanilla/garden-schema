@@ -7,6 +7,9 @@
 
 namespace Garden\Schema;
 
+use Ramsey\Uuid\Uuid;
+use Ramsey\Uuid\UuidInterface;
+
 /**
  * A class for defining and validating data schemas.
  */
@@ -1476,6 +1479,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             return $result;
         }
 
+        if ($field->val('format') === 'uuid') {
+            $result = $this->validateUuid($value, $field);
+            return $result;
+        }
+
         if (is_string($value) || is_numeric($value)) {
             $value = $result = (string)$value;
         } else {
@@ -1618,6 +1626,38 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             $field->addTypeError($value, 'date/time');
         }
         return $value;
+    }
+
+    /**
+     * Validate a UUID.
+     *
+     * @param mixed $value The value to validate.
+     * @param ValidationField $field The validation results to add.
+     * @return UuidInterface|Invalid Returns a valid UUID or invalid if the value doesn't validate.
+     */
+    protected function validateUuid($value, ValidationField $field) {
+        if ($value instanceof UuidInterface) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            try {
+                // First check if it's a valid UUID string format (36 chars with dashes, or 32 hex chars)
+                if (Uuid::isValid($value)) {
+                    return Uuid::fromString($value);
+                }
+                // If not a valid string format, try parsing as 16-byte binary
+                // Only accept as bytes if it contains non-printable characters (actual binary data)
+                if (strlen($value) === 16 && !ctype_print($value)) {
+                    return Uuid::fromBytes($value);
+                }
+            } catch (\Throwable $ex) {
+                // Fall through to error
+            }
+        }
+
+        $field->addTypeError($value, 'UUID');
+        return Invalid::value();
     }
 
     /**
@@ -2235,6 +2275,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
             } else {
                 $schemas[$schema] = $sparseSchema = new Schema();
                 $sparseSchema->schema = $schema->withSparseInternal($schema->schema, $schemas);
+                $sparseSchema->filters = $schema->filters;
+                $sparseSchema->validators = $schema->validators;
+                $sparseSchema->flags = $schema->flags;
+                $sparseSchema->validationFactory = $schema->validationFactory;
+                $sparseSchema->refLookup = $schema->refLookup;
                 if ($id = $sparseSchema->getID()) {
                     $sparseSchema->setID($id.'Sparse');
                 }
@@ -2244,6 +2289,7 @@ class Schema implements \JsonSerializable, \ArrayAccess {
         }
 
         unset($schema['required']);
+        unset($schema['default']);
 
         if (isset($schema['items'])) {
             $schema['items'] = $this->withSparseInternal($schema['items'], $schemas);

@@ -46,7 +46,7 @@ namespace Garden\Schema;
  * - Exclude read-only computed fields from Mutable/Create schemas
  */
 #[\Attribute(\Attribute::TARGET_PROPERTY | \Attribute::IS_REPEATABLE)]
-class ExcludeFromVariant {
+class ExcludeFromVariant implements ExcludeFromVariantInterface {
     /**
      * @var \BackedEnum[]
      */

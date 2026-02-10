@@ -163,16 +163,22 @@ class EntityDefaultTest extends TestCase {
     }
 
     /**
-     * Test that property is not required in schema when it has a default.
+     * Test that property is required in schema even when it has a default.
+     *
+     * Properties with defaults should be marked as required because the schema
+     * will apply the default, ensuring they're always present in validated data.
      */
-    public function testPropertyWithDefaultNotRequired(): void {
+    public function testPropertyWithDefaultIsRequired(): void {
         $schema = EntityWithDefaultChild::getSchema();
         $schemaArray = $schema->getSchemaArray();
 
-        // 'metadata' should not be in required because it has a default
         $required = $schemaArray['required'] ?? [];
+
+        // All non-nullable properties should be required, even if they have defaults
         $this->assertContains('title', $required);
-        $this->assertNotContains('metadata', $required);
+        $this->assertContains('metadata', $required); // Has default via EntityDefaultInterface
+
+        // Nullable properties should not be required
         $this->assertNotContains('optionalMetadata', $required);
     }
 }

@@ -7,6 +7,8 @@
 
 namespace Garden\Schema;
 
+use Ramsey\Uuid\Uuid;
+use Ramsey\Uuid\UuidInterface;
 use ReflectionClass;
 use ReflectionEnum;
 use ReflectionIntersectionType;
@@ -37,6 +39,20 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     use EntityTrait;
 
     /**
+     * Cache for field name maps, keyed by class name.
+     *
+     * @var array<string, EntityFieldNameMap>
+     */
+    private static array $fieldNameMaps = [];
+
+    /**
+     * Canonical property names that were set via update().
+     *
+     * @var string[]
+     */
+    private array $updatedFields = [];
+
+    /**
      * Build and return the schema for this entity using reflection.
      *
      * @param \BackedEnum|null $variant The schema variant to generate. Defaults to SchemaVariant::Full.
@@ -48,7 +64,14 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         $class = static::class;
 
         return EntitySchemaCache::getOrCreate($class, $variant, function () use ($class, $variant) {
-            return self::buildSchema($class, $variant);
+            $result = static::buildSchema($class, $variant);
+            $allCanonicalProperties = array_keys($result->getSchemaArray()['properties'] ?? []);
+            foreach (static::getFieldNameMap()->canonicalToAlt as $canonicalName => $altName) {
+                if ($altName !== $canonicalName && in_array($altName, $allCanonicalProperties)) {
+                    throw new \InvalidArgumentException("Conflict found for on properties '{$canonicalName}' and '{$altName}'. Property '{$canonicalName}' has a primary alt name of '{$altName}', but there is already a property with the canonical name '{$altName}'. ");
+                }
+            }
+            return $result;
         });
     }
 
@@ -59,9 +82,11 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * @param \BackedEnum $variant The schema variant to build.
      * @return Schema
      */
-    private static function buildSchema(string $class, \BackedEnum $variant): Schema {
+    protected static function buildSchema(string $class, \BackedEnum $variant): Schema {
         $reflection = new ReflectionClass($class);
-        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
+        // Get all properties, not just public - non-public properties with PropertySchema will be schema-only
+        $properties = $reflection->getProperties();
+        $properties = self::sortPropertiesBySchemaOrder($properties);
         $schemaProperties = [];
         $required = [];
         $includedProperties = [];
@@ -75,6 +100,18 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 continue;
             }
 
+            // For non-public properties, only include if they have a PropertySchema attribute.
+            // This allows schema-only properties that appear in getSchema() but won't be encoded/decoded
+            // (since we can't set private/protected properties from a parent class).
+            $isSchemaOnly = false;
+            if (!$property->isPublic()) {
+                $hasPropertySchema = !empty($property->getAttributes(PropertySchemaInterface::class, \ReflectionAttribute::IS_INSTANCEOF));
+                if (!$hasPropertySchema) {
+                    continue;
+                }
+                $isSchemaOnly = true;
+            }
+
             // Check if property should be included in this variant
             if (!self::isPropertyInVariant($property, $variant)) {
                 continue;
@@ -82,10 +119,17 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
 
             $propertyName = $property->getName();
             $propertySchema = self::buildPropertySchema($property, $class, $variant);
+
+            // Mark schema-only properties so toArray() can skip them
+            if ($isSchemaOnly) {
+                $propertySchema['x-schema-only'] = true;
+            }
+
             $schemaProperties[$propertyName] = $propertySchema;
             $includedProperties[] = $property;
 
-            if (self::isPropertyRequired($property)) {
+            // Schema-only properties can't be set from outside, so they should never be required
+            if (!$isSchemaOnly && self::isPropertyRequired($property)) {
                 $required[] = $propertyName;
             }
         }
@@ -102,24 +146,24 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
 
         // Collect alt names and add filter for property name mapping
         // Only include alt names for properties that are in this variant
-        $altNameMappings = self::collectAltNameMappings($includedProperties);
-        if (!empty($altNameMappings)) {
-            $schema->addFilter('', function ($data) use ($altNameMappings) {
+        $altNameMapping = CollectedAltNameMapping::collect($includedProperties);
+        if (!$altNameMapping->isEmpty()) {
+            $schema->addFilter('', function ($data) use ($altNameMapping) {
                 if (!is_array($data)) {
                     return $data;
                 }
-                foreach ($altNameMappings as $mainName => $altNames) {
-                    if (!array_key_exists($mainName, $data)) {
-                        foreach ($altNames as $altName) {
-                            if (array_key_exists($altName, $data)) {
-                                $data[$mainName] = $data[$altName];
-                                unset($data[$altName]);
-                                break;
-                            }
-                        }
-                    }
+                return $altNameMapping->mapProperties($data);
+            });
+        }
+
+        // Collect sub-property mappings and add filter for nested property construction
+        $subPropertyMappings = CollectedSubPropertyMappings::collect($includedProperties);
+        if (!$subPropertyMappings->isEmpty()) {
+            $schema->addFilter('', function ($data) use ($subPropertyMappings) {
+                if (!is_array($data)) {
+                    return $data;
                 }
-                return $data;
+                return $subPropertyMappings->mapProperties($data);
             });
         }
 
@@ -148,9 +192,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         }
 
         // Check for ExcludeFromVariant
-        $excludeAttrs = $property->getAttributes(ExcludeFromVariant::class);
+        $excludeAttrs = $property->getAttributes(ExcludeFromVariantInterface::class, \ReflectionAttribute::IS_INSTANCEOF);
         foreach ($excludeAttrs as $excludeAttr) {
-            /** @var ExcludeFromVariant $exclude */
+            /** @var ExcludeFromVariantInterface $exclude */
             $exclude = $excludeAttr->newInstance();
             if ($exclude->excludesVariant($variant)) {
                 return false;
@@ -172,37 +216,68 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     public static function invalidateSchemaCache(?string $class = null, ?\BackedEnum $variant = null): void {
         if ($class === null) {
             EntitySchemaCache::invalidateAll();
+            self::$fieldNameMaps = [];
         } else {
             EntitySchemaCache::invalidate($class, $variant);
+            unset(self::$fieldNameMaps[$class]);
         }
     }
 
     /**
-     * Collect alternative name mappings from PropertyAltNames attributes.
+     * Get the cached field name map for this entity class.
      *
-     * @param ReflectionProperty[] $properties
-     * @return array<string, string[]> Map of property name to alternative names.
+     * The map is built once per class from reflection and cached statically.
+     * It contains bidirectional mappings between canonical property names and their
+     * primary alt names (from PropertyAltNames), as well as MapSubProperties instances.
+     *
+     * @return EntityFieldNameMap
      */
-    private static function collectAltNameMappings(array $properties): array {
-        $mappings = [];
-        foreach ($properties as $property) {
-            if ($property->isStatic()) {
-                continue;
-            }
-            if (self::isPropertyExcluded($property)) {
-                continue;
-            }
-            $attributes = $property->getAttributes(PropertyAltNames::class);
-            if (!empty($attributes)) {
-                /** @var PropertyAltNames $attr */
-                $attr = $attributes[0]->newInstance();
-                $altNames = $attr->getAltNames();
-                if (!empty($altNames)) {
-                    $mappings[$property->getName()] = $altNames;
-                }
-            }
+    private static function getFieldNameMap(): EntityFieldNameMap {
+        $class = static::class;
+        if (!isset(self::$fieldNameMaps[$class])) {
+            $map = EntityFieldNameMap::build($class);
+            self::$fieldNameMaps[$class] = $map;
         }
-        return $mappings;
+        return self::$fieldNameMaps[$class];
+    }
+
+    /**
+     * Convert a single field name between canonical and primary alt name formats.
+     *
+     * Uses PropertyAltNames and MapSubProperties attributes to determine the mapping.
+     *
+     * For PropertyAltNames, the canonical name is the PHP property name and the alt name
+     * is the primary alt name (e.g. 'name' <-> 'user_name').
+     *
+     * For MapSubProperties, keys and mappings produce dot-notation canonical paths:
+     * - Keys: 'authorID' (alt) <-> 'author.authorID' (canonical)
+     * - Mappings: 'metadata.authorEmail' (alt) <-> 'author.email' (canonical)
+     *
+     * If the field name has no mapping for the target format, the original name is returned unchanged.
+     *
+     * @param string $fieldName The field name to convert.
+     * @param EntityFieldFormat $targetFormat The target format to convert to.
+     * @return string The converted field name, or the original if no mapping exists.
+     */
+    public static function convertFieldName(string $fieldName, EntityFieldFormat $targetFormat): string {
+        return static::getFieldNameMap()->convertFieldName($fieldName, $targetFormat);
+    }
+
+    /**
+     * Convert an array of field names between canonical and primary alt name formats.
+     *
+     * Uses the PropertyAltNames attribute to determine the mappings. Field names with
+     * no mapping for the target format are returned unchanged.
+     *
+     * @param string[] $fieldNames The field names to convert.
+     * @param EntityFieldFormat $targetFormat The target format to convert to.
+     * @return string[] The converted field names.
+     */
+    public static function convertFieldNames(array $fieldNames, EntityFieldFormat $targetFormat): array {
+        return array_map(
+            fn(string $name) => static::convertFieldName($name, $targetFormat),
+            $fieldNames,
+        );
     }
 
     /**
@@ -255,72 +330,101 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 continue;
             }
 
-            $value = $clean[$name];
-            $type = self::getPropertyType($property);
-
-            if ($type !== null && !$type->isBuiltin()) {
-                $typeName = $type->getName();
-                // Handle properties typed as the EntityInterface interface itself
-                // We can't call fromValidated() on an interface, so only assign existing instances
-                if ($typeName === EntityInterface::class) {
-                    if ($value === null) {
-                        $entity->{$name} = null;
-                    } elseif ($value instanceof EntityInterface) {
-                        $entity->{$name} = $value;
-                    }
-                    // Skip assignment for non-EntityInterface values (e.g., arrays)
-                    // since we don't know which concrete class to instantiate
-                    continue;
-                } elseif (is_subclass_of($typeName, EntityInterface::class)) {
-                    // Handle nested entities - both Entity subclasses and other EntityInterface implementations
-                    if ($value === null) {
-                        $entity->{$name} = null;
-                        continue;
-                    }
-                    if (!$value instanceof $typeName) {
-                        $value = $typeName::fromValidated($value, $variant);
-                    }
-                } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
-                    // Handle enum conversion if Schema didn't already convert it
-                    if (!$value instanceof $typeName && $value !== null) {
-                        $value = $typeName::from($value);
-                    }
-                } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
-                    // Convert array to ArrayObject instance
-                    if (is_array($value)) {
-                        $value = new $typeName($value);
-                    }
-                } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
-                    // Convert to DateTimeImmutable if not already
-                    if ($value !== null && !$value instanceof \DateTimeImmutable) {
-                        if ($value instanceof \DateTimeInterface) {
-                            $value = \DateTimeImmutable::createFromInterface($value);
-                        } elseif (is_string($value)) {
-                            $value = new \DateTimeImmutable($value);
-                        }
-                    }
-                }
-            } elseif (is_array($value)) {
-                // Handle arrays of nested entities via PropertySchema attribute
-                $propertySchema = $schemaProperties[$name] ?? [];
-                $itemsEntityClass = $propertySchema['items']['entityClassName'] ?? null;
-                if ($itemsEntityClass && is_subclass_of($itemsEntityClass, self::class)) {
-                    $value = array_map(function ($item) use ($itemsEntityClass, $variant) {
-                        if ($item instanceof $itemsEntityClass) {
-                            return $item;
-                        }
-                        if (is_array($item)) {
-                            return $itemsEntityClass::fromValidated($item, $variant);
-                        }
-                        return $item;
-                    }, $value);
-                }
-            }
-
-            $entity->{$name} = $value;
+            $entity->setValidatedProperty($name, $clean[$name], $schemaProperties, $variant);
         }
 
         return $entity;
+    }
+
+    /**
+     * Set a validated property value on the entity, performing type coercion as needed.
+     *
+     * Handles conversion of arrays to nested entities, enum values to enum instances,
+     * arrays to ArrayObject, strings to DateTimeImmutable/UUID, etc.
+     *
+     * @param string $name The canonical property name.
+     * @param mixed $value The validated value to set.
+     * @param array $schemaProperties The schema properties array for entity array detection.
+     * @param \BackedEnum|null $variant The variant for nested entity hydration.
+     */
+    private function setValidatedProperty(string $name, mixed $value, array $schemaProperties, ?\BackedEnum $variant): void {
+        $property = new ReflectionProperty(static::class, $name);
+        $type = self::getPropertyType($property);
+
+        if ($type !== null && !$type->isBuiltin()) {
+            $typeName = $type->getName();
+            // Handle properties typed as the EntityInterface interface itself
+            // We can't call fromValidated() on an interface, so only assign existing instances
+            if ($typeName === EntityInterface::class) {
+                if ($value === null) {
+                    $this->{$name} = null;
+                } elseif ($value instanceof EntityInterface) {
+                    $this->{$name} = $value;
+                }
+                // Skip assignment for non-EntityInterface values (e.g., arrays)
+                // since we don't know which concrete class to instantiate
+                return;
+            } elseif (is_subclass_of($typeName, EntityInterface::class)) {
+                // Handle nested entities - both Entity subclasses and other EntityInterface implementations
+                if ($value === null) {
+                    $this->{$name} = null;
+                    return;
+                }
+                if (!$value instanceof $typeName) {
+                    $value = $typeName::fromValidated($value, $variant);
+                }
+            } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
+                // Handle enum conversion if Schema didn't already convert it
+                if (!$value instanceof $typeName && $value !== null) {
+                    $value = $typeName::from($value);
+                }
+            } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
+                // Convert array to ArrayObject instance
+                if (is_array($value)) {
+                    $value = new $typeName($value);
+                }
+            } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
+                // Convert to DateTimeImmutable if not already
+                if ($value !== null && !$value instanceof \DateTimeImmutable) {
+                    if ($value instanceof \DateTimeInterface) {
+                        $value = \DateTimeImmutable::createFromInterface($value);
+                    } elseif (is_string($value)) {
+                        $value = new \DateTimeImmutable($value);
+                    }
+                }
+            } elseif ($typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class)) {
+                // Convert to UUID if not already
+                if ($value !== null && !$value instanceof UuidInterface) {
+                    if (is_string($value)) {
+                        // First check if it's a valid UUID string format (36 chars with dashes, or 32 hex chars)
+                        if (Uuid::isValid($value)) {
+                            $value = Uuid::fromString($value);
+                        } elseif (strlen($value) === 16 && !ctype_print($value)) {
+                            // If not a valid string format, try parsing as 16-byte binary
+                            // Only accept as bytes if it contains non-printable characters (actual binary data)
+                            $value = Uuid::fromBytes($value);
+                        }
+                    }
+                }
+            }
+        } elseif (is_array($value)) {
+            // Handle arrays of nested entities via PropertySchema attribute
+            $propertySchema = $schemaProperties[$name] ?? [];
+            $itemsEntityClass = $propertySchema['items']['entityClassName'] ?? null;
+            if ($itemsEntityClass && is_subclass_of($itemsEntityClass, self::class)) {
+                $value = array_map(function ($item) use ($itemsEntityClass, $variant) {
+                    if ($item instanceof $itemsEntityClass) {
+                        return $item;
+                    }
+                    if (is_array($item)) {
+                        return $itemsEntityClass::fromValidated($item, $variant);
+                    }
+                    return $item;
+                }, $value);
+            }
+        }
+
+        $this->{$name} = $value;
     }
 
     /**
@@ -376,6 +480,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
                     $schema['type'] = 'string';
                     $schema['format'] = 'date-time';
+                } elseif ($typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class)) {
+                    $schema['type'] = 'string';
+                    $schema['format'] = 'uuid';
                 } else {
                     throw new \InvalidArgumentException("Unsupported property type {$typeName}.");
                 }
@@ -391,8 +498,10 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         }
 
         $attributeSchema = self::getPropertySchemaAttribute($property);
-        if (!empty($attributeSchema)) {
-            $schema = array_replace_recursive($schema, $attributeSchema);
+        if ($attributeSchema !== null) {
+            $baseSchema = new Schema($schema);
+            $baseSchema->merge($attributeSchema);
+            $schema = $baseSchema->getSchemaArray();
         }
 
         // Store the nested variant in schema metadata if different from parent variant
@@ -479,25 +588,69 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     /**
      * Determine if a property is required.
      *
+     * A property is required if it must always be present in validated data.
+     * Properties with defaults are still required because the schema will apply the default.
+     *
      * @param ReflectionProperty $property
      * @return bool
      */
     private static function isPropertyRequired(ReflectionProperty $property): bool {
+        // Check for explicit Required attribute first - this overrides nullability
+        $requiredAttributes = $property->getAttributes(Required::class);
+        if (!empty($requiredAttributes)) {
+            return true;
+        }
+
         $type = self::getPropertyType($property);
-        if ($property->hasDefaultValue()) {
+
+        // Properties without a type hint are implicitly mixed/nullable, so optional
+        if ($type === null) {
             return false;
         }
-        if ($type !== null && $type->allowsNull()) {
+
+        // Nullable properties are optional
+        if ($type->allowsNull()) {
             return false;
         }
-        // Properties whose type implements EntityDefaultInterface are not required
-        if ($type !== null && !$type->isBuiltin()) {
-            $typeName = $type->getName();
-            if (is_subclass_of($typeName, EntityDefaultInterface::class)) {
-                return false;
+
+        // Properties with defaults are still required - the schema will apply the default
+        // This ensures they're always present in the output
+
+        return true;
+    }
+
+    /**
+     * Sort properties by SchemaOrder attribute.
+     *
+     * Properties with a SchemaOrder attribute come first, sorted by their order
+     * value in ascending order. Properties without SchemaOrder retain their original
+     * declaration order and appear after all ordered properties.
+     *
+     * @param ReflectionProperty[] $properties
+     * @return ReflectionProperty[]
+     */
+    private static function sortPropertiesBySchemaOrder(array $properties): array {
+        // Separate properties with and without SchemaOrder
+        $ordered = [];
+        $unordered = [];
+
+        foreach ($properties as $property) {
+            $attributes = $property->getAttributes(SchemaOrder::class);
+            if (!empty($attributes)) {
+                /** @var SchemaOrder $schemaOrder */
+                $schemaOrder = $attributes[0]->newInstance();
+                $ordered[] = ['property' => $property, 'order' => $schemaOrder->getOrder()];
+            } else {
+                $unordered[] = $property;
             }
         }
-        return true;
+
+        // Sort the ordered properties by their order value (ascending)
+        usort($ordered, fn($a, $b) => $a['order'] <=> $b['order']);
+
+        // Combine: ordered properties first, then unordered in their original order
+        $result = array_map(fn($item) => $item['property'], $ordered);
+        return array_merge($result, $unordered);
     }
 
     /**
@@ -512,20 +665,35 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     }
 
     /**
-     * Extract the PropertySchema attribute as a schema array.
+     * Extract and merge all PropertySchema attributes into a single Schema.
+     *
+     * Multiple PropertySchema attributes (including subclasses) are merged in order
+     * using Schema::merge(). This allows stacking multiple schema customizations
+     * and creating reusable schema helper attributes.
      *
      * @param ReflectionProperty $property
-     * @return array
+     * @return Schema|null Returns the merged schema, or null if no attributes found.
      */
-    private static function getPropertySchemaAttribute(ReflectionProperty $property): array {
-        $attributes = $property->getAttributes(PropertySchema::class);
+    private static function getPropertySchemaAttribute(ReflectionProperty $property): ?Schema {
+        $attributes = $property->getAttributes(PropertySchemaInterface::class, \ReflectionAttribute::IS_INSTANCEOF);
         if (empty($attributes)) {
-            return [];
+            return null;
         }
 
-        /** @var PropertySchema $attribute */
-        $attribute = $attributes[0]->newInstance();
-        return $attribute->getSchema();
+        $mergedSchema = null;
+        foreach ($attributes as $attribute) {
+            /** @var PropertySchemaInterface $propertySchemaAttr */
+            $propertySchemaAttr = $attribute->newInstance();
+            $attributeSchema = $propertySchemaAttr->getSchema();
+
+            if ($mergedSchema === null) {
+                $mergedSchema = $attributeSchema;
+            } else {
+                $mergedSchema->merge($attributeSchema);
+            }
+        }
+
+        return $mergedSchema;
     }
 
     /**
@@ -539,9 +707,27 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * attribute that specifies a different variant for that nested entity.
      *
      * @param \BackedEnum|null $variant Optional variant to filter properties. If provided, sets the serializationVariant.
+     * @param EntityFieldFormat $format The format to use for the field names.
+     *
      * @return array
      */
-    public function toArray(?\BackedEnum $variant = null): array {
+    public function toArray(?\BackedEnum $variant = null, EntityFieldFormat $format = EntityFieldFormat::Canonical): array {
+        return match ($format) {
+            EntityFieldFormat::Canonical => $this->toCanonicalArray($variant),
+            EntityFieldFormat::PrimaryAltName => $this->toAltArray($variant),
+        };
+    }
+
+    /**
+     * Convert the entity to an array using canonical property names.
+     *
+     * This contains the core serialization logic. Recursively converts nested entities
+     * and arrays of entities to arrays. BackedEnum values are converted to their backing values.
+     *
+     * @param \BackedEnum|null $variant Optional variant to filter properties.
+     * @return array
+     */
+    protected function toCanonicalArray(?\BackedEnum $variant = null): array {
         // If variant is explicitly passed, use it; otherwise use the instance's serializationVariant
         $effectiveVariant = $variant ?? $this->serializationVariant;
 
@@ -559,6 +745,12 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 continue;
             }
 
+            // Skip schema-only properties (private/protected with PropertySchema attribute)
+            // These are in the schema for documentation but can't be encoded/decoded
+            if (!empty($propertySchema['x-schema-only'])) {
+                continue;
+            }
+
             $value = $initializedProperties[$name];
 
             // Read nested variant from cached schema metadata (set during schema generation)
@@ -568,6 +760,93 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
             $result[$name] = $this->valueToArrayWithVariant($value, $nestedVariant);
         }
 
+        return $result;
+    }
+
+    /**
+     * Convert the entity to an array using alternative property names.
+     *
+     * This method does a toCanonicalArray() and then reverses the PropertyAltNames and MapSubProperties
+     * mappings. This allows you to decode an entity from alt names and serialize it back to
+     * the original structure.
+     *
+     * For PropertyAltNames: Uses the primaryAltName instead of the main property name.
+     * For MapSubProperties: Extracts values from nested properties back to their original locations.
+     *
+     * @param \BackedEnum|null $variant Optional variant to filter properties.
+     * @return array
+     */
+    protected function toAltArray(?\BackedEnum $variant = null): array {
+        $effectiveVariant = $variant ?? $this->serializationVariant;
+
+        // Start with the canonical array output, then reverse all mappings
+        $result = $this->toCanonicalArray($effectiveVariant);
+        return static::getFieldNameMap()->reverseMapToAlt($result);
+    }
+
+    /**
+     * Get the schema for the entity's mutation.
+     *
+     * @return Schema
+     */
+    public function getMutationSchema(): Schema {
+        return static::getSchema(SchemaVariant::Mutable)->withSparse();
+    }
+
+    /**
+     * Apply partial updates to the entity.
+     *
+     * Validates the updates against the Mutable variant schema (sparse), maps field
+     * names from alt names and sub-property mappings (just like from()), sets the
+     * properties on the entity, tracks which canonical fields were updated, and
+     * validates the full entity state.
+     *
+     * @param array $updates The partial update data. Keys can be canonical names,
+     *                       alt names, or mapped sub-property paths.
+     * @return static
+     * @throws ValidationException If the update data is invalid or the resulting entity state is invalid.
+     */
+    public function update(array $updates): static {
+        // Validate against the Mutable schema with sparse validation
+        // This handles alt name mapping and sub-property mapping via schema filters
+        $schema = $this->getMutationSchema();
+        $clean = $schema->validate($updates);
+        $schemaProperties = static::getSchema(SchemaVariant::Mutable)->getSchemaArray()['properties'] ?? [];
+
+        // Apply validated values with type coercion and track which fields were updated
+        foreach ($clean as $name => $value) {
+            $this->setValidatedProperty($name, $value, $schemaProperties, null);
+            if (!in_array($name, $this->updatedFields, true)) {
+                $this->updatedFields[] = $name;
+            }
+        }
+
+        // Validate the full entity state
+        $this->validate();
+
+        return $this;
+    }
+
+    /**
+     * Get the fields that were set via update(), as an array.
+     *
+     * Returns only the properties that were modified through update() calls,
+     * with values converted to their array representation (entities become arrays,
+     * enums become values, etc.).
+     *
+     * @param EntityFieldFormat $format The format for field names in the output.
+     * @return array
+     */
+    public function getUpdatedArray(EntityFieldFormat $format = EntityFieldFormat::Canonical): array {
+        $result = [];
+        foreach ($this->updatedFields as $name) {
+            $value = $this->valueToArrayWithVariant($this->{$name}, null);
+            $outputName = match ($format) {
+                EntityFieldFormat::Canonical => $name,
+                EntityFieldFormat::PrimaryAltName => static::convertFieldName($name, EntityFieldFormat::PrimaryAltName),
+            };
+            $result[$outputName] = $value;
+        }
         return $result;
     }
 
@@ -584,6 +863,9 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         }
         if ($value instanceof \BackedEnum) {
             return $value->value;
+        }
+        if ($value instanceof UuidInterface) {
+            return $value->toString();
         }
         if ($value instanceof \DateTimeInterface) {
             // Use RFC3339_EXTENDED if there are milliseconds, otherwise RFC3339

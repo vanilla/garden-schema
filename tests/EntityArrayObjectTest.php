@@ -88,4 +88,14 @@ class EntityArrayObjectTest extends TestCase {
         $this->assertSame('json-test', $decoded['name']);
         $this->assertSame(['key' => 'value'], $decoded['data']);
     }
+
+    public function testUpdateWithArrayObjectProperty(): void {
+        $entity = ArrayObjectEntity::from([
+            'name' => 'update-test',
+            'data' => ['key' => 'value'],
+        ]);
+
+        $entity->update(['data' => ['key' => 'new-value']]);
+        $this->assertSame(['key' => 'new-value'], $entity->data->getArrayCopy());
+    }
 }

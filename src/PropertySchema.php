@@ -14,6 +14,11 @@ namespace Garden\Schema;
  * type information. This allows you to add constraints (minLength, maxLength, pattern, etc.)
  * or override auto-generated values while preserving type inference.
  *
+ * This attribute is repeatable, allowing multiple schema customizations to be stacked.
+ * Multiple attributes are merged in order using Schema::merge().
+ *
+ * This attribute can be subclassed to create reusable schema helpers (e.g., #[MinLength(1)]).
+ *
  * Example:
  * ```
  * #[PropertySchema(['minLength' => 1, 'maxLength' => 100])]
@@ -23,8 +28,8 @@ namespace Garden\Schema;
  * public array $tags;  // Auto-generates type: array, adds items constraint
  * ```
  */
-#[\Attribute(\Attribute::TARGET_PROPERTY)]
-class PropertySchema {
+#[\Attribute(\Attribute::TARGET_PROPERTY | \Attribute::IS_REPEATABLE)]
+class PropertySchema implements PropertySchemaInterface {
     /**
      * @var array
      */
@@ -39,9 +44,9 @@ class PropertySchema {
     }
 
     /**
-     * @return array Returns the schema array for the property.
+     * @return Schema Returns the schema for the property.
      */
-    public function getSchema(): array {
-        return $this->schema;
+    public function getSchema(): Schema {
+        return new Schema($this->schema);
     }
 }
