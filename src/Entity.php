@@ -322,86 +322,101 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 continue;
             }
 
-            $value = $clean[$name];
-            $type = self::getPropertyType($property);
-
-            if ($type !== null && !$type->isBuiltin()) {
-                $typeName = $type->getName();
-                // Handle properties typed as the EntityInterface interface itself
-                // We can't call fromValidated() on an interface, so only assign existing instances
-                if ($typeName === EntityInterface::class) {
-                    if ($value === null) {
-                        $entity->{$name} = null;
-                    } elseif ($value instanceof EntityInterface) {
-                        $entity->{$name} = $value;
-                    }
-                    // Skip assignment for non-EntityInterface values (e.g., arrays)
-                    // since we don't know which concrete class to instantiate
-                    continue;
-                } elseif (is_subclass_of($typeName, EntityInterface::class)) {
-                    // Handle nested entities - both Entity subclasses and other EntityInterface implementations
-                    if ($value === null) {
-                        $entity->{$name} = null;
-                        continue;
-                    }
-                    if (!$value instanceof $typeName) {
-                        $value = $typeName::fromValidated($value, $variant);
-                    }
-                } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
-                    // Handle enum conversion if Schema didn't already convert it
-                    if (!$value instanceof $typeName && $value !== null) {
-                        $value = $typeName::from($value);
-                    }
-                } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
-                    // Convert array to ArrayObject instance
-                    if (is_array($value)) {
-                        $value = new $typeName($value);
-                    }
-                } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
-                    // Convert to DateTimeImmutable if not already
-                    if ($value !== null && !$value instanceof \DateTimeImmutable) {
-                        if ($value instanceof \DateTimeInterface) {
-                            $value = \DateTimeImmutable::createFromInterface($value);
-                        } elseif (is_string($value)) {
-                            $value = new \DateTimeImmutable($value);
-                        }
-                    }
-                } elseif ($typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class)) {
-                    // Convert to UUID if not already
-                    if ($value !== null && !$value instanceof UuidInterface) {
-                        if (is_string($value)) {
-                            // First check if it's a valid UUID string format (36 chars with dashes, or 32 hex chars)
-                            if (Uuid::isValid($value)) {
-                                $value = Uuid::fromString($value);
-                            } elseif (strlen($value) === 16 && !ctype_print($value)) {
-                                // If not a valid string format, try parsing as 16-byte binary
-                                // Only accept as bytes if it contains non-printable characters (actual binary data)
-                                $value = Uuid::fromBytes($value);
-                            }
-                        }
-                    }
-                }
-            } elseif (is_array($value)) {
-                // Handle arrays of nested entities via PropertySchema attribute
-                $propertySchema = $schemaProperties[$name] ?? [];
-                $itemsEntityClass = $propertySchema['items']['entityClassName'] ?? null;
-                if ($itemsEntityClass && is_subclass_of($itemsEntityClass, self::class)) {
-                    $value = array_map(function ($item) use ($itemsEntityClass, $variant) {
-                        if ($item instanceof $itemsEntityClass) {
-                            return $item;
-                        }
-                        if (is_array($item)) {
-                            return $itemsEntityClass::fromValidated($item, $variant);
-                        }
-                        return $item;
-                    }, $value);
-                }
-            }
-
-            $entity->{$name} = $value;
+            $entity->setValidatedProperty($name, $clean[$name], $schemaProperties, $variant);
         }
 
         return $entity;
+    }
+
+    /**
+     * Set a validated property value on the entity, performing type coercion as needed.
+     *
+     * Handles conversion of arrays to nested entities, enum values to enum instances,
+     * arrays to ArrayObject, strings to DateTimeImmutable/UUID, etc.
+     *
+     * @param string $name The canonical property name.
+     * @param mixed $value The validated value to set.
+     * @param array $schemaProperties The schema properties array for entity array detection.
+     * @param \BackedEnum|null $variant The variant for nested entity hydration.
+     */
+    private function setValidatedProperty(string $name, mixed $value, array $schemaProperties, ?\BackedEnum $variant): void {
+        $property = new ReflectionProperty(static::class, $name);
+        $type = self::getPropertyType($property);
+
+        if ($type !== null && !$type->isBuiltin()) {
+            $typeName = $type->getName();
+            // Handle properties typed as the EntityInterface interface itself
+            // We can't call fromValidated() on an interface, so only assign existing instances
+            if ($typeName === EntityInterface::class) {
+                if ($value === null) {
+                    $this->{$name} = null;
+                } elseif ($value instanceof EntityInterface) {
+                    $this->{$name} = $value;
+                }
+                // Skip assignment for non-EntityInterface values (e.g., arrays)
+                // since we don't know which concrete class to instantiate
+                return;
+            } elseif (is_subclass_of($typeName, EntityInterface::class)) {
+                // Handle nested entities - both Entity subclasses and other EntityInterface implementations
+                if ($value === null) {
+                    $this->{$name} = null;
+                    return;
+                }
+                if (!$value instanceof $typeName) {
+                    $value = $typeName::fromValidated($value, $variant);
+                }
+            } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
+                // Handle enum conversion if Schema didn't already convert it
+                if (!$value instanceof $typeName && $value !== null) {
+                    $value = $typeName::from($value);
+                }
+            } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
+                // Convert array to ArrayObject instance
+                if (is_array($value)) {
+                    $value = new $typeName($value);
+                }
+            } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
+                // Convert to DateTimeImmutable if not already
+                if ($value !== null && !$value instanceof \DateTimeImmutable) {
+                    if ($value instanceof \DateTimeInterface) {
+                        $value = \DateTimeImmutable::createFromInterface($value);
+                    } elseif (is_string($value)) {
+                        $value = new \DateTimeImmutable($value);
+                    }
+                }
+            } elseif ($typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class)) {
+                // Convert to UUID if not already
+                if ($value !== null && !$value instanceof UuidInterface) {
+                    if (is_string($value)) {
+                        // First check if it's a valid UUID string format (36 chars with dashes, or 32 hex chars)
+                        if (Uuid::isValid($value)) {
+                            $value = Uuid::fromString($value);
+                        } elseif (strlen($value) === 16 && !ctype_print($value)) {
+                            // If not a valid string format, try parsing as 16-byte binary
+                            // Only accept as bytes if it contains non-printable characters (actual binary data)
+                            $value = Uuid::fromBytes($value);
+                        }
+                    }
+                }
+            }
+        } elseif (is_array($value)) {
+            // Handle arrays of nested entities via PropertySchema attribute
+            $propertySchema = $schemaProperties[$name] ?? [];
+            $itemsEntityClass = $propertySchema['items']['entityClassName'] ?? null;
+            if ($itemsEntityClass && is_subclass_of($itemsEntityClass, self::class)) {
+                $value = array_map(function ($item) use ($itemsEntityClass, $variant) {
+                    if ($item instanceof $itemsEntityClass) {
+                        return $item;
+                    }
+                    if (is_array($item)) {
+                        return $itemsEntityClass::fromValidated($item, $variant);
+                    }
+                    return $item;
+                }, $value);
+            }
+        }
+
+        $this->{$name} = $value;
     }
 
     /**
@@ -788,10 +803,11 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         // This handles alt name mapping and sub-property mapping via schema filters
         $schema = $this->getMutationSchema();
         $clean = $schema->validate($updates);
+        $schemaProperties = static::getSchema(SchemaVariant::Mutable)->getSchemaArray()['properties'] ?? [];
 
-        // Apply validated values and track which fields were updated
+        // Apply validated values with type coercion and track which fields were updated
         foreach ($clean as $name => $value) {
-            $this->{$name} = $value;
+            $this->setValidatedProperty($name, $value, $schemaProperties, null);
             if (!in_array($name, $this->updatedFields, true)) {
                 $this->updatedFields[] = $name;
             }
