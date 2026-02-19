@@ -71,4 +71,18 @@ class EntityPropertyAltNamesTest extends TestCase {
 
         $this->assertSame('Testy', $entity->nickname);
     }
+
+    /**
+     * Test that multiple property alt names can map to the same property (as long as only one of them is the primary alt name).
+     */
+    public function testPropertyAltNamesDoubleMappedKey(): void {
+        $entity = AltNamesEntity::from([
+            "name" => "Test User",
+            'DoubleMappedKey' => 'Test User',
+            'count' => 35,
+        ]);
+
+        $this->assertSame('Test User', $entity->doubleMappedKey);
+        $this->assertSame('Test User', $entity->fallsbackToDoubleMappedKey);
+    }
 }
