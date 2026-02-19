@@ -20,4 +20,10 @@ class AltNamesEntity extends Entity {
     public ?string $nickname = null;
 
     public int $count;
+
+    #[PropertyAltNames(["FallsbackToDoubleMappedKey", "DoubleMappedKey"], primaryAltName: "FallsbackToDoubleMappedKey")]
+    public string $fallsbackToDoubleMappedKey = "";
+
+    #[PropertyAltNames("DoubleMappedKey")]
+    public string $doubleMappedKey = "";
 }

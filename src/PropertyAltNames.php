@@ -123,7 +123,6 @@ class PropertyAltNames {
                 }
             } elseif (array_key_exists($altName, $data)) {
                 $value = $data[$altName];
-                unset($data[$altName]);
                 return $value;
             }
         }
