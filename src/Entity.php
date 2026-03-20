@@ -85,7 +85,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
     protected static function buildSchema(string $class, \BackedEnum $variant): Schema {
         $reflection = new ReflectionClass($class);
         // Get all properties, not just public - non-public properties with PropertySchema will be schema-only
-        $properties = $reflection->getProperties();
+        $properties = EntityReflectionUtils::getSortedProperties($reflection, null);
         $properties = self::sortPropertiesBySchemaOrder($properties);
         $schemaProperties = [];
         $required = [];
