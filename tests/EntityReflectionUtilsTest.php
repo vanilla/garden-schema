@@ -4,6 +4,7 @@ namespace Garden\Schema\Tests;
 
 use Garden\Schema\EntityReflectionUtils;
 use Garden\Schema\Tests\Fixtures\ReflectionUtilsChildClass;
+use Garden\Schema\Tests\Fixtures\ReflectionUtilsEntityC;
 use Garden\Schema\Tests\Fixtures\ReflectionUtilsSchemaChildEntity;
 use Garden\Schema\Tests\Fixtures\ReflectionUtilsSecondClass;
 use PHPUnit\Framework\TestCase;
@@ -15,7 +16,7 @@ use ReflectionProperty;
  */
 class EntityReflectionUtilsTest extends TestCase {
     /**
-     * Properties are sorted so inheritance introduces names first, even when redeclared later.
+     * Properties are sorted parent-first, but redeclared properties use the most specific subclass position.
      */
     public function testGetSortedPropertiesSortsByInheritanceChainWithRedeclaredProperty(): void {
         $reflectedClass = new ReflectionClass(ReflectionUtilsChildClass::class);
@@ -24,7 +25,7 @@ class EntityReflectionUtilsTest extends TestCase {
         $names = array_map(fn(ReflectionProperty $property) => $property->getName(), $properties);
 
         $this->assertSame(
-            ["baseClassProp", "baseProtectedProp", "secondClassProp", "secondProtectedProp", "thirdClassProp"],
+            ["baseProtectedProp", "secondClassProp", "secondProtectedProp", "baseClassProp", "thirdClassProp"],
             $names,
         );
     }
@@ -38,7 +39,7 @@ class EntityReflectionUtilsTest extends TestCase {
         $properties = EntityReflectionUtils::getSortedProperties($reflectedClass, ReflectionProperty::IS_PUBLIC);
         $names = array_map(fn(ReflectionProperty $property) => $property->getName(), $properties);
 
-        $this->assertSame(["baseClassProp", "secondClassProp", "thirdClassProp"], $names);
+        $this->assertSame(["secondClassProp", "baseClassProp", "thirdClassProp"], $names);
     }
 
     /**
@@ -61,5 +62,27 @@ class EntityReflectionUtilsTest extends TestCase {
         $propertyNames = array_keys($schema->getSchemaArray()["properties"]);
 
         $this->assertSame(["schemaOrdered", "parentA", "parentB", "childA"], $propertyNames);
+    }
+
+    /**
+     * Redeclared properties in each subclass use that subclass's declaration position.
+     */
+    public function testGetSortedPropertiesUsesMostSpecificRedeclarationOrder(): void {
+        $reflectedClass = new ReflectionClass(ReflectionUtilsEntityC::class);
+
+        $properties = EntityReflectionUtils::getSortedProperties($reflectedClass, ReflectionProperty::IS_PUBLIC);
+        $names = array_map(fn(ReflectionProperty $property) => $property->getName(), $properties);
+
+        $this->assertSame(["propA", "propB", "propC", "propD"], $names);
+    }
+
+    /**
+     * Entity schema property order follows the same redeclaration-aware inheritance ordering.
+     */
+    public function testEntityBuildSchemaUsesMostSpecificRedeclarationOrder(): void {
+        $schema = ReflectionUtilsEntityC::getSchema();
+        $propertyNames = array_keys($schema->getSchemaArray()["properties"]);
+
+        $this->assertSame(["propA", "propB", "propC", "propD"], $propertyNames);
     }
 }

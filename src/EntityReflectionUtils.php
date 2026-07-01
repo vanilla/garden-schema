@@ -21,8 +21,8 @@ class EntityReflectionUtils {
      * The returned properties mirror ReflectionClass::getProperties($filters), but are
      * re-ordered so properties introduced by base classes come first.
      *
-     * For redeclared properties, ordering is based on the first class in the inheritance
-     * chain that introduced that property name.
+     * For redeclared properties, ordering is based on the most specific class in the
+     * inheritance chain that declares that property name.
      *
      * @param ReflectionClass $reflectedClass
      * @param int|null $filters ReflectionProperty filter mask.
@@ -54,9 +54,7 @@ class EntityReflectionUtils {
                     continue;
                 }
                 $propertyName = $property->getName();
-                if (!array_key_exists($propertyName, $propertyIntroductionOrder)) {
-                    $propertyIntroductionOrder[$propertyName] = $order++;
-                }
+                $propertyIntroductionOrder[$propertyName] = $order++;
             }
         }
 
@@ -65,14 +63,14 @@ class EntityReflectionUtils {
             $declaringClassName = $property->getDeclaringClass()->getName();
             $sortableProperties[] = [
                 "property" => $property,
-                "firstSeenOrder" => $propertyIntroductionOrder[$property->getName()] ?? PHP_INT_MAX,
+                "sortOrder" => $propertyIntroductionOrder[$property->getName()] ?? PHP_INT_MAX,
                 "declaringClassDepth" => $classDepth[$declaringClassName] ?? PHP_INT_MAX,
                 "originalIndex" => $index,
             ];
         }
 
         usort($sortableProperties, function (array $a, array $b): int {
-            $comparison = $a["firstSeenOrder"] <=> $b["firstSeenOrder"];
+            $comparison = $a["sortOrder"] <=> $b["sortOrder"];
             if ($comparison !== 0) {
                 return $comparison;
             }
