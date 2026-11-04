@@ -53,6 +53,11 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      */
     private static $DATE_REGEX = '`^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?`i';
 
+    /**
+     * @var class-string<\DateTimeImmutable> Class constructed for datetime values.
+     */
+    private static string $dateClass = \DateTimeImmutable::class;
+
     protected $schema = [];
 
     /**
@@ -1592,6 +1597,39 @@ class Schema implements \JsonSerializable, \ArrayAccess {
     }
 
     /**
+     * Set the class constructed for datetime values.
+     *
+     * @param class-string<\DateTimeImmutable> $class A DateTimeImmutable subclass.
+     */
+    public static function setDateClass(string $class): void {
+        if ($class !== \DateTimeImmutable::class && !is_subclass_of($class, \DateTimeImmutable::class)) {
+            throw new \InvalidArgumentException("Date class must extend DateTimeImmutable.");
+        }
+        self::$dateClass = $class;
+    }
+
+    /**
+     * Construct a datetime using the configured date class.
+     *
+     * An instance of the target class is returned as-is. Any other DateTimeInterface is recreated
+     * at the same instant so a subclass jsonSerialize() is the one that runs.
+     *
+     * @param \DateTimeInterface|string $value A datetime or a string the DateTime constructor accepts.
+     * @param class-string<\DateTimeImmutable>|null $class Override the configured class.
+     * @return \DateTimeImmutable
+     */
+    public static function createDate(\DateTimeInterface|string $value, ?string $class = null): \DateTimeImmutable {
+        $class ??= self::$dateClass;
+        if ($value instanceof $class) {
+            return $value;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return new $class($value->format('Y-m-d H:i:s.u'), $value->getTimezone());
+        }
+        return new $class($value);
+    }
+
+    /**
      * Validate a date time.
      *
      * @param mixed $value The value to validate.
@@ -1599,26 +1637,17 @@ class Schema implements \JsonSerializable, \ArrayAccess {
      * @return \DateTimeInterface|Invalid Returns the cleaned value or **null** if it isn't valid.
      */
     protected function validateDatetime($value, ValidationField $field) {
-        if ($value instanceof \DateTimeInterface) {
-            // do nothing, we're good
-        } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
-            try {
-                $dt = new \DateTimeImmutable($value);
-                if ($dt) {
-                    $value = $dt;
-                } else {
-                    $value = null;
-                }
-            } catch (\Throwable $ex) {
+        try {
+            if ($value instanceof \DateTimeInterface) {
+                $value = self::createDate($value);
+            } elseif (is_string($value) && $value !== '' && !is_numeric($value)) {
+                $value = self::createDate($value);
+            } elseif (is_int($value) && $value > 0) {
+                $value = self::createDate('@'.(string)round($value));
+            } else {
                 $value = Invalid::value();
             }
-        } elseif (is_int($value) && $value > 0) {
-            try {
-                $value = new \DateTimeImmutable('@'.(string)round($value));
-            } catch (\Throwable $ex) {
-                $value = Invalid::value();
-            }
-        } else {
+        } catch (\Throwable $ex) {
             $value = Invalid::value();
         }
 

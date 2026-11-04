@@ -451,13 +451,11 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 }
                 break;
             case EntityPropertyInfo::KIND_DATE_TIME:
-                // Convert to DateTimeImmutable if not already
-                if ($value !== null && !$value instanceof \DateTimeImmutable) {
-                    if ($value instanceof \DateTimeInterface) {
-                        $value = \DateTimeImmutable::createFromInterface($value);
-                    } elseif (is_string($value)) {
-                        $value = new \DateTimeImmutable($value);
-                    }
+                // A property typed as DateTimeImmutable uses the configured date class.
+                // A property typed as a specific subclass keeps that subclass.
+                if ($value !== null && ($value instanceof \DateTimeInterface || is_string($value))) {
+                    $dateClass = $typeName === \DateTimeImmutable::class ? null : $typeName;
+                    $value = Schema::createDate($value, $dateClass);
                 }
                 break;
             case EntityPropertyInfo::KIND_UUID:
