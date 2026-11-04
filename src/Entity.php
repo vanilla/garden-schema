@@ -60,7 +60,19 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * @return Schema
      */
     public static function getSchema(?\BackedEnum $variant = null): Schema {
-        $variant ??= SchemaVariant::Full;
+        return static::getStaticSchema($variant ?? SchemaVariant::Full);
+    }
+
+    /**
+     * Get the cached schema built from the class's attributes, ignoring any `getSchema()` override.
+     *
+     * Subclasses may override `getSchema()` to add request-time validators. Per-row work like hydration and
+     * serialization only needs what the attributes define, so it reads this instead and never runs the override.
+     *
+     * @param \BackedEnum $variant The schema variant.
+     * @return Schema
+     */
+    protected static function getStaticSchema(\BackedEnum $variant): Schema {
         $class = static::class;
 
         return EntitySchemaCache::getOrCreate($class, $variant, function () use ($class, $variant) {
@@ -73,6 +85,75 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
             }
             return $result;
         });
+    }
+
+    /**
+     * Get the `properties` of the cached schema built from the class's attributes, ignoring any `getSchema()` override.
+     *
+     * @param \BackedEnum $variant The schema variant.
+     * @return array<string, array>
+     */
+    protected static function getStaticSchemaProperties(\BackedEnum $variant): array {
+        return static::getStaticSchema($variant)->getSchemaArray()['properties'] ?? [];
+    }
+
+    /**
+     * Get the reflection metadata of every non-static property of this class, built once per class.
+     *
+     * Type analysis is only done for public, non-excluded properties. Those are the ones that are hydrated.
+     *
+     * @return array<string, EntityPropertyInfo> By property name.
+     */
+    private static function getPropertyInfos(): array {
+        return EntitySchemaCache::getMetadata(static::class, static function (): array {
+            $infos = [];
+            foreach ((new ReflectionClass(static::class))->getProperties() as $property) {
+                if ($property->isStatic()) {
+                    continue;
+                }
+                $infos[$property->getName()] = self::buildPropertyInfo($property);
+            }
+            return $infos;
+        });
+    }
+
+    /**
+     * Collect the facts hydration needs about a property.
+     *
+     * @param ReflectionProperty $property
+     * @return EntityPropertyInfo
+     */
+    private static function buildPropertyInfo(ReflectionProperty $property): EntityPropertyInfo {
+        $isPublic = $property->isPublic();
+        $isExcluded = self::isPropertyExcluded($property);
+        $type = $isPublic && !$isExcluded ? self::getPropertyType($property) : null;
+        $typeName = $type?->getName();
+        $kind = EntityPropertyInfo::KIND_PLAIN;
+        $hasEntityDefault = false;
+
+        if ($type !== null && !$type->isBuiltin()) {
+            $hasEntityDefault = is_subclass_of($typeName, EntityDefaultInterface::class);
+            $kind = match (true) {
+                $typeName === EntityInterface::class => EntityPropertyInfo::KIND_ENTITY_INTERFACE,
+                is_subclass_of($typeName, EntityInterface::class) => EntityPropertyInfo::KIND_ENTITY,
+                is_subclass_of($typeName, \BackedEnum::class) => EntityPropertyInfo::KIND_ENUM,
+                $typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class) => EntityPropertyInfo::KIND_ARRAY_OBJECT,
+                $typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class) => EntityPropertyInfo::KIND_DATE_TIME,
+                $typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class) => EntityPropertyInfo::KIND_UUID,
+                default => EntityPropertyInfo::KIND_OTHER,
+            };
+        }
+
+        return new EntityPropertyInfo(
+            $property->getName(),
+            $isPublic,
+            $isExcluded,
+            $typeName,
+            $type?->allowsNull() ?? false,
+            $property->hasDefaultValue(),
+            $hasEntityDefault,
+            $kind,
+        );
     }
 
     /**
@@ -293,44 +374,28 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      */
     public static function fromValidated(array $clean, ?\BackedEnum $variant = null): static {
         $entity = new static();
-        $reflection = new ReflectionClass(static::class);
-        $properties = $reflection->getProperties(ReflectionProperty::IS_PUBLIC);
-        $schemaProperties = static::getSchema($variant)->getSchemaArray()['properties'] ?? [];
+        $schemaProperties = static::getStaticSchemaProperties($variant ?? SchemaVariant::Full);
 
-        foreach ($properties as $property) {
-            if ($property->isStatic()) {
+        foreach (static::getPropertyInfos() as $info) {
+            if (!$info->isPublic || $info->isExcluded) {
                 continue;
             }
 
-            if (self::isPropertyExcluded($property)) {
-                continue;
-            }
-
-            $name = $property->getName();
+            $name = $info->name;
 
             // Handle properties not provided in the input
             if (!array_key_exists($name, $clean)) {
-                $type = self::getPropertyType($property);
-                if ($type !== null) {
-                    // Check if the property type implements EntityDefaultInterface
-                    if (!$type->isBuiltin()) {
-                        $typeName = $type->getName();
-                        if (is_subclass_of($typeName, EntityDefaultInterface::class)) {
-                            /** @var EntityDefaultInterface $typeName */
-                            $entity->{$name} = $typeName::default();
-                            continue;
-                        }
-                    }
-
+                if ($info->hasEntityDefault) {
+                    // The property type implements EntityDefaultInterface
+                    $entity->{$name} = $info->typeName::default();
+                } elseif ($info->typeName !== null && $info->allowsNull && !$info->hasDefault) {
                     // Initialize nullable properties with null if not provided
-                    if ($type->allowsNull() && !$property->hasDefaultValue()) {
-                        $entity->{$name} = null;
-                    }
+                    $entity->{$name} = null;
                 }
                 continue;
             }
 
-            $entity->setValidatedProperty($name, $clean[$name], $schemaProperties, $variant);
+            $entity->setValidatedProperty($info, $clean[$name], $schemaProperties, $variant);
         }
 
         return $entity;
@@ -342,20 +407,19 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      * Handles conversion of arrays to nested entities, enum values to enum instances,
      * arrays to ArrayObject, strings to DateTimeImmutable/UUID, etc.
      *
-     * @param string $name The canonical property name.
+     * @param EntityPropertyInfo $info The property to set.
      * @param mixed $value The validated value to set.
      * @param array $schemaProperties The schema properties array for entity array detection.
      * @param \BackedEnum|null $variant The variant for nested entity hydration.
      */
-    private function setValidatedProperty(string $name, mixed $value, array $schemaProperties, ?\BackedEnum $variant): void {
-        $property = new ReflectionProperty(static::class, $name);
-        $type = self::getPropertyType($property);
+    private function setValidatedProperty(EntityPropertyInfo $info, mixed $value, array $schemaProperties, ?\BackedEnum $variant): void {
+        $name = $info->name;
+        $typeName = $info->typeName;
 
-        if ($type !== null && !$type->isBuiltin()) {
-            $typeName = $type->getName();
-            // Handle properties typed as the EntityInterface interface itself
-            // We can't call fromValidated() on an interface, so only assign existing instances
-            if ($typeName === EntityInterface::class) {
+        switch ($info->kind) {
+            case EntityPropertyInfo::KIND_ENTITY_INTERFACE:
+                // Handle properties typed as the EntityInterface interface itself
+                // We can't call fromValidated() on an interface, so only assign existing instances
                 if ($value === null) {
                     $this->{$name} = null;
                 } elseif ($value instanceof EntityInterface) {
@@ -364,7 +428,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 // Skip assignment for non-EntityInterface values (e.g., arrays)
                 // since we don't know which concrete class to instantiate
                 return;
-            } elseif (is_subclass_of($typeName, EntityInterface::class)) {
+            case EntityPropertyInfo::KIND_ENTITY:
                 // Handle nested entities - both Entity subclasses and other EntityInterface implementations
                 if ($value === null) {
                     $this->{$name} = null;
@@ -373,17 +437,20 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                 if (!$value instanceof $typeName) {
                     $value = $typeName::fromValidated($value, $variant);
                 }
-            } elseif (is_subclass_of($typeName, \BackedEnum::class)) {
+                break;
+            case EntityPropertyInfo::KIND_ENUM:
                 // Handle enum conversion if Schema didn't already convert it
                 if (!$value instanceof $typeName && $value !== null) {
                     $value = $typeName::from($value);
                 }
-            } elseif ($typeName === \ArrayObject::class || is_subclass_of($typeName, \ArrayObject::class)) {
+                break;
+            case EntityPropertyInfo::KIND_ARRAY_OBJECT:
                 // Convert array to ArrayObject instance
                 if (is_array($value)) {
                     $value = new $typeName($value);
                 }
-            } elseif ($typeName === \DateTimeImmutable::class || is_subclass_of($typeName, \DateTimeImmutable::class)) {
+                break;
+            case EntityPropertyInfo::KIND_DATE_TIME:
                 // Convert to DateTimeImmutable if not already
                 if ($value !== null && !$value instanceof \DateTimeImmutable) {
                     if ($value instanceof \DateTimeInterface) {
@@ -392,36 +459,38 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                         $value = new \DateTimeImmutable($value);
                     }
                 }
-            } elseif ($typeName === UuidInterface::class || is_subclass_of($typeName, UuidInterface::class)) {
+                break;
+            case EntityPropertyInfo::KIND_UUID:
                 // Convert to UUID if not already
-                if ($value !== null && !$value instanceof UuidInterface) {
-                    if (is_string($value)) {
-                        // First check if it's a valid UUID string format (36 chars with dashes, or 32 hex chars)
-                        if (Uuid::isValid($value)) {
-                            $value = Uuid::fromString($value);
-                        } elseif (strlen($value) === 16 && !ctype_print($value)) {
-                            // If not a valid string format, try parsing as 16-byte binary
-                            // Only accept as bytes if it contains non-printable characters (actual binary data)
-                            $value = Uuid::fromBytes($value);
-                        }
+                if ($value !== null && !$value instanceof UuidInterface && is_string($value)) {
+                    // First check if it's a valid UUID string format (36 chars with dashes, or 32 hex chars)
+                    if (Uuid::isValid($value)) {
+                        $value = Uuid::fromString($value);
+                    } elseif (strlen($value) === 16 && !ctype_print($value)) {
+                        // If not a valid string format, try parsing as 16-byte binary
+                        // Only accept as bytes if it contains non-printable characters (actual binary data)
+                        $value = Uuid::fromBytes($value);
                     }
                 }
-            }
-        } elseif (is_array($value)) {
-            // Handle arrays of nested entities via PropertySchema attribute
-            $propertySchema = $schemaProperties[$name] ?? [];
-            $itemsEntityClass = $propertySchema['items']['entityClassName'] ?? null;
-            if ($itemsEntityClass && is_subclass_of($itemsEntityClass, self::class)) {
-                $value = array_map(function ($item) use ($itemsEntityClass, $variant) {
-                    if ($item instanceof $itemsEntityClass) {
-                        return $item;
+                break;
+            case EntityPropertyInfo::KIND_PLAIN:
+                if (is_array($value)) {
+                    // Handle arrays of nested entities via PropertySchema attribute
+                    $propertySchema = $schemaProperties[$name] ?? [];
+                    $itemsEntityClass = $propertySchema['items']['entityClassName'] ?? null;
+                    if ($itemsEntityClass && is_subclass_of($itemsEntityClass, self::class)) {
+                        $value = array_map(function ($item) use ($itemsEntityClass, $variant) {
+                            if ($item instanceof $itemsEntityClass) {
+                                return $item;
+                            }
+                            if (is_array($item)) {
+                                return $itemsEntityClass::fromValidated($item, $variant);
+                            }
+                            return $item;
+                        }, $value);
                     }
-                    if (is_array($item)) {
-                        return $itemsEntityClass::fromValidated($item, $variant);
-                    }
-                    return $item;
-                }, $value);
-            }
+                }
+                break;
         }
 
         $this->{$name} = $value;
@@ -463,7 +532,10 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
                         $schema['entityClassName'] = $typeName;
                     } else {
                         // Use the resolved nested variant for the child entity's schema
-                        $schema = $typeName::getSchema($nestedVariant)->getSchemaArray();
+                        $nestedSchema = is_subclass_of($typeName, self::class)
+                            ? $typeName::getStaticSchema($nestedVariant)
+                            : $typeName::getSchema($nestedVariant);
+                        $schema = $nestedSchema->getSchemaArray();
                         $schema['entityClassName'] = $typeName;
                     }
 
@@ -735,7 +807,7 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
 
         // Get schema properties for the effective variant (or full schema if no variant)
         // This is cached, so no reflection overhead here
-        $schemaProperties = static::getSchema($effectiveVariant)->getSchemaArray()['properties'] ?? [];
+        $schemaProperties = static::getStaticSchemaProperties($effectiveVariant ?? SchemaVariant::Full);
 
         // get_object_vars returns only initialized properties, avoiding reflection
         $initializedProperties = get_object_vars($this);
@@ -811,11 +883,13 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
         // This handles alt name mapping and sub-property mapping via schema filters
         $schema = $this->getMutationSchema();
         $clean = $schema->validate($updates);
-        $schemaProperties = static::getSchema(SchemaVariant::Mutable)->getSchemaArray()['properties'] ?? [];
+        $schemaProperties = static::getStaticSchemaProperties(SchemaVariant::Mutable);
+        $infos = static::getPropertyInfos();
 
         // Apply validated values with type coercion and track which fields were updated
         foreach ($clean as $name => $value) {
-            $this->setValidatedProperty($name, $value, $schemaProperties, null);
+            $info = $infos[$name] ?? throw new \ReflectionException("Property " . static::class . "::\${$name} does not exist");
+            $this->setValidatedProperty($info, $value, $schemaProperties, null);
             if (!in_array($name, $this->updatedFields, true)) {
                 $this->updatedFields[] = $name;
             }
@@ -916,16 +990,13 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
      */
     #[\ReturnTypeWillChange]
     public function offsetExists($offset) {
-        if (!property_exists(static::class, $offset)) {
+        $info = static::getPropertyInfos()[$offset] ?? null;
+        if ($info === null || !$info->isPublic) {
             return false;
         }
 
-        $reflection = new ReflectionProperty(static::class, $offset);
-        if (!$reflection->isPublic() || $reflection->isStatic()) {
-            return false;
-        }
-
-        return $reflection->isInitialized($this);
+        // Unlike property_exists(), this leaves out uninitialized typed properties.
+        return array_key_exists($offset, get_object_vars($this));
     }
 
     /**
@@ -959,8 +1030,8 @@ abstract class Entity implements EntityInterface, \ArrayAccess, \JsonSerializabl
             throw new \InvalidArgumentException("Property '$offset' does not exist on " . static::class . ".");
         }
 
-        $reflection = new ReflectionProperty(static::class, $offset);
-        if (!$reflection->isPublic() || $reflection->isStatic()) {
+        $info = static::getPropertyInfos()[$offset] ?? null;
+        if ($info === null || !$info->isPublic) {
             throw new \InvalidArgumentException("Property '$offset' is not a public instance property.");
         }
 

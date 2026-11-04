@@ -52,6 +52,13 @@ final class EntitySchemaCache {
     private static array $building = [];
 
     /**
+     * Reflection metadata of entity classes, keyed by class name. Cleared together with the class's schemas.
+     *
+     * @var array<class-string, array<string, EntityPropertyInfo>>
+     */
+    private static array $metadata = [];
+
+    /**
      * Prevent instantiation.
      */
     private function __construct() {}
@@ -97,6 +104,17 @@ final class EntitySchemaCache {
     }
 
     /**
+     * Get the cached property metadata of a class, or build it with the factory.
+     *
+     * @param class-string $class The entity class name.
+     * @param callable(): array<string, EntityPropertyInfo> $factory Builds the metadata, by property name.
+     * @return array<string, EntityPropertyInfo>
+     */
+    public static function getMetadata(string $class, callable $factory): array {
+        return self::$metadata[$class] ??= $factory();
+    }
+
+    /**
      * Check if a schema is cached for the given class and variant.
      *
      * @param class-string $class The entity class name.
@@ -129,6 +147,7 @@ final class EntitySchemaCache {
      * @param \BackedEnum|null $variant The specific variant to clear, or null to clear all variants for the class.
      */
     public static function invalidate(string $class, ?\BackedEnum $variant = null): void {
+        unset(self::$metadata[$class]);
         if ($variant !== null) {
             // Clear specific variant for this class
             $cacheKey = self::buildCacheKey($class, $variant);
@@ -151,6 +170,7 @@ final class EntitySchemaCache {
      */
     public static function invalidateAll(): void {
         self::$cache = [];
+        self::$metadata = [];
     }
 
     /**
